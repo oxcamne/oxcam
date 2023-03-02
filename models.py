@@ -18,7 +18,7 @@ import datetime
 # db.commit()
 #
 
-db.define_table('users', Field('name', 'string'),
+db.define_table('users', 
 	Field('email', 'string'),
 	Field('tokens', 'list:integer'),
 	Field('when_issued', 'datetime'),

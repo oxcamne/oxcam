@@ -18,6 +18,11 @@ import datetime
 # db.commit()
 #
 
+db.define_table('person',
+	Field('first', 'string'),
+	Field('last', 'string'),
+	Field.Virtual('name', lambda row: '%s %s'%(row.first, row.last)))
+
 db.define_table('users', 
 	Field('email', 'string'),
 	Field('tokens', 'list:integer'),
@@ -84,12 +89,12 @@ db.define_table('Members',
 	Field('Firstname', 'string', requires = IS_NOT_EMPTY(),comment='*'),
 	Field('Lastname', 'string', requires = IS_NOT_EMPTY(),comment='*'),
 	Field('Suffix', 'string'),
-	Field.Virtual('Name', lambda r: r.Members.Lastname+', '+(r.Members.Title or '')+' '+r.Members.Firstname+' '+(r.Members.Suffix or '')),
-	Field.Virtual('Primary_Affiliation', lambda r: primary_affiliation(r.Members.id)),
-	Field.Virtual('Affiliations', lambda r: member_affiliations(r.Members.id)),
-	Field.Virtual('Matr', lambda r: primary_matriculation(r.Members.id)),
-	Field.Virtual('Primary_Email', lambda r: primary_email(r.Members.id)),
-	Field.Virtual('Emails', lambda r: member_emails(r.Members.id)),
+#	Field.Virtual('Name', lambda r: '%s, %s %s %s'%(r.MembersLastname, r.MembersTitle or '', r.MembersFirstname, r.MembersSuffix or '')),
+#	Field.Virtual('Primary_Affiliation', lambda r: primary_affiliation(r.MembersMembers.id)),
+#	Field.Virtual('Affiliations', lambda r: member_affiliations(r.MembersMembers.id)),
+#	Field.Virtual('Matr', lambda r: primary_matriculation(r.MembersMembers.id)),
+#	Field.Virtual('Primary_Email', lambda r: primary_email(r.MembersMembers.id)),
+#	Field.Virtual('Emails', lambda r: member_emails(r.MembersMembers.id)),
 	Field('Membership', 'string', requires=IS_EMPTY_OR(IS_IN_SET(MEMBER_CATEGORIES))),
 	Field('Paiddate', 'date', requires = IS_EMPTY_OR(IS_DATE())),
 	Field('Stripe_id', 'string'),
@@ -112,7 +117,13 @@ db.define_table('Members',
 	Field('Created', 'datetime', default=datetime.datetime.now(), writable=False),
 	Field('Modified', 'datetime', default=datetime.datetime.now(), writable=False),
 	plural="Members", singular="Member",
-	format=lambda r: r.Lastname+', '+(r.Title or '')+' '+r.Firstname+' '+(r.Suffix or ''))
+	format=lambda r: r.MembersLastname+', '+(r.MembersTitle or '')+' '+r.MembersFirstname+' '+(r.MembersSuffix or ''))
+#db.Members.Name = Field.Virtual(lambda row: row.Members.Lastname+', '+(row.Members.Title or '')+' '+row.Members.Firstname+' '+(row.Members.Suffix or ''))
+#db.Members.Primary_Affiliation = Field.Virtual(lambda r: primary_affiliation(r.Members.id))
+#db.Members.Affiliations = Field.Virtual(lambda r: member_affiliations(r.Members.id))
+#db.Members.Matr = Field.Virtual(lambda r: primary_matriculation(r.Members.id))
+#db.Members.Primary_Email = Field.Virtual(lambda r: primary_email(r.Members.id))
+#db.Members.Emails = Field.Virtual('', lambda r: member_emails(r.Members.id))
 	
 db.define_table('Emails',
 	Field('Member', 'reference Members', writable=False),
@@ -139,7 +150,7 @@ def event_revenue(event_id):	#revenue from confirmed tickets
 			select(db.Reservations.Paid, db.Reservations.Charged)
 	paid = 0
 	for r in rows:
-		paid += (r.Paid or 0) + (r.Charged or 0)
+		paid += (r.Members.Paid or 0) + (r.Members.Charged or 0)
 	return paid if paid != 0 else None
 	
 def event_unpaid(event_id):	#unpaid from confirmed reservations
@@ -147,8 +158,8 @@ def event_unpaid(event_id):	#unpaid from confirmed reservations
 			select(db.Reservations.Unitcost, db.Reservations.Paid, db.Reservations.Charged)
 	cost = paid = 0
 	for r in rows:
-		cost += (r.Unitcost or 0)
-		paid += (r.Paid or 0) + (r.Charged or 0)
+		cost += (r.Members.Unitcost or 0)
+		paid += (r.Members.Paid or 0) + (r.Members.Charged or 0)
 	return cost - paid if cost - paid != 0 else None
 	
 db.define_table('Events',
@@ -161,18 +172,18 @@ db.define_table('Events',
 	Field('Online', 'boolean', default=False, comment=" disables addition of guests within member's registration"),
 	Field('Sponsors', 'list:reference Colleges',
 			requires=IS_EMPTY_OR(IS_IN_DB(db(db.Colleges.Oxbridge!=True), db.Colleges.id, '%(Name)s', multiple=True)),
-			comment=' Select co-sponsors to allow members to register. Use ctrl-click to select multiple, e.g. for AUABN'),
+			comment=' Select co-sponsors to allow members to register.Members. Use ctrl-click to select multiple, e.g. for AUABN'),
 	Field('Venue', 'string', requires=IS_NOT_EMPTY()),
 	Field('Capacity', 'integer'),
 	Field('Speaker', 'string'),
 	Field('Tickets', 'list:string',
 			comment="empty for free events, or list ticket types (full member price first). Example ticket types are: 	'$45.00', 'Student $35.00', 'Fresher $0.00', 'Non-Member $55', ..."),
-	Field.Virtual('Attendees', lambda r: db((db.Reservations.Event==r.Events.id)&(db.Reservations.Provisional==False)& \
+	Field.Virtual('Attendees', lambda r: db((db.Reservations.Event==r.Members.Events.id)&(db.Reservations.Provisional==False)& \
 								(db.Reservations.Waitlist==False)).count()),
-	Field.Virtual('Wtlstd', lambda r: db((db.Reservations.Event==r.Events.id)&(db.Reservations.Waitlist==True)).count()),
-	Field.Virtual('Prvsnl', lambda r: db((db.Reservations.Event==r.Events.id)&(db.Reservations.Provisional==True)).count()),
-	Field.Virtual('Revenue', lambda r: event_revenue(r.Events.id)),
-	Field.Virtual('Unpaid', lambda r: event_unpaid(r.Events.id)),
+	Field.Virtual('Wtlstd', lambda r: db((db.Reservations.Event==r.Members.Events.id)&(db.Reservations.Waitlist==True)).count()),
+	Field.Virtual('Prvsnl', lambda r: db((db.Reservations.Event==r.Members.Events.id)&(db.Reservations.Provisional==True)).count()),
+	Field.Virtual('Revenue', lambda r: event_revenue(r.Members.Events.id)),
+	Field.Virtual('Unpaid', lambda r: event_unpaid(r.Members.Events.id)),
 	Field('Selections', 'list:string', comment="if selection required, list one choice per line"), #e.g. Menuchoices
 	Field('Notes', 'text', comment="included on registration confirmation"),
 	Field('Survey', 'list:string',
@@ -194,7 +205,7 @@ def res_totalcost(member_id, event_id):	#cost of confirmed places
 	resvtns = db((db.Reservations.Member==member_id)&(db.Reservations.Event==event_id)\
 				&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)).select(db.Reservations.Unitcost)
 	v=0
-	for r in resvtns: v+=(r.Unitcost or 0)
+	for r in resvtns: v+=(r.Members.Unitcost or 0)
 	return v if v!=0 else None
 
 def res_tbc(member_id, event_id, dues=False):	#cost of confirmed still tbc
@@ -203,8 +214,8 @@ def res_tbc(member_id, event_id, dues=False):	#cost of confirmed still tbc
 								db.Reservations.Paid, db.Reservations.Charged, db.Reservations.Checkout)
 	v=0
 	for r in resvtns: 
-		v+=(r.Unitcost or 0)-(r.Paid or 0)-(r.Charged or 0)
-		if dues==True and r.Checkout:
+		v+=(r.Members.Unitcost or 0)-(r.Members.Paid or 0)-(r.Members.Charged or 0)
+		if dues==True and r.Members.Checkout:
 			v += eval(r.Checkout).get('dues', 0)
 	return v if v!=0 else None
 				

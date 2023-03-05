@@ -46,9 +46,10 @@ for an explanation see the blog article from which I cribbed
 def checkaccess(requiredaccess):
 	def wrap(f):
 		def wrapped_f(*args, **kwds):
-			if db(db.Members.id>0).count()==0:
-				redirect(URL('oxcam_restore'))	#no database yet
 			if not session.get('logged_in') == True:    #logged in
+				if db(db.Members.id>0).count()==0:
+					session['url']=URL('oxcam_restore')
+					redirect(URL('oxcam_restore'))
 				session['url']=request.url
 				redirect(URL('login'))
 

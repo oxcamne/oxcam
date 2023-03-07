@@ -1,7 +1,16 @@
 [[extend 'layout.html']]
 <div>
-    [[=legend]]
+    [[try:
+        =legend
+    except:
+        pass
+    pass]]
 </div>
-[[if form:]]
-    [[=form]]
-[[pass]]
+[[=form]]
+<div>
+    [[try:
+        =footer
+    except:
+        pass
+    pass]]
+</div>

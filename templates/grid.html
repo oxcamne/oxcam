@@ -1,5 +1,16 @@
 [[extend 'layout.html']]
 <div>
-    <h5>[[=title]]</h5>
+    [[try:
+        =legend
+    except:
+        pass
+    pass]]
 </div>
 [[=grid.render()]]
+<div>
+    [[try:
+        =footer
+    except:
+        pass
+    pass]]
+</div>

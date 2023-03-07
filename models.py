@@ -21,7 +21,7 @@ import datetime
 db.define_table('person',
 	Field('first', 'string'),
 	Field('last', 'string'),
-	Field.Virtual('name', lambda row: '%s %s'%(row.first, row.last)))
+	Field.Virtual('name', lambda row:  f"{row['first']} {row['last']}"))
 
 db.define_table('users', 
 	Field('email', 'string'),
@@ -89,12 +89,12 @@ db.define_table('Members',
 	Field('Firstname', 'string', requires = IS_NOT_EMPTY(),comment='*'),
 	Field('Lastname', 'string', requires = IS_NOT_EMPTY(),comment='*'),
 	Field('Suffix', 'string'),
-#	Field.Virtual('Name', lambda r: '%s, %s %s %s'%(r.MembersLastname, r.MembersTitle or '', r.MembersFirstname, r.MembersSuffix or '')),
-#	Field.Virtual('Primary_Affiliation', lambda r: primary_affiliation(r.MembersMembers.id)),
-#	Field.Virtual('Affiliations', lambda r: member_affiliations(r.MembersMembers.id)),
-#	Field.Virtual('Matr', lambda r: primary_matriculation(r.MembersMembers.id)),
-#	Field.Virtual('Primary_Email', lambda r: primary_email(r.MembersMembers.id)),
-#	Field.Virtual('Emails', lambda r: member_emails(r.MembersMembers.id)),
+	Field.Virtual('Name', lambda r: f"{r['Lastname']}, {r['Title'] or ''} {r['Firstname']} {r['Suffix'] or ''}"),
+	Field.Virtual('Primary_Affiliation', lambda r: primary_affiliation(r['id'])),
+	Field.Virtual('Affiliations', lambda r: member_affiliations(r['id'])),
+	Field.Virtual('Matr', lambda r: primary_matriculation(r['id'])),
+	Field.Virtual('Primary_Email', lambda r: primary_email(r['id'])),
+	Field.Virtual('Emails', lambda r: member_emails(r['id'])),
 	Field('Membership', 'string', requires=IS_EMPTY_OR(IS_IN_SET(MEMBER_CATEGORIES))),
 	Field('Paiddate', 'date', requires = IS_EMPTY_OR(IS_DATE())),
 	Field('Stripe_id', 'string'),
@@ -118,12 +118,6 @@ db.define_table('Members',
 	Field('Modified', 'datetime', default=datetime.datetime.now(), writable=False),
 	plural="Members", singular="Member",
 	format=lambda r: r.MembersLastname+', '+(r.MembersTitle or '')+' '+r.MembersFirstname+' '+(r.MembersSuffix or ''))
-#db.Members.Name = Field.Virtual(lambda row: row.Members.Lastname+', '+(row.Members.Title or '')+' '+row.Members.Firstname+' '+(row.Members.Suffix or ''))
-#db.Members.Primary_Affiliation = Field.Virtual(lambda r: primary_affiliation(r.Members.id))
-#db.Members.Affiliations = Field.Virtual(lambda r: member_affiliations(r.Members.id))
-#db.Members.Matr = Field.Virtual(lambda r: primary_matriculation(r.Members.id))
-#db.Members.Primary_Email = Field.Virtual(lambda r: primary_email(r.Members.id))
-#db.Members.Emails = Field.Virtual('', lambda r: member_emails(r.Members.id))
 	
 db.define_table('Emails',
 	Field('Member', 'reference Members', writable=False),

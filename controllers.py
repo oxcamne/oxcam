@@ -28,8 +28,8 @@ Warning: Fixtures MUST be declared with @action.uses({fixtures}) else your app w
 from py4web import action, request, abort, redirect, URL, Field, DAL
 from yatl.helpers import *
 from .common import db, session, T, cache, auth, logger, authenticated, unauthenticated, flash
-from .settings_private import MEMBER_CATEGORIES, ACCESS_LEVELS, SUPPORT_EMAIL
-from .models import primary_affiliation
+from .settings_private import *
+from .models import primary_affiliation, member_affiliations
 from py4web.utils.grid import Grid, GridClassStyleBulma, Column
 from py4web.utils.form import Form, FormStyleBulma
 from pydal.validators import *
@@ -46,10 +46,11 @@ for an explanation see the blog article from which I cribbed
 def checkaccess(requiredaccess):
 	def wrap(f):
 		def wrapped_f(*args, **kwds):
+			session['prev_url'] = session.get('url')
+			session['url']=request.url
 			if not session.get('logged_in') == True:    #logged in
-				session['url']=request.url
 				if db(db.Members.id>0).count()==0:
-					session['url']=URL('oxcam_restore')
+					session['url']=URL('db_restore')
 				redirect(URL('login'))
 
 			#check access
@@ -78,8 +79,9 @@ def index():
 @checkaccess('read')
 def members(path=None):
 	query = []
+	left = ""
 	qdesc = ""
-	title = 'Member Records'
+	legend = H5('Member Records')
 	errors = ''
 	
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
@@ -89,27 +91,34 @@ def members(path=None):
 	db.Members.City.requires=db.Members.State.requires=db.Members.Zip.requires=None
 
 	form=Form([
-		Field('mailing_list', 'reference Email_Lists',
-							requires=IS_EMPTY_OR(IS_IN_DB(db, 'Email_Lists', '%(Listname)s', zero="list?"))),
-		Field('event', 'reference Events', 
+		Field('mailing_list', 'reference Email_Lists', default=request.query.get('mailing_list'),
+				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Email_Lists', '%(Listname)s', zero="list?"))),
+		Field('event', 'reference Events', default=request.query.get('event'),
 				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Events', '%(Description).20s', orderby = ~db.Events.DateTime, zero="event?")),
 				comment = "exclude/select confirmed event registrants (with/without mailing list selection) "),
-		Field('good_standing', 'boolean', default=False, comment='tick to limit to members in good standing'),
+		Field('good_standing', 'boolean', default=request.query.get('good_standing'), 
+				comment='tick to limit to members in good standing'),
 		Field('field', 'string', requires=IS_EMPTY_OR(IS_IN_SET(['Affiliation', 'Email']+db.Members.fields,
-					zero='search?'))),
-		Field('value', 'string')]
+					zero='search?')), default=request.query.get('field')),
+		Field('value', 'string', default=request.query.get('value'))],
+		keep_values=True
 	)
-
+		
 	if len(form.vars) > 0:
 		if form.vars.get('mailing_list'):
-			mailing_list_members = [r.Member for r in db(db.Emails.Mailings.contains(form.vars.get('mailing_list'))).select(db.Emails.Member)]
-			query.append('db.Members.id.belongs(mailing_list_members)')
+			query.append("(db.Emails.Member==db.Members.id)&db.Emails.Mailings.contains(form.vars.get('mailing_list'))")
 			qdesc = db.Email_Lists[form.vars.get('mailing_list')].Listname+' mail list, '
 		if form.vars.get('event'):
-			event_attendees = [r.Member for r in db((db.Reservations.Event==form.vars.get('event'))&\
-				(db.Reservations.Host==True)&(db.Reservations.Provisional!=True)&\
-				(db.Reservations.Waitlist!=True)).select(db.Reservations.Member)]
-			query.append(('~' if form.vars.get('mailing_list') else '')+'db.Members.id.belongs(event_attendees)')
+			if form.vars.get('mailing_list'):
+				left="db.Reservations.on((db.Reservations.Member == db.Members.id)&\
+			    	(db.Reservations.Event==form.vars.get('event'))&\
+					(db.Reservations.Host==True)&(db.Reservations.Provisional!=True)&\
+					(db.Reservations.Waitlist!=True))"
+				query.append("(db.Reservations.id==None)")
+			else:
+				query.append("(db.Reservations.Member==db.Members.id)&(db.Reservations.Event==form.vars.get('event'))&\
+					(db.Reservations.Host==True)&(db.Reservations.Provisional!=True)&\
+					(db.Reservations.Waitlist!=True)")
 			qdesc += (' excluding ' if form.vars.get('mailing_list') else '')+db.Events[form.vars.get('event')].Description[0:25]+' attendees, '
 		if form.vars.get('good_standing'):
 			query.append("((db.Members.Membership!=None)&(((db.Members.Paiddate==None)|(db.Members.Paiddate>=datetime.datetime.now()))\
@@ -139,15 +148,13 @@ def members(path=None):
 	query = '&'.join(query)
 	if query == '': query = 'db.Members.id>0'
 
-	flash.set(errors or "Filtered: "+qdesc)
+	if errors or qdesc:
+		flash.set(errors or "Filtered: "+qdesc)
 
-	grid = Grid(path, eval(query),
+	grid = Grid(path, eval(query), left=eval(left) if left else None,
 	     	orderby=db.Members.Lastname|db.Members.Firstname,
-			columns=[Column("Name", lambda r: r.Lastname+', '+(r.Title or '')+' '+r.Firstname+' '+(r.Suffix or '')),
-					#db.Members.Name,
-					db.Members.Membership,db.Members.Paiddate,
-					Column("Affiliation", lambda r: primary_affiliation(r.id)),
-					db.Members.Access, db.Members.Notes],
+			columns=[db.Members.Name, db.Members.Membership, db.Members.Paiddate,
+					db.Members.Affiliations, db.Members.Access, db.Members.Notes],
 			details=not write, editable=write, create=write,
 			grid_class_style=GridClassStyleBulma,
 			formstyle=FormStyleBulma,
@@ -159,7 +166,7 @@ def members(path=None):
 @action('person/<path:path>', method=['POST', 'GET'])
 @action.uses("grid.html", db)
 def person(path=None):
-	title = 'Person Records'			
+	legend = H5('Person Records')		
 	grid = Grid(path,
             formstyle=FormStyleBulma,
             grid_class_style=GridClassStyleBulma,
@@ -188,12 +195,15 @@ def login():
 				tokens= [token],
 				when_issued = datetime.datetime.now(),
 				url = session['url'])
-		log = 'login '+request.remote_addr+' '+form.vars['email']+' '+request.environ['HTTP_USER_AGENT']
+		log = 'login '+request.remote_addr+' '+form.vars['email']+' '+request.environ['HTTP_USER_AGENT']+' '+session['url']
 		logger.info(log)
 		message = HTML(DIV(
-					P("Use this link to log in to OxCamNE."),
+					A("Please click to continue to "+SOCIETY_DOMAIN, _href=URL('validate', id, token, scheme=True)),
 					P("Please ignore this message if you did not request it."),
-					URL('validate', id, token, scheme=True)))
+					P(DIV("If you have questions, please contact ",
+	   						A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL),
+							".")),
+					))
 		auth.sender.send(to=form.vars['email'], subject='Confirm Email',
 							body=message)
 		form = None
@@ -206,8 +216,7 @@ def login():
 @action.uses("message.html", db, session)
 def validate(id, token):
 	user = db(db.users.id == id).select().first()
-	if not user or not int(token) in user.tokens or \
-		datetime.datetime.now() > user.when_issued + datetime.timedelta(minutes = 15):
+	if not user or not int(token) in user.tokens or datetime.datetime.now() > user.when_issued + datetime.timedelta(minutes = 15):
 		redirect(URL('index'))
 	session['logged_in'] = True
 	session['id'] = user.id
@@ -240,9 +249,13 @@ def validate(id, token):
 	return locals()
 
 @action('accessdenied')
-@action.uses('message.html')
+@action.uses('message.html', session)
 def accessdenied():
-	message = HTML("You do not have permission for that, please contact "+SUPPORT_EMAIL+" if you think this is wrong.")
+	message = TBODY(
+		DIV("You do not have permission for that, please contact ",
+      		A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL),
+			" if you think this is wrong."),
+		P(A('Go back', _href=session.get('prev_url'))))
 	return locals()
 
 @action('logout')
@@ -251,13 +264,13 @@ def logout():
 	session['logged_in'] = False
 	redirect(URL('index'))
 
-@action("oxcam_restore", method=['POST', 'GET'])
+@action("db_restore", method=['POST', 'GET'])
 @action.uses("form.html", db, session, flash)
 @checkaccess('admin')
-def oxcam_restore():
+def db_restore():
 	form = Form([Field('filespec', 'string', requires=IS_NOT_EMPTY(),
-					   default='oxcam_backup.csv')], formstyle=FormStyleBulma)
-	legend = P("OxCam database will be restored from this file in app base directory. Click Submit to proceed")
+					   default='db_backup.csv')], formstyle=FormStyleBulma)
+	legend = P(SOCIETY_DOMAIN+" database will be restored from this file in app base directory. Click Submit to proceed")
 	
 	if form.accepted:
 		with open(form.vars['filespec'], 'r', encoding='utf-8', newline='') as dumpfile:
@@ -268,11 +281,11 @@ def oxcam_restore():
 
 	return locals()
 
-@action("oxcam_backup")
+@action("db_backup")
 @action.uses("message.html", db, session)
 @checkaccess('admin')
-def oxcam_backup():
-	with open('oxcam_backup.csv', 'w', encoding='utf-8', newline='') as dumpfile:
+def db_backup():
+	with open('db_backup.csv', 'w', encoding='utf-8', newline='') as dumpfile:
 		db.export_to_csv_file(dumpfile)
-	return dict(message="OxCam database backed up to 'oxcam_backup.csv' in app base directory.")
+	return dict(message=SOCIETY_DOMAIN+" database backed up to 'db_backup.csv' in app base directory.")
 

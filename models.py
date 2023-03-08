@@ -18,11 +18,6 @@ import datetime
 # db.commit()
 #
 
-db.define_table('person',
-	Field('first', 'string'),
-	Field('last', 'string'),
-	Field.Virtual('name', lambda row:  f"{row['first']} {row['last']}"))
-
 db.define_table('users', 
 	Field('email', 'string'),
 	Field('tokens', 'list:integer'),

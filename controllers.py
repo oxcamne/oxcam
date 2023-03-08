@@ -31,9 +31,9 @@ from .common import db, session, T, cache, auth, logger, authenticated, unauthen
 from .settings_private import *
 from .models import primary_affiliation, member_affiliations
 from py4web.utils.grid import Grid, GridClassStyleBulma, Column
-from py4web.utils.form import Form, FormStyleBulma
+from py4web.utils.form import Form, FormStyleBulma, TextareaWidget
 from pydal.validators import *
-import datetime, random
+import datetime, random, re
 
 """
 decorator for validating login & access permission using a one-time code
@@ -66,8 +66,12 @@ def checkaccess(requiredaccess):
 		return wrapped_f
 	return wrap
 
+def getmeta(name):
+	m = db(db.Metadata.Name==name).select().first()
+	return m.Code if m else None
+
 @action('index')
-@action.uses('message.html', db, session)
+@action.uses('message.html', db, session, flash)
 @checkaccess(None)
 def index():
 	message = "reached index"
@@ -162,17 +166,101 @@ def members(path=None):
 			deletable=False)
 	return locals()
 
-@action('person', method=['POST', 'GET'])
-@action('person/<path:path>', method=['POST', 'GET'])
-@action.uses("grid.html", db)
-def person(path=None):
-	legend = H5('Person Records')		
-	grid = Grid(path,
-            formstyle=FormStyleBulma,
-            grid_class_style=GridClassStyleBulma,
-            query=(db.person.id > 0),
-            orderby=[db.person.last],
-			columns=[db.person.name, db.person.first, db.person.last])
+def emailexpand(body, subject):
+#this function validates and expands boilerplate <...> elements except the ones left til the last minute	
+	m = re.match(r"^(.*)(\{\{.*\}\})(.*)$", body, flags=re.DOTALL)
+	if m:			#don't unpack included html content
+		return emailexpand(m.group(1), subject)+ m.group(2) + emailexpand(m.group(3), subject)
+
+	m = re.match(r"^(.*)<(.*)>(.*)$", body, flags=re.DOTALL)
+	if m:			#found something to expand
+		expanded = None
+		if m.group(2)=='subject':
+			expanded = subject
+		if m.group(2)=='greeting':
+			expanded = '<greeting>'
+		elif m.group(2)=='email':
+			expanded = '<email>'
+		elif m.group(2)=='member':
+			expanded = '<member>'
+		elif m.group(2)=='reservation':
+			expanded = '<reservation>'				
+		else:	#metadata?
+			expanded = getmeta(m.group(2))
+		if not expanded:
+			raise Exception("<%s> can't be used in this context or is not in metadata"%(m.group(2)))
+		return emailexpand(m.group(1), subject)+ expanded + emailexpand(m.group(3), subject)
+	return body
+
+@action('composemail', method=['POST', 'GET'])
+@action.uses("form.html", db, session, flash)
+@checkaccess('write')
+def composemail():
+	source = [row['Email'] for row in db((db.Emails.Member == session['member_id']) & \
+	   (db.Emails.Email.contains(SOCIETY_DOMAIN.lower()))).select(
+			db.Emails.Email, orderby=~db.Emails.Modified)]
+	if len(source) == 0:
+		flash.set('Sorry, you cannot send email without a Society email address')
+		redirect(URL('accessdenied'))
+	
+	proto = {}
+	form = Form(
+		[Field('template', 'reference EMProtos',
+			requires=IS_IN_DB(db, 'EMProtos.id','%(Subject)s', orderby=~db.EMProtos.Modified),
+			comment='Optional: select an existing mail template')],
+			submit_value='Use Template', formstyle=FormStyleBulma,
+			form_name="template_form")
+	if form.accepted:
+		proto = db.EMProtos[form.vars.get('template')]
+		
+	footer=DIV("You can use <subject>, <greeting>, <member>, <reservation>, <email>, or <metadata> ",
+				"where metadata is 'Letterhead', 'Membership Secretary' or ", "'Reservations', etc.  ",
+				"You can also include html content thus: {{content}}.")
+
+	#as part of validation, we expand the <...> elements of the body
+	def checkbody(form):
+		try:
+			form.vars['body'] = emailexpand(form.vars['body'], form.vars['subject'])
+		except Exception as e:
+			form.errors['body'] = e
+
+	fields =[Field('sender', 'string', requires=IS_IN_SET(source), default=source[0])]
+	fields.append(Field('to', 'string',
+			comment='Include spaces between multiple recipients',
+   			requires=[IS_NOT_EMPTY(), IS_LIST_OF_EMAILS()]))
+	fields.append(Field('subject', 'string', requires=IS_NOT_EMPTY(), default=proto.get('Subject')))
+	fields.append(Field('body', 'text', requires=IS_NOT_EMPTY(), default=proto.get('Body') if proto!={} else \
+				"<Letterhead>\n\n"))
+	fields.append(Field('save', 'boolean', default=proto!={}, comment='store/update template'))
+	if proto!={}:
+		form=None
+		fields.append(Field('delete', 'boolean', comment='tick to delete template; sends no message'))
+	form2 = Form(
+		fields, form_name="message_form",
+		submit_value = 'Send', formstyle=FormStyleBulma)
+			
+	if form2.accepted:
+		if proto!={}:
+			if form2.vars['delete']:
+				db(db.EMProtos.id == request.vars.template).delete()
+				flash.set("Template deleted: "+ proto.Subject)
+				redirect(session['prev_url'])
+			if form2.vars['save']:
+				proto.update_record(Subject=form2.vars['subject'],
+					Bcc=form2.vars.get('bcc', ''), Body=form2.vars['body'], Modified=datetime.datetime.now())
+				flash.set("Template updated: "+ form2.vars['subject'])
+		else:
+			if form2.vars['save']:
+				db.EMProtos.insert(Subject=form2.vars['subject'],
+					Bcc=form2.vars.get('bcc', ''), Body=form2.vars['body'])
+				flash.set("Template stored: "+ form2.vars['subject'])
+		
+		to = re.compile('[^,;\s]+').findall(form.vars['to'])
+		message = form.vars['body']
+		auth.sender.send(to=to, subject=form.vars['subject'],
+							bcc=form.vars['sender'], body=message)
+		flash.set(f"Email sent to: {form.vars['to']}")
+		redirect(session['prev_url'])
 	return locals()
 
 @action('login', method=['POST', 'GET'])
@@ -249,7 +337,7 @@ def validate(id, token):
 	return locals()
 
 @action('accessdenied')
-@action.uses('message.html', session)
+@action.uses('message.html', session, flash)
 def accessdenied():
 	message = TBODY(
 		DIV("You do not have permission for that, please contact ",

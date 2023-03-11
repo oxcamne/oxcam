@@ -31,9 +31,9 @@ from .common import db, session, T, cache, auth, logger, authenticated, unauthen
 from .settings_private import *
 from .models import primary_affiliation, member_affiliations
 from py4web.utils.grid import Grid, GridClassStyleBulma, Column
-from py4web.utils.form import Form, FormStyleBulma, TextareaWidget
+from py4web.utils.form import Form, FormStyleBulma
 from pydal.validators import *
-import datetime, random, re
+import datetime, random, re, markmin
 
 """
 decorator for validating login & access permission using a one-time code
@@ -83,6 +83,7 @@ def index():
 @checkaccess('read')
 def members(path=None):
 	query = []
+	equery = None
 	left = ""
 	qdesc = ""
 	legend = H5('Member Records')
@@ -94,75 +95,103 @@ def members(path=None):
 		db.Members.Access.writable = False
 	db.Members.City.requires=db.Members.State.requires=db.Members.Zip.requires=None
 
-	form=Form([
-		Field('mailing_list', 'reference Email_Lists', default=request.query.get('mailing_list'),
+	search_form=Form([
+		Field('mailing_list', 'reference Email_Lists', 
 				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Email_Lists', '%(Listname)s', zero="list?"))),
-		Field('event', 'reference Events', default=request.query.get('event'),
+		Field('event', 'reference Events', 
 				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Events', '%(Description).20s', orderby = ~db.Events.DateTime, zero="event?")),
 				comment = "exclude/select confirmed event registrants (with/without mailing list selection) "),
-		Field('good_standing', 'boolean', default=request.query.get('good_standing'), 
-				comment='tick to limit to members in good standing'),
+		Field('good_standing', 'boolean', comment='tick to limit to members in good standing'),
 		Field('field', 'string', requires=IS_EMPTY_OR(IS_IN_SET(['Affiliation', 'Email']+db.Members.fields,
-					zero='search?')), default=request.query.get('field')),
-		Field('value', 'string', default=request.query.get('value'))],
-		keep_values=True
+					zero='search?'))),
+		Field('value', 'string')],
+		keep_values=True, formstyle=FormStyleBulma
 	)
-		
-	if len(form.vars) > 0:
-		if form.vars.get('mailing_list'):
-			query.append("(db.Emails.Member==db.Members.id)&db.Emails.Mailings.contains(form.vars.get('mailing_list'))")
-			qdesc = db.Email_Lists[form.vars.get('mailing_list')].Listname+' mail list, '
-		if form.vars.get('event'):
-			if form.vars.get('mailing_list'):
-				left="db.Reservations.on((db.Reservations.Member == db.Members.id)&\
-			    	(db.Reservations.Event==form.vars.get('event'))&\
-					(db.Reservations.Host==True)&(db.Reservations.Provisional!=True)&\
-					(db.Reservations.Waitlist!=True))"
-				query.append("(db.Reservations.id==None)")
-			else:
-				query.append("(db.Reservations.Member==db.Members.id)&(db.Reservations.Event==form.vars.get('event'))&\
-					(db.Reservations.Host==True)&(db.Reservations.Provisional!=True)&\
-					(db.Reservations.Waitlist!=True)")
-			qdesc += (' excluding ' if form.vars.get('mailing_list') else '')+db.Events[form.vars.get('event')].Description[0:25]+' attendees, '
-		if form.vars.get('good_standing'):
-			query.append("((db.Members.Membership!=None)&(((db.Members.Paiddate==None)|(db.Members.Paiddate>=datetime.datetime.now()))\
-						|(db.Members.Charged!=None)|((db.Members.Stripe_subscription!=None)&(db.Members.Stripe_subscription!=('Cancelled')))))")
-			qdesc += ' in good standing, '
-		if form.vars.get('value'):
-			field = form.vars.get('field')
-			value = form.vars.get('value')
-			if not form.vars.get('field'):
-				errors = 'Please specify which field to search'
-			elif field == 'Affiliation':
-				affiliated_members=[r.Member for r in db(db.Colleges.Name.ilike('%'+value+'%')&\
-					(db.Affiliations.College==db.Colleges.id)).select(db.Affiliations.Member, orderby=db.Affiliations.Member, distinct=True)]
-				query.append('db.Members.id.belongs(affiliated_members)')
-				qdesc += " with affiliation matching '"+value+"'."
-			elif field == 'Email':
-				email_match_members=[r.Member for r in db(db.Emails.Email.ilike('%'+value+'%')).select(db.Emails.Member)]
-				query.append('db.Members.id.belongs(email_match_members)')
-				qdesc += " with email matching '"+value+"'."
-			else:
-				fieldtype = eval("db.Members."+field+'.type')
-				if fieldtype != 'string':
-					errors = 'search '+fieldtype+' fields not yet supported'
-				else:
+
+	if len(search_form.vars) == 0:
+		search_form.vars = request.query
+
+	if search_form.vars.get('mailing_list'):
+		query.append("(db.Emails.Member==db.Members.id)&db.Emails.Mailings.contains(search_form.vars.get('mailing_list'))")
+		qdesc = db.Email_Lists[search_form.vars.get('mailing_list')].Listname+' mail list, '
+	if search_form.vars.get('event'):
+		if search_form.vars.get('mailing_list'):
+			left="db.Reservations.on((db.Reservations.Member == db.Members.id)&\
+				(db.Reservations.Event==search_form.vars.get('event'))&\
+				(db.Reservations.Host==True)&(db.Reservations.Provisional!=True)&\
+				(db.Reservations.Waitlist!=True))"
+			query.append("(db.Reservations.id==None)")
+		else:
+			query.append("(db.Reservations.Member==db.Members.id)&(db.Reservations.Event==search_form.vars.get('event'))&\
+				(db.Reservations.Host==True)&(db.Reservations.Provisional!=True)&\
+				(db.Reservations.Waitlist!=True)")
+		qdesc += (' excluding ' if search_form.vars.get('mailing_list') else '')+db.Events[search_form.vars.get('event')].Description[0:25]+' attendees, '
+	if search_form.vars.get('good_standing'):
+		query.append("((db.Members.Membership!=None)&(((db.Members.Paiddate==None)|(db.Members.Paiddate>=datetime.datetime.now()))\
+					|(db.Members.Charged!=None)|((db.Members.Stripe_subscription!=None)&(db.Members.Stripe_subscription!=('Cancelled')))))")
+		qdesc += ' in good standing, '
+	if search_form.vars.get('value'):
+		field = search_form.vars.get('field')
+		value = search_form.vars.get('value')
+		if not search_form.vars.get('field'):
+			errors = 'Please specify which field to search'
+		elif field == 'Affiliation':
+			affiliated_members=[r.Member for r in db(db.Colleges.Name.ilike('%'+value+'%')&\
+				(db.Affiliations.College==db.Colleges.id)).select(db.Affiliations.Member, orderby=db.Affiliations.Member, distinct=True)]
+			query.append('db.Members.id.belongs(affiliated_members)')
+			qdesc += " with affiliation matching '"+value+"'."
+		elif field == 'Email':
+			email_match_members=[r.Member for r in db(db.Emails.Email.ilike('%'+value+'%')).select(db.Emails.Member)]
+			query.append('db.Members.id.belongs(email_match_members)')
+			qdesc += " with email matching '"+value+"'."
+		else:
+			fieldtype = eval("db.Members."+field+'.type')
+			m = re.match(r"^([<>]?=?)\s*(.*)$", value, flags=re.DOTALL)
+			operator = m.group(1)
+			value = m.group(2)
+			if fieldtype == 'string':
+				if not operator:
 					query.append('db.Members.'+field+'.like("%'+value+'%")')
 					qdesc += ' '+field+' contains '+value+'.'
+				elif operator == '=':
+					query.append('db.Members.'+field+'.like("'+value+'")')
+					qdesc += ' '+field+' equals '+value+'.'
+				else:
+					query.append('(db.Members.'+field+operator+"'"+value+"')")
+					qdesc += ' '+field+' '+operator+' '+value+'.'
+			elif fieldtype == 'date':
+				try:
+					date = datetime.datetime.strptime(value, '%m/%d/%Y').date()
+				except:
+					errors = 'please use mm/dd/yyyy format for dates'
+				if not errors:
+					if not operator or operator == '=':
+						operator = '=='
+					if operator == '==': equery = (eval('db.Members.'+field) == date)
+					if operator == '<': equery = (eval('db.Members.'+field) < date)
+					if operator == '<=': equery =  (eval('db.Members.'+field) <= date)
+					if operator == '>': equery = (eval('db.Members.'+field) > date)
+					if operator == '>=': equery = (eval('db.Members.'+field) >= date)
+					qdesc += ' '+field+' '+operator+' '+value+'.'
+			else:
+				errors = 'search '+fieldtype+' fields not yet op'
 	query = '&'.join(query)
-	if query == '': query = 'db.Members.id>0'
+	if query == '':
+		equery = equery or db.Members.id>0
+	elif equery:
+		equery = equery & eval(query)
 
 	if errors or qdesc:
 		flash.set(errors or "Filtered: "+qdesc)
 
-	grid = Grid(path, eval(query), left=eval(left) if left else None,
+	grid = Grid(path, equery, left=eval(left) if left else None,
 	     	orderby=db.Members.Lastname|db.Members.Firstname,
 			columns=[db.Members.Name, db.Members.Membership, db.Members.Paiddate,
 					db.Members.Affiliations, db.Members.Access, db.Members.Notes],
 			details=not write, editable=write, create=write,
 			grid_class_style=GridClassStyleBulma,
 			formstyle=FormStyleBulma,
-			search_form=form,
+			search_form=search_form,
 			deletable=False)
 	return locals()
 
@@ -256,7 +285,7 @@ def composemail():
 				flash.set("Template stored: "+ form2.vars['subject'])
 		
 		to = re.compile('[^,;\s]+').findall(form.vars['to'])
-		message = form.vars['body']
+		message = HTML(XML(markmin.markmin2html(form.vars['body'])))
 		auth.sender.send(to=to, subject=form.vars['subject'],
 							bcc=form.vars['sender'], body=message)
 		flash.set(f"Email sent to: {form.vars['to']}")

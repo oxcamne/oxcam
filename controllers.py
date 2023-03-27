@@ -136,20 +136,17 @@ def members(path=None):
 		if not search_form.vars.get('field'):
 			errors = 'Please specify which field to search'
 		elif field == 'Affiliation':
-			affiliated_members=[r.Member for r in db(db.Colleges.Name.ilike('%'+value+'%')&\
-				(db.Affiliations.College==db.Colleges.id)).select(db.Affiliations.Member, orderby=db.Affiliations.Member, distinct=True)]
-			query.append('db.Members.id.belongs(affiliated_members)')
+			query.append("db.Colleges.Name.ilike('%"+value+"%')&(db.Affiliations.College==db.Colleges.id)&(db.Members.id==db.Affiliations.Member)")
 			qdesc += " with affiliation matching '"+value+"'."
 		elif field == 'Email':
-			email_match_members=[r.Member for r in db(db.Emails.Email.ilike('%'+value+'%')).select(db.Emails.Member)]
-			query.append('db.Members.id.belongs(email_match_members)')
+			query.append("db.Emails.Email.ilike('%"+value+"%')&(db.Emails.Member==db.Members.id)")
 			qdesc += " with email matching '"+value+"'."
 		else:
 			fieldtype = eval("db.Members."+field+'.type')
 			m = re.match(r"^([<>]?=?)\s*(.*)$", value, flags=re.DOTALL)
 			operator = m.group(1)
 			value = m.group(2)
-			if fieldtype == 'string':
+			if fieldtype == 'string' or fieldtype == 'text':
 				if not operator:
 					query.append('db.Members.'+field+'.like("%'+value+'%")')
 					qdesc += ' '+field+' contains '+value+'.'
@@ -159,7 +156,7 @@ def members(path=None):
 				else:
 					query.append('(db.Members.'+field+operator+"'"+value+"')")
 					qdesc += ' '+field+' '+operator+' '+value+'.'
-			elif fieldtype == 'date':
+			elif fieldtype == 'date' or fieldtype == 'datetime':
 				try:
 					date = datetime.datetime.strptime(value, '%m/%d/%Y').date()
 				except:
@@ -167,24 +164,30 @@ def members(path=None):
 				if not errors:
 					if not operator or operator == '=':
 						operator = '=='
-					if operator == '==': equery = (eval('db.Members.'+field) == date)
-					if operator == '<': equery = (eval('db.Members.'+field) < date)
-					if operator == '<=': equery =  (eval('db.Members.'+field) <= date)
-					if operator == '>': equery = (eval('db.Members.'+field) > date)
-					if operator == '>=': equery = (eval('db.Members.'+field) >= date)
+					query.append('(db.Members.'+field+operator+'"'+date.strftime('%Y-%m-%d')+'")')
+					qdesc += ' '+field+' '+operator+' '+value+'.'
+			elif fieldtype == 'boolean':
+				if value != 'T' and value != 'F':
+					errors = 'please use T or F for boolean field'
+				else:
+					query.append('(db.Members.'+field+"=='"+value+"')")
+					qdesc += ' '+field+' ' + value
+			elif fieldtype.startswith('decimal'):
+				if not value.isdigit():
+					errors = 'please use only digits'
+				else:
+					query.append('(db.Members.'+field+operator+value+')')
 					qdesc += ' '+field+' '+operator+' '+value+'.'
 			else:
-				errors = 'search '+fieldtype+' fields not yet op'
+				errors = 'search '+fieldtype+' fields not yet implemented'
 	query = '&'.join(query)
 	if query == '':
-		equery = equery or db.Members.id>0
-	elif equery:
-		equery = equery & eval(query)
+		query = 'db.Members.id>0'
 
 	if errors or qdesc:
 		flash.set(errors or "Filtered: "+qdesc)
 
-	grid = Grid(path, equery, left=eval(left) if left else None,
+	grid = Grid(path, eval(query), left=eval(left) if left else None,
 	     	orderby=db.Members.Lastname|db.Members.Firstname,
 			columns=[db.Members.Name, db.Members.Membership, db.Members.Paiddate,
 					db.Members.Affiliations, db.Members.Access, db.Members.Notes],

@@ -247,7 +247,10 @@ def composemail():
 		
 	footer=DIV("You can use <subject>, <greeting>, <member>, <reservation>, <email>, or <metadata> ",
 				"where metadata is 'Letterhead', 'Membership Secretary' or ", "'Reservations', etc.  ",
-				"You can also include html content thus: {{content}}.")
+				"You can also include html content thus: {{content}}."
+				"Email is formatted using ",
+					A("Markmin", _href='http://www.web2py.com/examples/static/markmin.html', _target="Markmin"),
+					".")
 
 	#as part of validation, we expand the <...> elements of the body
 	def checkbody(form):

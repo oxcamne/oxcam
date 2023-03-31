@@ -29,7 +29,7 @@ from py4web import action, request, abort, redirect, URL, Field, DAL
 from yatl.helpers import *
 from .common import db, session, T, cache, auth, logger, authenticated, unauthenticated, flash
 from .settings_private import *
-from .models import primary_affiliation, member_affiliations
+from .models import primary_email, res_tbc
 from py4web.utils.grid import Grid, GridClassStyleBulma, Column
 from py4web.utils.form import Form, FormStyleBulma
 from pydal.validators import *
@@ -83,10 +83,10 @@ def index():
 @checkaccess('read')
 def members(path=None):
 	query = []
-	equery = None
-	left = ""
+	left = None
 	qdesc = ""
-	legend = H5('Member Records')
+	legend = CAT(H5('Member Records'),
+				A("Send Email to Specific Address(es)", _href=URL('composemail', vars=dict(back=request.url))))
 	errors = ''
 	
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
@@ -112,23 +112,17 @@ def members(path=None):
 		search_form.vars = request.query
 
 	if search_form.vars.get('mailing_list'):
-		query.append("(db.Emails.Member==db.Members.id)&db.Emails.Mailings.contains(search_form.vars.get('mailing_list'))")
-		qdesc = db.Email_Lists[search_form.vars.get('mailing_list')].Listname+' mail list, '
+		query.append(f"(db.Emails.Member==db.Members.id)&db.Emails.Mailings.contains({search_form.vars.get('mailing_list')})")
+		qdesc = f"{db.Email_Lists[search_form.vars.get('mailing_list')].Listname} mail list, "
 	if search_form.vars.get('event'):
 		if search_form.vars.get('mailing_list'):
-			left="db.Reservations.on((db.Reservations.Member == db.Members.id)&\
-				(db.Reservations.Event==search_form.vars.get('event'))&\
-				(db.Reservations.Host==True)&(db.Reservations.Provisional!=True)&\
-				(db.Reservations.Waitlist!=True))"
+			left=f"db.Reservations.on((db.Reservations.Member == db.Members.id)&(db.Reservations.Event=={search_form.vars.get('event')})&(db.Reservations.Host==True)&(db.Reservations.Provisional!=True)&(db.Reservations.Waitlist!=True))"
 			query.append("(db.Reservations.id==None)")
 		else:
-			query.append("(db.Reservations.Member==db.Members.id)&(db.Reservations.Event==search_form.vars.get('event'))&\
-				(db.Reservations.Host==True)&(db.Reservations.Provisional!=True)&\
-				(db.Reservations.Waitlist!=True)")
-		qdesc += (' excluding ' if search_form.vars.get('mailing_list') else '')+db.Events[search_form.vars.get('event')].Description[0:25]+' attendees, '
+			query.append(f"(db.Reservations.Member==db.Members.id)&(db.Reservations.Event=={search_form.vars.get('event')})&(db.Reservations.Host==True)&(db.Reservations.Provisional!=True)&(db.Reservations.Waitlist!=True)")
+		qdesc += f"{'excluding ' if search_form.vars.get('mailing_list') else ''}{db.Events[search_form.vars.get('event')].Description[0:25]} attendees, "
 	if search_form.vars.get('good_standing'):
-		query.append("((db.Members.Membership!=None)&(((db.Members.Paiddate==None)|(db.Members.Paiddate>=datetime.datetime.now()))\
-					|(db.Members.Charged!=None)|((db.Members.Stripe_subscription!=None)&(db.Members.Stripe_subscription!=('Cancelled')))))")
+		query.append("((db.Members.Membership!=None)&(((db.Members.Paiddate==None)|(db.Members.Paiddate>=datetime.datetime.now()))|(db.Members.Charged!=None)|((db.Members.Stripe_subscription!=None)&(db.Members.Stripe_subscription!=('Cancelled')))))")
 		qdesc += ' in good standing, '
 	if search_form.vars.get('value'):
 		field = search_form.vars.get('field')
@@ -136,11 +130,11 @@ def members(path=None):
 		if not search_form.vars.get('field'):
 			errors = 'Please specify which field to search'
 		elif field == 'Affiliation':
-			query.append("db.Colleges.Name.ilike('%"+value+"%')&(db.Affiliations.College==db.Colleges.id)&(db.Members.id==db.Affiliations.Member)")
-			qdesc += " with affiliation matching '"+value+"'."
+			query.append(f"db.Colleges.Name.ilike('%{value}%')&(db.Affiliations.College==db.Colleges.id)&(db.Members.id==db.Affiliations.Member)")
+			qdesc += f" with affiliation matching '{value}'."
 		elif field == 'Email':
-			query.append("db.Emails.Email.ilike('%"+value+"%')&(db.Emails.Member==db.Members.id)")
-			qdesc += " with email matching '"+value+"'."
+			query.append(f"db.Emails.Email.ilike('%{value}%')&(db.Emails.Member==db.Members.id)")
+			qdesc += f" with email matching '{value}'."
 		else:
 			fieldtype = eval("db.Members."+field+'.type')
 			m = re.match(r"^([<>]?=?)\s*(.*)$", value, flags=re.DOTALL)
@@ -148,14 +142,14 @@ def members(path=None):
 			value = m.group(2)
 			if fieldtype == 'string' or fieldtype == 'text':
 				if not operator:
-					query.append('db.Members.'+field+'.like("%'+value+'%")')
-					qdesc += ' '+field+' contains '+value+'.'
+					query.append(f'db.Members.{field}.like("%{value}%")')
+					qdesc += f' {field} contains {value}.'
 				elif operator == '=':
-					query.append('db.Members.'+field+'.like("'+value+'")')
-					qdesc += ' '+field+' equals '+value+'.'
+					query.append(f'db.Members.{field}.like("{value}")')
+					qdesc += f' {field} equals {value}.'
 				else:
-					query.append('(db.Members.'+field+operator+"'"+value+"')")
-					qdesc += ' '+field+' '+operator+' '+value+'.'
+					query.append(f"(db.Members.{field}{operator}{value})")
+					qdesc += f' {field} {operator} {value}.'
 			elif fieldtype == 'date' or fieldtype == 'datetime':
 				try:
 					date = datetime.datetime.strptime(value, '%m/%d/%Y').date()
@@ -164,28 +158,33 @@ def members(path=None):
 				if not errors:
 					if not operator or operator == '=':
 						operator = '=='
-					query.append('(db.Members.'+field+operator+'"'+date.strftime('%Y-%m-%d')+'")')
-					qdesc += ' '+field+' '+operator+' '+value+'.'
+					query.append(f"(db.Members.{field}{operator}'{date.strftime('%Y-%m-%d')}')")
+					qdesc += f' {field} {operator} {value}.'
 			elif fieldtype == 'boolean':
 				if value != 'T' and value != 'F':
 					errors = 'please use T or F for boolean field'
 				else:
-					query.append('(db.Members.'+field+"=='"+value+"')")
-					qdesc += ' '+field+' ' + value
+					query.append(f'(db.Members.{field}=={value}')
+					qdesc += f' {field} {value}'
 			elif fieldtype.startswith('decimal'):
 				if not value.isdigit():
 					errors = 'please use only digits'
 				else:
-					query.append('(db.Members.'+field+operator+value+')')
-					qdesc += ' '+field+' '+operator+' '+value+'.'
+					query.append(f'(db.Members.{field}{operator}{value})')
+					qdesc += f' {field} {operator} {value}.'
 			else:
-				errors = 'search '+fieldtype+' fields not yet implemented'
+				errors = f'search {fieldtype} fields not yet implemented'
 	query = '&'.join(query)
 	if query == '':
 		query = 'db.Members.id>0'
 
 	if errors or qdesc:
 		flash.set(errors or "Filtered: "+qdesc)
+	
+	if qdesc:
+		legend = CAT(legend,
+					P(A("Send Notice to "+qdesc, _href=URL('composemail',
+						vars=dict(query=query, left=left or '', qdesc=qdesc, back=request.url)))))
 
 	grid = Grid(path, eval(query), left=eval(left) if left else None,
 	     	orderby=db.Members.Lastname|db.Members.Firstname,
@@ -198,36 +197,103 @@ def members(path=None):
 			deletable=False)
 	return locals()
 
-def emailexpand(body, subject):
+def emailparse(body, subject, query):
 #this function validates and expands boilerplate <...> elements except the ones left til the last minute	
 	m = re.match(r"^(.*)(\{\{.*\}\})(.*)$", body, flags=re.DOTALL)
 	if m:			#don't unpack included html content
-		return emailexpand(m.group(1), subject)+ m.group(2) + emailexpand(m.group(3), subject)
+		return emailparse(m.group(1), subject, query)+[(m.group(2), None)]+emailparse(m.group(3), subject, query)
 
 	m = re.match(r"^(.*)<(.*)>(.*)$", body, flags=re.DOTALL)
 	if m:			#found something to expand
-		expanded = None
+		text = func = None
 		if m.group(2)=='subject':
-			expanded = subject
-		if m.group(2)=='greeting':
-			expanded = '<greeting>'
-		elif m.group(2)=='email':
-			expanded = '<email>'
-		elif m.group(2)=='member':
-			expanded = '<member>'
-		elif m.group(2)=='reservation':
-			expanded = '<reservation>'				
+			text = subject
+		elif m.group(2)=='greeting' or m.group(2)=='email' or m.group(2)=='member' or m.group(2)=='reservation':
+			if not query or m.group(2)=='reservation' and not ('Reservations.Member' in query):
+				raise Exception(f"<{m.group(2)}> can't be used in this context")
+			func=m.group(2)
 		else:	#metadata?
-			expanded = getmeta(m.group(2))
-		if not expanded:
-			raise Exception("<%s> can't be used in this context or is not in metadata"%(m.group(2)))
-		return emailexpand(m.group(1), subject)+ expanded + emailexpand(m.group(3), subject)
+			text = getmeta(m.group(2)).replace('<subject>', subject)
+			if not text:
+				raise Exception(f"<{m.group(2)}>  is not in metadata")
+		return emailparse(m.group(1), subject, query)+[(text, func)]+emailparse(m.group(3), subject, query)
+	return [(body, None)]
+	
+#display member profile
+def member_profile(member):
+	body = '------------------------\n'
+	body += '**Name:**|' + f"{member.Lastname}, {member.Title or ''} {member.Firstname} {member.Suffix or ''}" + '\n'
+	affiliations = db(db.Affiliations.Member == member.id).select(orderby = db.Affiliations.Modified)
+	body += '**Affiliations:**'
+	for aff in affiliations:
+		body += '|' + aff.College.Name + ' ' + str(aff.Matr or '') + '\n'
+	body += '\n**Address line 1:**|' + (member.Address1 or '') + '\n'
+	body += '**Address line 2:**|' + (member.Address2 or '') + '\n'
+	body += '**Town/City:**|' + (member.City or '') + '\n'
+	body += '**State:**|' + (member.State or '') + '\n'
+	body += '**Zip:**|' + (member.Zip or '') + '\n'
+	body += '**Home phone:**|' + (member.Homephone or '') + '\n'
+	body += '**Work phone:**|' + (member.Workphone or '') + '\n'
+	body += '**Mobile:**|' + (member.Cellphone or '') + ' (not in directory)\n'
+	body += '**Email:**|' + (primary_email(member.id) or '') + (' (not in directory)\n' if member.Privacy==True else '\n')
+	body += '------------------------\n\n'
+	return body
+	
+#create confirmation of event
+def evtconfirm(event_id, member_id, justpaid=0):
+	event = db.Events[event_id]
+	resvtns = db((db.Reservations.Event==event_id)&(db.Reservations.Member==member_id)).select(
+					orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname)
+	if not resvtns: return ''
+	tbc = res_tbc(member_id, event_id) or 0
+	tbcdues = res_tbc(member_id, event_id, True) or 0
+	body = '------------------------\n'
+	body += '**Event:**|' + (event.Description or '') + '\n'
+	body += '**Venue:**|' + (event.Venue or '') + '\n'
+	body += '**Date:**|' + event.DateTime.strftime("%A %B %d, %Y") + '\n'
+	body += '**Time:**|' + event.DateTime.strftime("%I:%M%p") + '\n'
+	body += '------------------------\n'
+	body += '------------------------\n'
+	body += '**Name**|**Affiliation**|**Selection**|**Ticket Cost**\n'
+	for t in resvtns:
+		body += '%s, %s %s %s|'%(t.Lastname, t.Title or '', t.Firstname, t.Suffix or '')
+		body += (t.Affiliation.Name if t.Affiliation else '') +'|'
+		body += (t.Selection or '') + '|'
+		body += '$%6.2f'%(t.Unitcost or 0.00) + '|'
+		if t.Waitlist:
+			body += '%s\n'%('``**waitlisted**``:red')
+		elif t.Provisional:
+			body += '%s\n'%('``**unconfirmed**``:red')
+		else:
+			body += '\n'
+	if tbcdues > tbc:
+		body += 'Membership Dues|||$%6.2f\n'%(tbcdues - tbc)
+	body += '**Total cost**|||**$%6.2f**\n'%((resvtns.first().Totalcost or 0) + tbcdues - tbc)
+	body += '**Paid**|||**$%6.2f**\n'%((resvtns.first().Paid or 0)+(resvtns.first().Charged or 0)+justpaid)
+	if tbcdues>justpaid:
+		body += '**Net amount due**|||**$%6.2f**\n'%(tbcdues-justpaid)
+	body += '------------------------\n'
+	if (tbcdues)>justpaid:
+		body += 'To pay online please visit '+URL('member', 'registration', args=[event.id], scheme=True, host=getmeta('Subdomain'))
+	elif event.Notes and not resvtns[0].Waitlist and not resvtns[0].Provisional:
+		body += '\n\n%s\n'%event.Notes
 	return body
 
 @action('composemail', method=['POST', 'GET'])
 @action.uses("form.html", db, session, flash)
 @checkaccess('write')
 def composemail():
+	query = request.query.get('query')
+	qdesc = request.query.get('qdesc')
+	left = request.query.get('left')
+
+	legend = CAT(H5("Send Email"),
+	      		P(A('back', _href=request.query.get('back'))))
+	footer=DIV("You can use <subject>, <greeting>, <member>, <reservation>, <email>, or <metadata> ",
+				"where metadata is 'Letterhead', 'Membership Secretary' or ", "'Reservations', etc.  ",
+				"You can also include html content thus: {{content}}. Email is formatted using ",
+					A("Markmin", _href='http://www.web2py.com/examples/static/markmin.html', _target="Markmin"),
+					".")
 	source = [row['Email'] for row in db((db.Emails.Member == session['member_id']) & \
 	   (db.Emails.Email.contains(SOCIETY_DOMAIN.lower()))).select(
 			db.Emails.Email, orderby=~db.Emails.Modified)]
@@ -244,35 +310,24 @@ def composemail():
 			form_name="template_form")
 	if form.accepted:
 		proto = db.EMProtos[form.vars.get('template')]
-		
-	footer=DIV("You can use <subject>, <greeting>, <member>, <reservation>, <email>, or <metadata> ",
-				"where metadata is 'Letterhead', 'Membership Secretary' or ", "'Reservations', etc.  ",
-				"You can also include html content thus: {{content}}."
-				"Email is formatted using ",
-					A("Markmin", _href='http://www.web2py.com/examples/static/markmin.html', _target="Markmin"),
-					".")
-
-	#as part of validation, we expand the <...> elements of the body
-	def checkbody(form):
-		try:
-			form.vars['body'] = emailexpand(form.vars['body'], form.vars['subject'])
-		except Exception as e:
-			form.errors['body'] = e
 
 	fields =[Field('sender', 'string', requires=IS_IN_SET(source), default=source[0])]
-	fields.append(Field('to', 'string',
+	if query:
+		legend = CAT(legend, P(f'To: {qdesc}'))
+	else:
+		fields.append(Field('to', 'string',
 			comment='Include spaces between multiple recipients',
    			requires=[IS_NOT_EMPTY(), IS_LIST_OF_EMAILS()]))
+	fields.append(Field('bcc', 'string', requires=IS_LIST_OF_EMAILS()))
 	fields.append(Field('subject', 'string', requires=IS_NOT_EMPTY(), default=proto.get('Subject')))
 	fields.append(Field('body', 'text', requires=IS_NOT_EMPTY(), default=proto.get('Body') if proto!={} else \
-				"<Letterhead>\n\n"))
+				"<Letterhead>\n<greeting>\n\n" if query else "<Letterhead>\n\n"))
 	fields.append(Field('save', 'boolean', default=proto!={}, comment='store/update template'))
 	if proto!={}:
 		form=None
 		fields.append(Field('delete', 'boolean', comment='tick to delete template; sends no message'))
-	form2 = Form(
-		fields, form_name="message_form",
-		submit_value = 'Send', formstyle=FormStyleBulma)
+	form2 = Form(fields, form_name="message_form", keep_values=True,
+					submit_value = 'Send', formstyle=FormStyleBulma)
 			
 	if form2.accepted:
 		if proto!={}:
@@ -283,19 +338,61 @@ def composemail():
 			if form2.vars['save']:
 				proto.update_record(Subject=form2.vars['subject'],
 					Bcc=form2.vars.get('bcc', ''), Body=form2.vars['body'], Modified=datetime.datetime.now())
-				flash.set("Template updated: "+ form2.vars['subject'])
+				flash.set("Template updatelend: "+ form2.vars['subject'])
 		else:
 			if form2.vars['save']:
 				db.EMProtos.insert(Subject=form2.vars['subject'],
 					Bcc=form2.vars.get('bcc', ''), Body=form2.vars['body'])
 				flash.set("Template stored: "+ form2.vars['subject'])
-		
-		to = re.compile('[^,;\s]+').findall(form.vars['to'])
-		message = HTML(XML(markmin.markmin2html(form.vars['body'])))
-		auth.sender.send(to=to, subject=form.vars['subject'],
-							bcc=form.vars['sender'], body=message)
-		flash.set(f"Email sent to: {form.vars['to']}")
-		redirect(session['prev_url'])
+
+		bcc = re.compile('[^,;\s]+').findall(form.vars['bcc'])
+		try:
+			bodyparts = emailparse(form.vars['body'], form.vars['subject'], query)
+		except Exception as e:
+			flash.set(e)
+			bodyparts = None
+		if bodyparts:
+			if query:
+				select_fields = [db.Members.id]
+				if 'Reservations.Member' in query:	#refers to Reservation
+					select_fields.append(db.Reservations.Event)
+				if 'Mailings.contains'in query:		#using a mailing list
+					select_fields.append(db.Emails.Email)
+				rows = db(eval(query)).select(*select_fields, left=eval(left) if left!='' else None, distinct=True)
+				for row in rows:
+					body = ''
+					member = db.Members[row.get(db.Members.id)]
+					to = row.get(db.Emails.Email) or primary_email(member.id)
+					if not to:
+						continue
+					for part in bodyparts:
+						if part[0]:
+							body += part[0]
+						elif part[1] == 'greeting':
+							if member.Title:
+								title = member.Title[4:] if member.Title.startswith('The ') else member.Title
+								name = member.Firstname if title.find("Sir") >= 0 else member.Lastname
+								body += 'Dear ' + title + ' ' + name + ',\n\n'
+							else:
+								body += 'Dear ' + member.Firstname.partition(' ')[0] + ',\n\n'
+						elif part[1] == 'email':
+							body += to
+						elif part[1] == 'member':
+							body += member_profile(member)
+						elif part[1] == 'reservation':
+							body += evtconfirm(row.get(db.Reservations.Event), member.id)
+					message = HTML(XML(markmin.markmin2html(body)))
+					auth.sender.send(to=to, subject=form.vars['subject'], bcc=bcc, body=message)
+				flash.set(f"{len(rows)} emails sent to {qdesc}")
+			else:
+				to = re.compile('[^,;\s]+').findall(form.vars['to'])
+				body = ''
+				for part in bodyparts:
+					body += part[0]		
+				flash.set(f"Email sent to: {to}")
+				message = HTML(XML(markmin.markmin2html(body)))
+				auth.sender.send(to=to, subject=form.vars['subject'], bcc=bcc, body=message)
+			redirect(request.query.get('back'))
 	return locals()
 
 @action('login', method=['POST', 'GET'])

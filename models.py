@@ -194,7 +194,7 @@ def res_totalcost(member_id, event_id):	#cost of confirmed places
 	resvtns = db((db.Reservations.Member==member_id)&(db.Reservations.Event==event_id)\
 				&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)).select(db.Reservations.Unitcost)
 	v=0
-	for r in resvtns: v+=(r.Members.Unitcost or 0)
+	for r in resvtns: v+=(r.Unitcost or 0)
 	return v if v!=0 else None
 
 def res_tbc(member_id, event_id, dues=False):	#cost of confirmed still tbc
@@ -203,8 +203,8 @@ def res_tbc(member_id, event_id, dues=False):	#cost of confirmed still tbc
 								db.Reservations.Paid, db.Reservations.Charged, db.Reservations.Checkout)
 	v=0
 	for r in resvtns: 
-		v+=(r.Members.Unitcost or 0)-(r.Members.Paid or 0)-(r.Members.Charged or 0)
-		if dues==True and r.Members.Checkout:
+		v+=(r.Unitcost or 0)-(r.Paid or 0)-(r.Charged or 0)
+		if dues==True and r.Checkout:
 			v += eval(r.Checkout).get('dues', 0)
 	return v if v!=0 else None
 				

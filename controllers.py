@@ -85,10 +85,11 @@ def members(path=None):
 	query = []
 	left = None
 	qdesc = ""
-	legend = CAT(H5('Member Records'),
-				A("Send Email to Specific Address(es)", _href=URL('composemail', vars=dict(back=request.url))))
 	errors = ''
-	
+	legend = H5('Member Records')
+	db.Members.Name.readable = False
+	db.Members.Affiliations.readable = False
+
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 	admin = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('admin')
 	if not admin:
@@ -110,6 +111,22 @@ def members(path=None):
 
 	if len(search_form.vars) == 0:
 		search_form.vars = request.query
+	backvars=dict(mailing_list=search_form.vars.get('mailing_list'),
+						event=search_form.vars.get('event'),
+						field=search_form.vars.get('field'),
+						value=search_form.vars.get('value'))
+	if search_form.vars.get('good_standing'):
+		backvars['good_standing'] = 'On'
+	back = URL('members/select', scheme=True, vars=backvars)
+	
+	if path=='select':
+		legend = CAT(legend, A("Send Email to Specific Address(es)", _href=URL('composemail', vars=dict(back=back))))
+		db.Members.Name.readable = True
+		db.Members.Affiliations.readable = True
+		session['search_form_vars'] = backvars
+	elif path and path.startswith('edit'):
+		legend = CAT(legend,
+	       			P(A('back', _href=URL('members/select', scheme=True, vars=session.get('search_form_vars')))))
 
 	if search_form.vars.get('mailing_list'):
 		query.append(f"(db.Emails.Member==db.Members.id)&db.Emails.Mailings.contains({search_form.vars.get('mailing_list')})")
@@ -178,13 +195,13 @@ def members(path=None):
 	if query == '':
 		query = 'db.Members.id>0'
 
-	if errors or qdesc:
-		flash.set(errors or "Filtered: "+qdesc)
+	if errors:
+		flash.set(errors)
 	
-	if qdesc:
+	if qdesc and path=='select':
 		legend = CAT(legend,
-					P(A("Send Notice to "+qdesc, _href=URL('composemail',
-						vars=dict(query=query, left=left or '', qdesc=qdesc, back=request.url)))))
+				P(A("Send Notice to "+qdesc, _href=URL('composemail',
+					vars=dict(query=query, left=left or '', qdesc=qdesc, back=back)))))
 
 	grid = Grid(path, eval(query), left=eval(left) if left else None,
 	     	orderby=db.Members.Lastname|db.Members.Firstname,
@@ -301,7 +318,6 @@ def composemail():
 		flash.set('Sorry, you cannot send email without a Society email address')
 		redirect(URL('accessdenied'))
 	
-	proto = {}
 	form = Form(
 		[Field('template', 'reference EMProtos',
 			requires=IS_IN_DB(db, 'EMProtos.id','%(Subject)s', orderby=~db.EMProtos.Modified),
@@ -309,8 +325,10 @@ def composemail():
 			submit_value='Use Template', formstyle=FormStyleBulma,
 			form_name="template_form")
 	if form.accepted:
-		proto = db.EMProtos[form.vars.get('template')]
+		request.query['proto'] = form.vars.get('template')
+		redirect(URL('composemail', vars=request.query))
 
+	proto = db(db.EMProtos.id == request.query.get('proto')).select().first()
 	fields =[Field('sender', 'string', requires=IS_IN_SET(source), default=source[0])]
 	if query:
 		legend = CAT(legend, P(f'To: {qdesc}'))
@@ -318,36 +336,35 @@ def composemail():
 		fields.append(Field('to', 'string',
 			comment='Include spaces between multiple recipients',
    			requires=[IS_NOT_EMPTY(), IS_LIST_OF_EMAILS()]))
-	fields.append(Field('bcc', 'string', requires=IS_LIST_OF_EMAILS()))
-	fields.append(Field('subject', 'string', requires=IS_NOT_EMPTY(), default=proto.get('Subject')))
-	fields.append(Field('body', 'text', requires=IS_NOT_EMPTY(), default=proto.get('Body') if proto!={} else \
+	fields.append(Field('bcc', 'string', requires=IS_LIST_OF_EMAILS(), default=''))
+	fields.append(Field('subject', 'string', requires=IS_NOT_EMPTY(), default=proto.Subject if proto else ''))
+	fields.append(Field('body', 'text', requires=IS_NOT_EMPTY(), default=proto.Body if proto else \
 				"<Letterhead>\n<greeting>\n\n" if query else "<Letterhead>\n\n"))
-	fields.append(Field('save', 'boolean', default=proto!={}, comment='store/update template'))
-	if proto!={}:
+	fields.append(Field('save', 'boolean', default=proto!=None, comment='store/update template'))
+	if proto:
 		form=None
 		fields.append(Field('delete', 'boolean', comment='tick to delete template; sends no message'))
 	form2 = Form(fields, form_name="message_form", keep_values=True,
 					submit_value = 'Send', formstyle=FormStyleBulma)
 			
 	if form2.accepted:
-		if proto!={}:
+		if proto:
 			if form2.vars['delete']:
-				db(db.EMProtos.id == request.vars.template).delete()
+				db(db.EMProtos.id == proto.id).delete()
 				flash.set("Template deleted: "+ proto.Subject)
-				redirect(session['prev_url'])
+				redirect(request.query.get('back'))
 			if form2.vars['save']:
 				proto.update_record(Subject=form2.vars['subject'],
-					Bcc=form2.vars.get('bcc', ''), Body=form2.vars['body'], Modified=datetime.datetime.now())
+					Body=form2.vars['body'], Modified=datetime.datetime.now())
 				flash.set("Template updatelend: "+ form2.vars['subject'])
 		else:
 			if form2.vars['save']:
-				db.EMProtos.insert(Subject=form2.vars['subject'],
-					Bcc=form2.vars.get('bcc', ''), Body=form2.vars['body'])
+				db.EMProtos.insert(Subject=form2.vars['subject'], Body=form2.vars['body'])
 				flash.set("Template stored: "+ form2.vars['subject'])
 
-		bcc = re.compile('[^,;\s]+').findall(form.vars['bcc'])
+		bcc = re.compile('[^,;\s]+').findall(form2.vars['bcc'])
 		try:
-			bodyparts = emailparse(form.vars['body'], form.vars['subject'], query)
+			bodyparts = emailparse(form2.vars['body'], form2.vars['subject'], query)
 		except Exception as e:
 			flash.set(e)
 			bodyparts = None
@@ -358,6 +375,9 @@ def composemail():
 					select_fields.append(db.Reservations.Event)
 				if 'Mailings.contains'in query:		#using a mailing list
 					select_fields.append(db.Emails.Email)
+					unsubscribe = URL('member',  'mail_lists', scheme=True)
+					bodyparts.append((f"\n\n''This message addressed to {qdesc} [[unsubscribe {unsubscribe}]]''", None))
+				bodyparts.append((f"\n\n''{getmeta('Visit Website Instructions')}''", None))
 				rows = db(eval(query)).select(*select_fields, left=eval(left) if left!='' else None, distinct=True)
 				for row in rows:
 					body = ''
@@ -382,16 +402,16 @@ def composemail():
 						elif part[1] == 'reservation':
 							body += evtconfirm(row.get(db.Reservations.Event), member.id)
 					message = HTML(XML(markmin.markmin2html(body)))
-					auth.sender.send(to=to, subject=form.vars['subject'], bcc=bcc, body=message)
+					auth.sender.send(to=to, subject=form2.vars['subject'], bcc=bcc, body=message)
 				flash.set(f"{len(rows)} emails sent to {qdesc}")
 			else:
-				to = re.compile('[^,;\s]+').findall(form.vars['to'])
+				to = re.compile('[^,;\s]+').findall(form2.vars['to'])
 				body = ''
 				for part in bodyparts:
 					body += part[0]		
 				flash.set(f"Email sent to: {to}")
 				message = HTML(XML(markmin.markmin2html(body)))
-				auth.sender.send(to=to, subject=form.vars['subject'], bcc=bcc, body=message)
+				auth.sender.send(to=to, subject=form2.vars['subject'], bcc=bcc, body=message)
 			redirect(request.query.get('back'))
 	return locals()
 

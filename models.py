@@ -25,15 +25,6 @@ db.define_table('users',
 	Field('url', 'string'))
 db.users.email.requires = IS_NOT_IN_DB(db, db.users.email)
 
-db.define_table('Metadata',
-	Field('Name', 'string'),
-	Field('Code', 'text'),
-	Field('Notes', 'text'),
-	Field('Modified', 'datetime', default=datetime.datetime.now(), writable=False),
-	format='%(Name)s')
-db.Metadata.Name.requires=[IS_NOT_EMPTY(), IS_NOT_IN_DB(db, 'Metadata.Name')]
-
-
 def collegelist(sponsors=[]):
 	colleges = db().select(db.Colleges.ALL, orderby=db.Colleges.Oxbridge|db.Colleges.Name).find(lambda c: c.Oxbridge==True or c.id in sponsors)
 	clist = []
@@ -46,6 +37,11 @@ db.define_table('Colleges',	#contains the individual colleges and other Oxbridge
 	Field('Oxbridge', 'boolean', default=True, comment=" (Non-Oxbridge organizations may be event co-sponsors)"),
 	format='%(Name)s')
 db.Colleges.Name.requires=[IS_NOT_EMPTY(), IS_NOT_IN_DB(db, 'Colleges.Name')]
+	
+def email_lists(id):
+	email = db.Emails[id]
+	lists = db(db.Email_Lists.id.belongs(email.Mailings)).select()
+	return ', '.join([l.Listname for l in lists])
 	
 db.define_table('Email_Lists',
 	Field('Listname', 'string'),
@@ -66,11 +62,6 @@ def member_affiliations(id):
 					db.Colleges.Name, db.Affiliations.Matr, orderby=db.Affiliations.Modified)
 	return '; '.join([a.Colleges.Name+(' '+str(a.Affiliations.Matr) if a.Affiliations.Matr else '') for a in affiliations])
 	
-def email_lists(id):
-	email = db.Emails[id]
-	lists = db(db.Email_Lists.id.belongs(email.Mailings)).select()
-	return ', '.join([l.Listname for l in lists])
-	
 def member_emails(id):
 	emails = db(db.Emails.Member == id).select(orderby=~db.Emails.Modified)
 	return ', '.join([e.Email for e in emails])
@@ -78,18 +69,22 @@ def member_emails(id):
 def primary_email(id):
 	em = db(db.Emails.Member == id).select(orderby=~db.Emails.Modified).first()
 	return em.Email if em else None
+
+def member_name(id):
+	member = db.Members[id]
+	return f"{member.Lastname}, {member.Title or ''} {member.Firstname} {member.Suffix or ''}"
 	
 db.define_table('Members',
 	Field('Title', 'string'),
 	Field('Firstname', 'string', requires = IS_NOT_EMPTY(),comment='*'),
 	Field('Lastname', 'string', requires = IS_NOT_EMPTY(),comment='*'),
 	Field('Suffix', 'string'),
-	Field.Virtual('Name', lambda r: f"{r['Lastname']}, {r['Title'] or ''} {r['Firstname']} {r['Suffix'] or ''}", readable=False),
-	Field.Virtual('Primary_Affiliation', lambda r: primary_affiliation(r['id']),readable=False),
-	Field.Virtual('Affiliations', lambda r: member_affiliations(r['id']),readable=False),
-	Field.Virtual('Matr', lambda r: primary_matriculation(r['id']),readable=False),
-	Field.Virtual('Primary_Email', lambda r: primary_email(r['id']),readable=False),
-	Field.Virtual('Emails', lambda r: member_emails(r['id']),readable=False),
+	#Field.Virtual('Name', lambda r: member_name(r['id']), readable=False),
+	#Field.Virtual('Primary_Affiliation', lambda r: primary_affiliation(r['id']), readable=False),
+	#Field.Virtual('Affiliations', lambda r: member_affiliations(r['id']), readable=False),
+	#Field.Virtual('Matr', lambda r: primary_matriculation(r['id']), readable=False),
+	#Field.Virtual('Primary_Email', lambda r: primary_email(r['id']), readable=False),
+	#Field.Virtual('Emails', lambda r: member_emails(r['id']), readable=False),
 	Field('Membership', 'string', requires=IS_EMPTY_OR(IS_IN_SET(MEMBER_CATEGORIES))),
 	Field('Paiddate', 'date', requires = IS_EMPTY_OR(IS_DATE())),
 	Field('Stripe_id', 'string'),
@@ -117,8 +112,8 @@ db.define_table('Members',
 db.define_table('Emails',
 	Field('Member', 'reference Members', writable=False),
 	Field('Email', 'string', requires=IS_EMAIL(), writable=False),
-	Field('Mailings', 'list:reference Email_Lists', widget=CheckboxWidget,
-			comment=' please tick/untick to subscribe/opt out as noted below'),
+	Field('Mailings', 'list:reference Email_Lists', #widget=CheckboxWidget,
+			comment='Ctrl-click on list name in list above to toggle selection'),
 	Field('Created', 'datetime', default=datetime.datetime.now(), writable=False),
 	Field('Modified', 'datetime', default=datetime.datetime.now(), writable=False),
 	singular="Email", plural="Emails", format='%(Email)s')
@@ -131,7 +126,7 @@ db.define_table('Dues',
 	Field('Notes', 'string', default=''),
 	Field('Prevpaid', 'date'), #used to track paid member history
 	Field('Nowpaid', 'date'), #paid date after this payment
-	Field.Virtual('Type', lambda d: 'new' if not d.Dues.Prevpaid else ('renewal' if d.Dues.Date <= d.Dues.Prevpaid + datetime.timedelta(days=365) else 'reinstated')),
+	#Field.Virtual('Type', lambda d: 'new' if not d.Dues.Prevpaid else ('renewal' if d.Dues.Date <= d.Dues.Prevpaid + datetime.timedelta(days=365) else 'reinstated')),
 	singular="Dues", plural="Dues")
 	
 def event_revenue(event_id):	#revenue from confirmed tickets
@@ -139,17 +134,17 @@ def event_revenue(event_id):	#revenue from confirmed tickets
 			select(db.Reservations.Paid, db.Reservations.Charged)
 	paid = 0
 	for r in rows:
-		paid += (r.Members.Paid or 0) + (r.Members.Charged or 0)
-	return paid if paid != 0 else None
+		paid += (r.Paid or 0) + (r.Charged or 0)
+	return paid
 	
 def event_unpaid(event_id):	#unpaid from confirmed reservations
 	rows = db((db.Reservations.Event==event_id)&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)).\
 			select(db.Reservations.Unitcost, db.Reservations.Paid, db.Reservations.Charged)
 	cost = paid = 0
 	for r in rows:
-		cost += (r.Members.Unitcost or 0)
-		paid += (r.Members.Paid or 0) + (r.Members.Charged or 0)
-	return cost - paid if cost - paid != 0 else None
+		cost += (r.Unitcost or 0)
+		paid += (r.Paid or 0) + (r.Charged or 0)
+	return cost - paid
 	
 db.define_table('Events',
 	Field('Page', 'string', requires=IS_NOT_EMPTY(), comment=" Link to event page"),
@@ -167,17 +162,17 @@ db.define_table('Events',
 	Field('Speaker', 'string'),
 	Field('Tickets', 'list:string',
 			comment="empty for free events, or list ticket types (full member price first). Example ticket types are: 	'$45.00', 'Student $35.00', 'Fresher $0.00', 'Non-Member $55', ..."),
-	Field.Virtual('Attendees', lambda r: db((db.Reservations.Event==r.Members.Events.id)&(db.Reservations.Provisional==False)& \
-								(db.Reservations.Waitlist==False)).count()),
-	Field.Virtual('Wtlstd', lambda r: db((db.Reservations.Event==r.Members.Events.id)&(db.Reservations.Waitlist==True)).count()),
-	Field.Virtual('Prvsnl', lambda r: db((db.Reservations.Event==r.Members.Events.id)&(db.Reservations.Provisional==True)).count()),
-	Field.Virtual('Revenue', lambda r: event_revenue(r.Members.Events.id)),
-	Field.Virtual('Unpaid', lambda r: event_unpaid(r.Members.Events.id)),
+	#Field.Virtual('Attendees', lambda r: db((db.Reservations.Event==r['id'])&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).count(), readable=False),
+	#Field.Virtual('Wtlstd', lambda r: db((db.Reservations.Event==r['id'])&(db.Reservations.Waitlist==True)).count(), readable=False),
+	#Field.Virtual('Prvsnl', lambda r: db((db.Reservations.Event==r['id'])&(db.Reservations.Provisional==True)).count(), readable=False),
+	#Field.Virtual('Revenue', lambda r: event_revenue(r['id']), readable=False),
+	#Field.Virtual('Unpaid', lambda r: event_unpaid(r['id']), readable=False),
 	Field('Selections', 'list:string', comment="if selection required, list one choice per line"), #e.g. Menuchoices
 	Field('Notes', 'text', comment="included on registration confirmation"),
 	Field('Survey', 'list:string',
 		comment="multiple choice question at Checkout. First row is the question, the rest are possible selections"),
 	Field('Comment', 'string', comment="open ended question at Checkout."),
+	Field('Modified', 'datetime', default=datetime.datetime.now(), writable=False),
 	singular="Event", plural="Events", format='%(Description)s')
 
 db.define_table('Affiliations',
@@ -254,15 +249,6 @@ db.Reservations.Event.requires=IS_IN_DB(db, 'Events.id', '%(Event)s', zero=None,
 db.define_table('EMProtos',
 	Field('Subject', 'string', requires=IS_NOT_EMPTY()),
 	Field('Body', 'text', requires=IS_NOT_EMPTY()),
-	Field('Created', 'datetime', default=datetime.datetime.now(), writable=False),
-	Field('Modified', 'datetime', default=datetime.datetime.now(), writable=False))
-
-db.define_table('emailqueue',	#used for notices or messages targetted via membership database
-	Field('subject', 'string'),
-	Field('body', 'text'),	#already in HTML, but contains {{greeting}} to be substituted individually
-	Field('reply_to', 'string'),	#the sender's selected Society email address
-	Field('targets', 'list:reference Emails'),	#emails now in their own table
-	Field('event', 'reference Events'),		#if references reservations, else None
 	Field('Created', 'datetime', default=datetime.datetime.now(), writable=False),
 	Field('Modified', 'datetime', default=datetime.datetime.now(), writable=False))
 	

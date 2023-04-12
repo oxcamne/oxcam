@@ -21,6 +21,7 @@ import datetime
 db.define_table('users', 
 	Field('email', 'string'),
 	Field('tokens', 'list:integer'),
+	Field('remote_addr', 'string'),
 	Field('when_issued', 'datetime'),
 	Field('url', 'string'))
 db.users.email.requires = IS_NOT_IN_DB(db, db.users.email)
@@ -79,12 +80,12 @@ db.define_table('Members',
 	Field('Firstname', 'string', requires = IS_NOT_EMPTY(),comment='*'),
 	Field('Lastname', 'string', requires = IS_NOT_EMPTY(),comment='*'),
 	Field('Suffix', 'string'),
-	#Field.Virtual('Name', lambda r: member_name(r['id']), readable=False),
-	#Field.Virtual('Primary_Affiliation', lambda r: primary_affiliation(r['id']), readable=False),
-	#Field.Virtual('Affiliations', lambda r: member_affiliations(r['id']), readable=False),
-	#Field.Virtual('Matr', lambda r: primary_matriculation(r['id']), readable=False),
-	#Field.Virtual('Primary_Email', lambda r: primary_email(r['id']), readable=False),
-	#Field.Virtual('Emails', lambda r: member_emails(r['id']), readable=False),
+	Field.Virtual('Name', lambda r: member_name(r['id']), readable=False),
+	Field.Virtual('Primary_Affiliation', lambda r: primary_affiliation(r['id']), readable=False),
+	Field.Virtual('Affiliations', lambda r: member_affiliations(r['id']), readable=False),
+	Field.Virtual('Matr', lambda r: primary_matriculation(r['id']), readable=False),
+	Field.Virtual('Primary_Email', lambda r: primary_email(r['id']), readable=False),
+	Field.Virtual('Emails', lambda r: member_emails(r['id']), readable=False),
 	Field('Membership', 'string', requires=IS_EMPTY_OR(IS_IN_SET(MEMBER_CATEGORIES))),
 	Field('Paiddate', 'date', requires = IS_EMPTY_OR(IS_DATE())),
 	Field('Stripe_id', 'string'),
@@ -135,7 +136,7 @@ def event_revenue(event_id):	#revenue from confirmed tickets
 	paid = 0
 	for r in rows:
 		paid += (r.Paid or 0) + (r.Charged or 0)
-	return paid
+	return paid if paid != 0 else None
 	
 def event_unpaid(event_id):	#unpaid from confirmed reservations
 	rows = db((db.Reservations.Event==event_id)&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)).\
@@ -144,8 +145,20 @@ def event_unpaid(event_id):	#unpaid from confirmed reservations
 	for r in rows:
 		cost += (r.Unitcost or 0)
 		paid += (r.Paid or 0) + (r.Charged or 0)
-	return cost - paid
-	
+	return cost - paid if cost-paid != 0 else None
+
+def event_prvsnl(event_id):
+	prvsnl = db((db.Reservations.Event==event_id)&(db.Reservations.Provisional==True)).count()
+	return prvsnl if prvsnl != 0 else None
+
+def event_wait(event_id):
+	wait = db((db.Reservations.Event==event_id)&(db.Reservations.Waitlist==True)).count()
+	return wait if wait != 0 else None
+
+def event_attend(event_id):
+	attend = db((db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).count()
+	return attend if attend != 0 else None	
+
 db.define_table('Events',
 	Field('Page', 'string', requires=IS_NOT_EMPTY(), comment=" Link to event page"),
 	Field('Description', 'string', requires=IS_NOT_EMPTY(), comment=" Shown on website, confirmations, and financials"),
@@ -162,11 +175,11 @@ db.define_table('Events',
 	Field('Speaker', 'string'),
 	Field('Tickets', 'list:string',
 			comment="empty for free events, or list ticket types (full member price first). Example ticket types are: 	'$45.00', 'Student $35.00', 'Fresher $0.00', 'Non-Member $55', ..."),
-	#Field.Virtual('Attendees', lambda r: db((db.Reservations.Event==r['id'])&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).count(), readable=False),
-	#Field.Virtual('Wtlstd', lambda r: db((db.Reservations.Event==r['id'])&(db.Reservations.Waitlist==True)).count(), readable=False),
-	#Field.Virtual('Prvsnl', lambda r: db((db.Reservations.Event==r['id'])&(db.Reservations.Provisional==True)).count(), readable=False),
-	#Field.Virtual('Revenue', lambda r: event_revenue(r['id']), readable=False),
-	#Field.Virtual('Unpaid', lambda r: event_unpaid(r['id']), readable=False),
+	Field.Virtual('Attend', lambda r: event_attend(r['id']) or '', readable=False),
+	Field.Virtual('Wait', lambda r: event_wait(r['id']) or '', readable=False),
+	Field.Virtual('Prvsnl', lambda r: event_prvsnl(r['id']) or '', readable=False),
+	Field.Virtual('Paid', lambda r: event_revenue(r['id']) or '', readable=False),
+	Field.Virtual('Unpaid', lambda r: event_unpaid(r['id']) or '', readable=False),
 	Field('Selections', 'list:string', comment="if selection required, list one choice per line"), #e.g. Menuchoices
 	Field('Notes', 'text', comment="included on registration confirmation"),
 	Field('Survey', 'list:string',
@@ -202,7 +215,11 @@ def res_tbc(member_id, event_id, dues=False):	#cost of confirmed still tbc
 		if dues==True and r.Checkout:
 			v += eval(r.Checkout).get('dues', 0)
 	return v if v!=0 else None
-				
+
+def res_wait(member_id, event_id):
+	wait = db((db.Reservations.Member==member_id)&(db.Reservations.Event==event_id)&(db.Reservations.Waitlist==True)).count()
+	return wait if wait!=0 else None
+
 #table includes primary reservation records plus guest records for each guest.
 #Member(host) must have record in Members.
 #Primary reservation record has Host==True
@@ -218,7 +235,7 @@ db.define_table('Reservations',
 			requires=IS_EMPTY_OR(IS_IN_DB(db, db.Colleges.id, '%(Name)s', orderby=db.Colleges.Name))),
 	Field('Ticket', 'string'),
 	Field('Selection', 'string'), #field was previously Menuchoice
-	Field('Notes', 'string'),	#host name specified, or justifying ticket selection
+	Field('Notes', 'text'),	#host name specified, or justifying ticket selection
 	Field('Survey', 'string', readable=False, writable=False),	#answer to multiple choice question
 	Field('Comment', 'string', readable=False, writable=False),	#answer to open ended question
 	Field('Unitcost', 'decimal(5,2)', requires=IS_EMPTY_OR(IS_DECIMAL_IN_RANGE(0, 1000))),
@@ -227,19 +244,17 @@ db.define_table('Reservations',
 	Field('Waitlist', 'boolean', default=False),	#now meaningfull in each individual reservation
 	
 	#following fields meaningfull only on the member's own reservation (Host==True)
-	Field.Virtual('Totalcost', lambda r: res_totalcost(r.Reservations.Member, r.Reservations.Event)),
-	Field.Virtual('Tbc', lambda r: res_tbc(r.Reservations.Member, r.Reservations.Event)),	#tickets only
-	Field.Virtual('TBC', lambda r: res_tbc(r.Reservations.Member, r.Reservations.Event, True)),	#include dues
+	Field.Virtual('Cost', lambda r: res_totalcost(r['Member'], r['Event']) or ''),
+	Field.Virtual('Tbc', lambda r: res_tbc(r['Member'], r['Event']) or ''),	#tickets only
+	Field.Virtual('TBC', lambda r: res_tbc(r['Member'], r['Event'], True) or ''),	#include dues
 	Field('Paid', 'decimal(8,2)', readable=False, writable=False,
 				requires=IS_EMPTY_OR(IS_DECIMAL_IN_RANGE(0, 10000))), #total paid, confirmed by download from Stripe, Bank
 	Field('Charged', 'decimal(6,2)', readable=False, writable=False),	#payment made, not yet downloaded from Stripe
 	Field('Checkout', 'string', readable=False, writable=False),	#session.vars of incomplete checkout
-	Field.Virtual('Confirmed', lambda r: db((db.Reservations.Member==r.Reservations.Member)& \
-								(db.Reservations.Event==r.Reservations.Event)&(db.Reservations.Provisional==False)& \
+	Field.Virtual('conf', lambda r: db((db.Reservations.Member==r['Member'])& \
+								(db.Reservations.Event==r['Event'])&(db.Reservations.Provisional==False)& \
 								(db.Reservations.Waitlist==False)).count()),
-	Field.Virtual('Waitlisted', lambda r: db((db.Reservations.Member==r.Reservations.Member)& \
-								(db.Reservations.Event==r.Reservations.Event)& \
-								(db.Reservations.Waitlist==True)).count()),
+	Field.Virtual('Wait', lambda r: res_wait(r['Member'], r['Event']) or ''),
 	
 	Field('Created', 'datetime', default=datetime.datetime.now(), readable=False, writable=False),
 	Field('Modified', 'datetime', default=datetime.datetime.now(), writable=False),

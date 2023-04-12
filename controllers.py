@@ -30,11 +30,14 @@ from yatl.helpers import *
 from .common import db, session, T, cache, auth, logger, authenticated, unauthenticated, flash
 from .settings_private import *
 from .models import primary_email, res_tbc, member_name, member_affiliations, primary_matriculation, \
-			member_emails, event_revenue, event_unpaid
-from py4web.utils.grid import Grid, GridClassStyleBulma, Column
-from py4web.utils.form import Form, FormStyleBulma
+			member_emails, event_revenue, event_unpaid, res_totalcost
+from py4web.utils.grid import Grid, GridClassStyleBulma, Column, GridClassStyleBootstrap5
+from py4web.utils.form import Form, FormStyleBulma, FormStyleBootstrap4
 from pydal.validators import *
+#from py4web.core import response
+from py4web.utils.factories import Inject
 import datetime, random, re, markmin, stripe, csv
+from io import StringIO
 
 class GridActionButton:
     def __init__(
@@ -102,7 +105,7 @@ def members(path=None):
 	left = None #only used if mailing list with excluded event attendees
 	qdesc = ""
 	errors = ''
-	legend = H5('Member Records')
+	header = H5('Member Records')
 	back = URL('members/select', scheme=True)
 
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
@@ -110,6 +113,8 @@ def members(path=None):
 	if not admin:
 		db.Members.Access.writable = False
 	db.Members.City.requires=db.Members.State.requires=db.Members.Zip.requires=None
+	db.Members.Name.readable = False
+	db.Members.Affiliations.readable = False
 
 	search_form=Form([
 		Field('mailing_list', 'reference Email_Lists', 
@@ -121,10 +126,12 @@ def members(path=None):
 		Field('field', 'string', requires=IS_EMPTY_OR(IS_IN_SET(['Affiliation', 'Email']+db.Members.fields,
 					zero='field?'))),
 		Field('value', 'string')],
-		keep_values=True, formstyle=FormStyleBulma
+		keep_values=True, formstyle=FormStyleBootstrap4
 	)
 	
 	if path=='select':
+		db.Members.Name.readable = True
+		db.Members.Affiliations.readable = True
 		if len(search_form.vars) == 0:
 			search_form.vars = session.get('member_filter') or {}
 		else:
@@ -135,11 +142,11 @@ def members(path=None):
 			if search_form.vars.get('good_standing'):
 				member_filter['good_standing'] = 'On'
 			session['member_filter'] = member_filter
-		legend = CAT(legend, A("Send Email to Specific Address(es)", _href=URL('composemail', vars=dict(back=back))))
+		header = CAT(header, A("Send Email to Specific Address(es)", _href=URL('composemail', vars=dict(back=back))))
 	elif path:
-		legend = CAT(H5('Member Record'), A('back', _href=back))
+		header = CAT(H5('Member Record'), A('back', _href=back))
 		if path.startswith('edit'):
-			legend= CAT(legend,
+			header= CAT(header,
 	       			P(A('OxCam affiliation(s)', _href=URL('affiliations', path[5:])), XML('<br>'),
 					A('Email addresses and subscriptions', _href=URL('emails', path[5:])), XML('<br>'),
 					A('Dues payments', _href=URL('dues', path[5:])), XML('<br>'),
@@ -221,10 +228,10 @@ def members(path=None):
 	
 	if path=='select':
 		if qdesc:
-			legend = CAT(legend,
+			header = CAT(header,
 				P(A("Send Notice to "+qdesc, _href=URL('composemail',
 					vars=dict(query=query, left=left or '', qdesc=qdesc, back=back)))))
-		legend = CAT(legend,
+		header = CAT(header,
 	       P("Use filter to select a mailing list or apply other filters. Selecting an event selects \
 (or excludes from a mailing list) attendees. You can filter on a member record field \
 using an optional operator (=, <, >, <=, >=) together with a value."))
@@ -254,37 +261,45 @@ using an optional operator (=, <, >, <=, >=) together with a value."))
 
 	grid = Grid(path, eval(query), left=eval(left) if left else None,
 	     	orderby=db.Members.Lastname|db.Members.Firstname,
-			columns=[Column('Name', lambda r: member_name(r['id'])),
+			columns=[db.Members.Name,
 	    			db.Members.Membership, db.Members.Paiddate,
-					Column('College', lambda r: member_affiliations(r['id'])),
+					db.Members.Affiliations,
 					db.Members.Access, db.Members.Notes],
+			headings=['Name', 'Status', 'Until', 'College', 'Access', 'Notes'],
 			details=not write, editable=write, create=write,
-			grid_class_style=GridClassStyleBulma,
-			formstyle=FormStyleBulma,
+			grid_class_style=GridClassStyleBootstrap5,
+			formstyle=FormStyleBootstrap4,
 			search_form=search_form,
 			validation=mod_member,
-			deletable=lambda r: member_deletable(r.id))
+			deletable=lambda r: member_deletable(r['id'])
+			)
 	return locals()
 
 @action('members_export', method=['GET'])
-@action.uses(db, session, flash)
+@action.uses("download.html", db, session, flash)#, Inject(response=response))
+#@action.uses(db, session, flash)
 @checkaccess('write')
 def members_export():
+	stream = StringIO()
+	content_type = 'text/csv'
+	filename = 'members.csv'
 	query = request.query.get('query')
 	left = request.query.get('left')
 	rows = db(eval(query)).select(db.Members.ALL, left=left, orderby=db.Members.Lastname|db.Members.Firstname)
 	try:
-		with open('members.csv', 'w', encoding='utf-8', newline='') as csvfile:
-			writer=csv.writer(csvfile)
-			writer.writerow(['Name', 'Affiliations', 'Emails']+db.Members.fields)
-			for row in rows:
-				data = [member_name(row.id), member_affiliations(row.id), member_emails(row.id)]+[row[field] for field in db.Members.fields]
-				writer.writerow(data)
-		flash.set("Selected Members exported to members.csv")
+		#with open('members.csv', 'w', encoding='utf-8', newline='') as csvfile:
+		writer=csv.writer(stream)
+			#writer=csv.writer(csvfile)
+		writer.writerow(['Name', 'Affiliations', 'Emails']+db.Members.fields)
+		for row in rows:
+			data = [member_name(row.id), member_affiliations(row.id), member_emails(row.id)]+[row[field] for field in db.Members.fields]
+			writer.writerow(data)
+		flash.set("Selected Members exported to server side py4web/members.csv")
 	except Exception as e:
 		flash.set(e)
-	redirect(URL('members/select'))
-	
+#	redirect(URL('members/select'))
+	return locals()	
+
 @action('affiliations/<member_id:int>', method=['POST', 'GET'])
 @action('affiliations/<member_id:int>/<path:path>', method=['POST', 'GET'])
 @action.uses("grid.html", db, session, flash)
@@ -295,7 +310,7 @@ def affiliations(member_id, path=None):
 	db.Affiliations.Member.default=member_id
 
 	member=db.Members[member_id]
-	legend = CAT(H5('Member Affiliations'),
+	header = CAT(H5('Member Affiliations'),
 	      		H6(f"{member.Lastname}, {member.Title or ''} {member.Firstname} {member.Suffix or ''}"),
 				P(A('back', _href=URL(f'members/edit/{member_id}', scheme=True))))
 	footer = "Multiple affiliations are listed in order modified. The topmost one \
@@ -310,8 +325,8 @@ is used on name badges etc."
 			columns=[db.Affiliations.College, db.Affiliations.Matr, db.Affiliations.Notes],
 			details=not write, editable=write, create=write, deletable=write,
 			validation=affiliation_modified,
-			grid_class_style=GridClassStyleBulma,
-			formstyle=FormStyleBulma,
+			grid_class_style=GridClassStyleBootstrap5,
+			formstyle=FormStyleBootstrap4,
 			)
 	return locals()
 	
@@ -336,7 +351,7 @@ def emails(member_id, path=None):
 	db.Emails.Member.default=member_id
 
 	member=db.Members[member_id]
-	legend = CAT(H5('Member Emails'),
+	header = CAT(H5('Member Emails'),
 	      		H6(f"{member.Lastname}, {member.Title or ''} {member.Firstname} {member.Suffix or ''}"),
 				P(A('back', _href=URL(f'members/edit/{member_id}', scheme=True))))
 	footer = "Note, the most recently edited (topmost) email is used for messages \
@@ -353,8 +368,8 @@ are sent as specified in the Mailings Column."
 			columns=[db.Emails.Email, db.Emails.Mailings],
 			details=not write, editable=write, create=write, deletable=write,
 			validation=email_modified,
-			grid_class_style=GridClassStyleBulma,
-			formstyle=FormStyleBulma,
+			grid_class_style=GridClassStyleBootstrap5,
+			formstyle=FormStyleBootstrap4,
 			)
 	return locals()
 
@@ -380,7 +395,7 @@ def dues(member_id, path=None):
 	db.Dues.Prevpaid.default = member.Paiddate
 	db.Dues.Nowpaid.default = newpaiddate(member.Paiddate)
 
-	legend = CAT(H5('Member Dues'),
+	header = CAT(H5('Member Dues'),
 	      		H6(f"{member.Lastname}, {member.Title or ''} {member.Firstname} {member.Suffix or ''}"),
 				P(A('back', _href=URL(f'members/edit/{member_id}', scheme=True))))
 
@@ -394,8 +409,8 @@ def dues(member_id, path=None):
 			columns=[db.Dues.Amount, db.Dues.Date, db.Dues.Notes, db.Dues.Prevpaid, db.Dues.Nowpaid],
 			details=not write, editable=write, create=write, deletable=write,
 			validation=dues_validated,
-			grid_class_style=GridClassStyleBulma,
-			formstyle=FormStyleBulma,
+			grid_class_style=GridClassStyleBootstrap5,
+			formstyle=FormStyleBootstrap4,
 			)
 	return locals()
 	
@@ -407,13 +422,15 @@ def events(path=None):
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 	back = URL('events/select', scheme=True)
 
-	legend = H5('Events')
+	header = H5('Events')
 
 	if path=='select':
-		footer = A("Export all Events as CSV file", _href=URL('events_export'))
+		footer = A("Export all Events as CSV file", _href=URL('events_export')) 
+		db.Events.Paid.readable = db.Events.Unpaid.readable = True
+		db.Events.Prvsnl.readable = db.Events.Wait.readable = db.Events.Attend.readable = True
 	elif path and path.startswith('edit'):
 		url = URL('register', path[5:], scheme=True)
-		legend = CAT(H5('Event Record'), A('back', _href=back), XML('<br>'),
+		header = CAT(H5('Event Record'), A('back', _href=back), XML('<br>'),
 	       			"Booking link is ", A(url, _href=url), XML('<br>'),
 	       			A('Make a Copy of This Event', _href=URL('event_copy', path[5:])))
 	       		
@@ -424,7 +441,7 @@ def events(path=None):
 		if isinstance(form.vars['Tickets'], str):
 				form.vars['Tickets'] = [form.vars['Tickets']]
 		for t in form.vars['Tickets']:
-			if t!='' and not re.match('[^\$]*\$[0-9]+\.?[0-9]{0,2}$', t):
+			if t!='' and not re.match(r'[^\$]*\$[0-9]+\.?[0-9]{0,2}$', t):
 				form.errors['Tickets'] = "'%s' is not a good ticket definition"%(t)
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
@@ -435,11 +452,7 @@ def events(path=None):
 	grid = Grid(path, db.Events.id>0,
 	     	orderby=~db.Events.DateTime,
 			columns=[db.Events.id, db.Events.DateTime, db.Events.Description, db.Events.Venue, db.Events.Speaker,
-					Column('Revenue', lambda r: event_revenue(r['id'])),
-					Column('UnPd', lambda r: event_unpaid(r['id'])),
-					Column('Prvnl', lambda r: db((db.Reservations.Event==r['id'])&(db.Reservations.Provisional==True)).count()),
-					Column('Wait', lambda r: db((db.Reservations.Event==r['id'])&(db.Reservations.Waitlist==True)).count()),
-					Column('Attend', lambda r: db((db.Reservations.Event==r['id'])&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).count())],
+	    			db.Events.Paid, db.Events.Unpaid, db.Events.Prvsnl, db.Events.Wait, db.Events.Attend],
 			search_queries=[["Description", lambda value: db.Events.Description.like('%'+value+'%')],
 		    				["Venue", lambda value: db.Events.Venue.like('%'+value+'%')],
 						    ["Speaker", lambda value: db.Events.Speaker.like('%'+value+'%')]],
@@ -447,10 +460,91 @@ def events(path=None):
 			details=not write, editable=write, create=write,
 			deletable=lambda r: write and db(db.Reservations.Event == r['id']).count() == 0 and db(db.AccTrans.Event == r['id']).count() == 0,
 			validation=checktickets,
-			grid_class_style=GridClassStyleBulma,
-			formstyle=FormStyleBulma,
+			grid_class_style=GridClassStyleBootstrap5,
+			formstyle=FormStyleBootstrap4,
 			)
 	return locals()
+		
+@action('event_reservations/<event_id:int>', method=['POST', 'GET'])
+@action('event_reservations/<event_id:int>/<path:path>', method=['POST', 'GET'])
+@action.uses("grid.html", db, session, flash)
+@checkaccess('read')
+def event_reservations(event_id, path=None):
+# ...event_reservatins/event_id/...
+# request.query: waitlist=True, provisional=True
+	db.Reservations.id.readable=db.Reservations.Event.readable=False
+	db.Reservations.Provisional.readable=True
+	back=URL(f'event_reservations/{event_id}/select', vars=request.query, scheme=True)
+
+	event = db.Events[event_id]
+	header = CAT(A('back', _href=URL('events/select')),
+	      		H5('Provisional Reservations' if request.query.get('provisional') else 'Waitlist' if request.query.get('waitlist') else 'Reservations'),
+				H6(f"{event.DateTime}, {event.Description}"),
+				"Use the 'Expand' link to drill down on a reservation and view detail or edit individual reservations.", XML('<br>'))
+	query = f'(db.Reservations.Event=={event_id})'
+	#for waitlist or provisional, have to include hosts with waitlisted or provisional guests
+	if request.query.get('waitlist') or request.query.get('provisional'):
+		query += f"&db.Reservations.Member.belongs([r.Member for r in \
+db((db.Reservations.Event=={event_id})&{'(db.Reservations.Waitlist==True)' if request.query.get('waitlist') else '(db.Reservations.Provisional==True)'}).\
+select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
+	else:
+		query += '&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)'
+		header = CAT(header, A('Export Doorlist as CSV file',
+			 _href=(URL(f'doorlist_export/{event_id}', vars=dict(back=back), scheme=True))), XML('<br>'))
+	query += '&(db.Reservations.Host==True)'
+
+	if not request.query.get('provisional'):
+		header = CAT(header, A('Send Email Notice', _href=URL('composemail', vars=dict(query=query,
+			left  = "[db.Emails.on(db.Emails.Member==db.Reservations.Member),db.Members.on(db.Members.id==db.Reservations.Member)]",	
+			qdesc=f"{event.Description} {'Waitlist' if request.query.get('waitlist') else 'Attendees'}",
+			back=back))), XML('<br>'))
+	header = CAT(header, 'Display: ')
+	if request.query.get('waitlist') or request.query.get('provisional'):
+		header = CAT(header, A('reservations', _href=URL('event_reservations/'+str(event_id))), ' or ')
+	if not request.query.get('waitlist'):
+		header = CAT(header, A('waitlist', _href=URL('event_reservations/'+str(event_id)+'/select', vars=dict(waitlist=True))), ' or ')
+	if not request.query.get('provisional'):
+		header = CAT(header, A('provisional', _href=URL('event_reservations/'+str(event_id)+'/select', vars=dict(provisional=True))), ' not checked out')
+
+	grid = Grid(path, eval(query),
+			left=db.Members.on(db.Members.id == db.Reservations.Member),
+			orderby=db.Reservations.Created if request.query.get('waitlist') else db.Reservations.Lastname|db.Reservations.Firstname,
+			fields=[db.Reservations.Member,db.Members.Membership, db.Members.Paiddate,
+						db.Reservations.Affiliation, db.Reservations.Notes, db.Reservations.Wait,
+						db.Reservations.conf, db.Reservations.Cost, db.Reservations.TBC],
+			headings=['Member', 'Type', 'Until', 'College', 'Notes', 'Wait', 'Conf', 'Cost', 'Tbc'],
+						details=False, editable = False, create = False, deletable = False,
+						rows_per_page=200)
+	return locals()
+
+@action('doorlist_export/<event_id:int>', method=['GET'])
+@action.uses(db, session, flash)
+@checkaccess('read')
+def doorlist_export(event_id):
+	hosts = db((db.Reservations.Event==event_id)&(db.Reservations.Host==True)&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)).select(
+					orderby=db.Reservations.Lastname|db.Reservations.Firstname,
+					left=db.Members.on(db.Reservations.Member == db.Members.id))
+	try:
+		with open('doorlist.csv', 'w', encoding='utf-8', newline='') as csvfile:
+			writer=csv.writer(csvfile)
+			writer.writerow(['HostLast','HostFirst','Notes','LastName','FirstName','CollegeName','Selection','Table','Ticket',
+								'Email','Cell','Survey','Comment'])
+			for host in hosts:
+				guests=db((db.Reservations.Event==event_id)&(db.Reservations.Member==host.Reservations.Member)\
+						&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).select(
+					orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname)
+					
+				for guest in guests:
+					email = primary_email(host.Members.id) if host.Reservations.id==guest.id else ''
+					writer.writerow([host.Reservations.Lastname, host.Reservations.Firstname, guest.Notes or '',
+										guest.Lastname, guest.Firstname, guest.Affiliation.Name if guest.Affiliation else '',
+										guest.Selection or '', '', guest.Ticket or '', email,
+										host.Members.Cellphone if host.Reservations.id==guest.id else '',
+										guest.Survey or '', guest.Comment or ''])
+		flash.set("Doorlist exported to server side py4web/doorlist.csv")
+	except Exception as e:
+		flash.set(e)
+	redirect(request.query.get('back'))
 	
 @action('event_copy/<event_id:int>', method=['GET'])
 @action.uses(db, session, flash)
@@ -479,7 +573,7 @@ def events_export():
 						db((db.Reservations.Event==r.id)&(db.Reservations.Waitlist==True)).count(),
 						db((db.Reservations.Event==r.id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).count()]
 				writer.writerow(data)
-		flash.set("Events exported to events.csv")
+		flash.set("Events exported to server side py4web/events.csv")
 	except Exception as e:
 		flash.set(e)
 	redirect(URL('events/select'))
@@ -496,7 +590,7 @@ def emailparse(body, subject, query):
 		if m.group(2)=='subject':
 			text = subject
 		elif m.group(2)=='greeting' or m.group(2)=='email' or m.group(2)=='member' or m.group(2)=='reservation':
-			if not query or m.group(2)=='reservation' and not ('Reservations.Member' in query):
+			if not query or m.group(2)=='reservation' and not ('Reservations.Event' in query):
 				raise Exception(f"<{m.group(2)}> can't be used in this context")
 			func=m.group(2)
 		else:	#metadata?
@@ -534,6 +628,7 @@ def evtconfirm(event_id, member_id, justpaid=0):
 	if not resvtns: return ''
 	tbc = res_tbc(member_id, event_id) or 0
 	tbcdues = res_tbc(member_id, event_id, True) or 0
+	cost = res_totalcost(member_id, event_id) or 0
 	body = '------------------------\n'
 	body += '**Event:**|' + (event.Description or '') + '\n'
 	body += '**Venue:**|' + (event.Venue or '') + '\n'
@@ -555,7 +650,7 @@ def evtconfirm(event_id, member_id, justpaid=0):
 			body += '\n'
 	if tbcdues > tbc:
 		body += 'Membership Dues|||$%6.2f\n'%(tbcdues - tbc)
-	body += '**Total cost**|||**$%6.2f**\n'%((resvtns.first().Totalcost or 0) + tbcdues - tbc)
+	body += '**Total cost**|||**$%6.2f**\n'%(cost + tbcdues - tbc)
 	body += '**Paid**|||**$%6.2f**\n'%((resvtns.first().Paid or 0)+(resvtns.first().Charged or 0)+justpaid)
 	if tbcdues>justpaid:
 		body += '**Net amount due**|||**$%6.2f**\n'%(tbcdues-justpaid)
@@ -581,13 +676,8 @@ def composemail():
 	qdesc = request.query.get('qdesc')
 	left = request.query.get('left')
 
-	legend = CAT(H5("Send Email"),
+	header = CAT(H5("Send Email"),
 	      		P(A('back', _href=request.query.get('back'))))
-	footer=DIV("You can use <subject>, <greeting>, <member>, <reservation>, <email>, or <metadata> ",
-				"where metadata is 'Letterhead', 'Membership Secretary' or ", "'Reservations', etc.  ",
-				"You can also include html content thus: {{content}}. Email is formatted using ",
-					A("Markmin", _href='http://www.web2py.com/examples/static/markmin.html', _target="Markmin"),
-					".")
 	source = [row['Email'] for row in db((db.Emails.Member == session['member_id']) & \
 	   (db.Emails.Email.contains(SOCIETY_DOMAIN.lower()))).select(
 			db.Emails.Email, orderby=~db.Emails.Modified)]
@@ -599,7 +689,7 @@ def composemail():
 		[Field('template', 'reference EMProtos',
 			requires=IS_IN_DB(db, 'EMProtos.id','%(Subject)s', orderby=~db.EMProtos.Modified),
 			comment='Optional: select an existing mail template')],
-			submit_value='Use Template', formstyle=FormStyleBulma,
+			submit_value='Use Template', formstyle=FormStyleBootstrap4,
 			form_name="template_form")
 	if form.accepted:
 		request.query['proto'] = form.vars.get('template')
@@ -608,7 +698,7 @@ def composemail():
 	proto = db(db.EMProtos.id == request.query.get('proto')).select().first()
 	fields =[Field('sender', 'string', requires=IS_IN_SET(source), default=source[0])]
 	if query:
-		legend = CAT(legend, P(f'To: {qdesc}'))
+		header = CAT(header, P(f'To: {qdesc}'))
 		footer = A("Export bcc list for use in email", _href=URL('bcc_export',
 						vars=dict(query=query, left=left or '', back=request.query.get('back'))))
 	else:
@@ -617,14 +707,17 @@ def composemail():
    			requires=[IS_NOT_EMPTY(), IS_LIST_OF_EMAILS()]))
 	fields.append(Field('bcc', 'string', requires=IS_LIST_OF_EMAILS(), default=''))
 	fields.append(Field('subject', 'string', requires=IS_NOT_EMPTY(), default=proto.Subject if proto else ''))
-	fields.append(Field('body', 'text', requires=IS_NOT_EMPTY(), default=proto.Body if proto else \
-				"<Letterhead>\n<greeting>\n\n" if query else "<Letterhead>\n\n"))
+	fields.append(Field('body', 'text', requires=IS_NOT_EMPTY(), default=proto.Body if proto else "<Letterhead>\n<greeting>\n\n" if query else "<Letterhead>\n\n",
+				comment=CAT("You can use <subject>, <greeting>, <member>, <reservation>, <email>, or <metadata> ",
+				"where metadata is 'Letterhead', 'Membership Secretary' or  'Reservations', etc.  ",
+				"You can also include html content thus: {{content}}. Email is formatted using ",
+					A('Markmin', _href='http://www.web2py.com/examples/static/markmin.html', _target='Markmin'), '.')))
 	fields.append(Field('save', 'boolean', default=proto!=None, comment='store/update template'))
 	if proto:
 		form=None
 		fields.append(Field('delete', 'boolean', comment='tick to delete template; sends no message'))
 	form2 = Form(fields, form_name="message_form", keep_values=True,
-					submit_value = 'Send', formstyle=FormStyleBulma)
+					submit_value = 'Send', formstyle=FormStyleBootstrap4)
 			
 	if form2.accepted:
 		if proto:
@@ -700,7 +793,7 @@ def composemail():
 def bcc_export():
 	query = request.query.get('query')
 	mailing_list = 'Mailings.contains'in query
-	left = request.query.get('left') if mailing_list else "db.Emails.on(db.Emails.Member==db.Members.id)"
+	left = request.query.get('left') or "db.Emails.on(db.Emails.Member==db.Members.id)"
 	rows = db(eval(query)).select(db.Members.id, db.Emails.Email, left=eval(left) if left else None,
 			       orderby=db.Members.id|~db.Emails.Modified, distinct=True)
 	try:
@@ -711,7 +804,7 @@ def bcc_export():
 				if mailing_list or row.Members.id != id:	#allow only primary email
 					writer.writerow([row.Emails.Email])
 				id = row.Members.id
-		flash.set("Email addresses exported to bcc.txt")
+		flash.set("Email addresses exported to server side py4web/bcc.txt")
 	except Exception as e:
 		flash.set(e)
 	redirect(request.query.get('back'))
@@ -721,8 +814,8 @@ def bcc_export():
 def login():
 	form = Form([Field('email', 'string',
 				requires=[IS_NOT_EMPTY(), IS_EMAIL()], default = session.get('email'))],
-				formstyle=FormStyleBulma)
-	legend = P("Please specify your email to login, you will receive a verification email there.")
+				formstyle=FormStyleBootstrap4)
+	header = P("Please specify your email to login, you will receive a verification email there.")
  
 	if form.accepted:
 		user = db(db.users.email==form.vars['email'].lower()).select().first()
@@ -730,10 +823,10 @@ def login():
 		if user:
 			id = user.id
 			user.update_record(tokens= [token]+(user.tokens or []),
-				when_issued = datetime.datetime.now())
+				remote_addr = request.remote_addr, when_issued = datetime.datetime.now())
 		else:
 			id = db.users.insert(email = form.vars['email'].lower(),
-				tokens= [token],
+				tokens= [token], remote_addr = request.remote_addr,
 				when_issued = datetime.datetime.now(),
 				url = session['url'])
 		log = 'login '+request.remote_addr+' '+form.vars['email']+' '+request.environ['HTTP_USER_AGENT']+' '+session['url']
@@ -749,19 +842,22 @@ def login():
 							body=message)
 		form = None
 
-		legend = DIV(P('Please click the link sent to your email to continue.'),
-					P('This link is valid for 15 minutes. You may close this browser tab.'))
+		header = DIV(P('Please click the link sent to your email to continue.'),
+					P('This link is valid for 15 minutes. You may close this window.'))
 	return locals()
 
 @action('validate/<id:int>/<token:int>', method=['POST', 'GET'])
 @action.uses("message.html", db, session)
 def validate(id, token):
 	user = db(db.users.id == id).select().first()
-	if not user or not int(token) in user.tokens or datetime.datetime.now() > user.when_issued + datetime.timedelta(minutes = 15):
+	if not user or not int(token) in user.tokens or \
+			datetime.datetime.now() > user.when_issued + datetime.timedelta(minutes = 15) or \
+			user.remote_addr != request.remote_addr:
 		redirect(URL('index'))
 	session['logged_in'] = True
 	session['id'] = user.id
 	session['email'] = user.email
+	session['member_filter'] = None
 	log = 'verified '+request.remote_addr+' '+user.email
 	logger.info(log)
 	user.update_record(tokens=[])
@@ -810,8 +906,8 @@ def logout():
 @checkaccess('admin')
 def db_restore():
 	form = Form([Field('filespec', 'string', requires=IS_NOT_EMPTY(),
-					   default='db_backup.csv')], formstyle=FormStyleBulma)
-	legend = P(SOCIETY_DOMAIN+" database will be restored from this file in app base directory. Click Submit to proceed")
+					   default='db_backup.csv')], formstyle=FormStyleBootstrap4)
+	header = P(SOCIETY_DOMAIN+" database will be restored from this file in app base directory. Click Submit to proceed")
 	
 	if form.accepted:
 		with open(form.vars['filespec'], 'r', encoding='utf-8', newline='') as dumpfile:

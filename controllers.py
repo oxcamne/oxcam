@@ -30,13 +30,13 @@ from yatl.helpers import *
 from .common import db, session, T, cache, auth, logger, authenticated, unauthenticated, flash
 from .settings_private import *
 from .models import primary_email, res_tbc, member_name, member_affiliations, primary_matriculation, \
-			member_emails, event_revenue, event_unpaid, res_totalcost
-from py4web.utils.grid import Grid, GridClassStyleBulma, Column, GridClassStyleBootstrap5
-from py4web.utils.form import Form, FormStyleBulma, FormStyleBootstrap4
+			member_emails, event_revenue, event_unpaid, res_totalcost, primary_affiliation
+from py4web.utils.grid import Grid, GridClassStyleBulma, Column
+from py4web.utils.form import Form, FormStyleBulma
 from pydal.validators import *
 #from py4web.core import response
 from py4web.utils.factories import Inject
-import datetime, random, re, markmin, stripe, csv
+import datetime, random, re, markmin, stripe, csv, decimal
 from io import StringIO
 
 class GridActionButton:
@@ -69,7 +69,7 @@ for an explanation see the blog article from which I cribbed
 def checkaccess(requiredaccess):
 	def wrap(f):
 		def wrapped_f(*args, **kwds):
-			session['prev_url'] = session.get('url')
+			session['urll_prev'] = session.get('url')
 			session['url']=request.url
 			if not session.get('logged_in') == True:    #logged in
 				if db(db.Members.id>0).count()==0:
@@ -126,7 +126,7 @@ def members(path=None):
 		Field('field', 'string', requires=IS_EMPTY_OR(IS_IN_SET(['Affiliation', 'Email']+db.Members.fields,
 					zero='field?'))),
 		Field('value', 'string')],
-		keep_values=True, formstyle=FormStyleBootstrap4
+		keep_values=True, formstyle=FormStyleBulma
 	)
 	
 	if path=='select':
@@ -267,8 +267,8 @@ using an optional operator (=, <, >, <=, >=) together with a value."))
 					db.Members.Access, db.Members.Notes],
 			headings=['Name', 'Status', 'Until', 'College', 'Access', 'Notes'],
 			details=not write, editable=write, create=write,
-			grid_class_style=GridClassStyleBootstrap5,
-			formstyle=FormStyleBootstrap4,
+			grid_class_style=GridClassStyleBulma,
+			formstyle=FormStyleBulma,
 			search_form=search_form,
 			validation=mod_member,
 			deletable=lambda r: member_deletable(r['id'])
@@ -325,8 +325,8 @@ is used on name badges etc."
 			columns=[db.Affiliations.College, db.Affiliations.Matr, db.Affiliations.Notes],
 			details=not write, editable=write, create=write, deletable=write,
 			validation=affiliation_modified,
-			grid_class_style=GridClassStyleBootstrap5,
-			formstyle=FormStyleBootstrap4,
+			grid_class_style=GridClassStyleBulma,
+			formstyle=FormStyleBulma,
 			)
 	return locals()
 	
@@ -368,8 +368,8 @@ are sent as specified in the Mailings Column."
 			columns=[db.Emails.Email, db.Emails.Mailings],
 			details=not write, editable=write, create=write, deletable=write,
 			validation=email_modified,
-			grid_class_style=GridClassStyleBootstrap5,
-			formstyle=FormStyleBootstrap4,
+			grid_class_style=GridClassStyleBulma,
+			formstyle=FormStyleBulma,
 			)
 	return locals()
 
@@ -409,8 +409,8 @@ def dues(member_id, path=None):
 			columns=[db.Dues.Amount, db.Dues.Date, db.Dues.Notes, db.Dues.Prevpaid, db.Dues.Nowpaid],
 			details=not write, editable=write, create=write, deletable=write,
 			validation=dues_validated,
-			grid_class_style=GridClassStyleBootstrap5,
-			formstyle=FormStyleBootstrap4,
+			grid_class_style=GridClassStyleBulma,
+			formstyle=FormStyleBulma,
 			)
 	return locals()
 	
@@ -451,8 +451,9 @@ def events(path=None):
 
 	grid = Grid(path, db.Events.id>0,
 	     	orderby=~db.Events.DateTime,
-			columns=[db.Events.id, db.Events.DateTime, db.Events.Description, db.Events.Venue, db.Events.Speaker,
-	    			db.Events.Paid, db.Events.Unpaid, db.Events.Prvsnl, db.Events.Wait, db.Events.Attend],
+		    headings=['Datetime', 'Description', 'Venue','Speaker', 'Paid','TBC', 'Conf', 'Wait'],
+			fields=[db.Events.DateTime, db.Events.Description, db.Events.Venue, db.Events.Speaker,
+	    			db.Events.Paid, db.Events.Unpaid, db.Events.Attend, db.Events.Wait],
 			search_queries=[["Description", lambda value: db.Events.Description.like('%'+value+'%')],
 		    				["Venue", lambda value: db.Events.Venue.like('%'+value+'%')],
 						    ["Speaker", lambda value: db.Events.Speaker.like('%'+value+'%')]],
@@ -460,8 +461,8 @@ def events(path=None):
 			details=not write, editable=write, create=write,
 			deletable=lambda r: write and db(db.Reservations.Event == r['id']).count() == 0 and db(db.AccTrans.Event == r['id']).count() == 0,
 			validation=checktickets,
-			grid_class_style=GridClassStyleBootstrap5,
-			formstyle=FormStyleBootstrap4,
+			grid_class_style=GridClassStyleBulma,
+			formstyle=FormStyleBulma,
 			)
 	return locals()
 		
@@ -480,7 +481,7 @@ def event_reservations(event_id, path=None):
 	header = CAT(A('back', _href=URL('events/select')),
 	      		H5('Provisional Reservations' if request.query.get('provisional') else 'Waitlist' if request.query.get('waitlist') else 'Reservations'),
 				H6(f"{event.DateTime}, {event.Description}"),
-				"Use the 'Expand' link to drill down on a reservation and view detail or edit individual reservations.", XML('<br>'))
+				"Use the 'Edit' buttons to drill down on a reservation and view detail or edit individual reservations.", XML('<br>'))
 	query = f'(db.Reservations.Event=={event_id})'
 	#for waitlist or provisional, have to include hosts with waitlisted or provisional guests
 	if request.query.get('waitlist') or request.query.get('provisional'):
@@ -500,21 +501,119 @@ select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 			back=back))), XML('<br>'))
 	header = CAT(header, 'Display: ')
 	if request.query.get('waitlist') or request.query.get('provisional'):
-		header = CAT(header, A('reservations', _href=URL('event_reservations/'+str(event_id))), ' or ')
+		header = CAT(header, A('reservations', _href=URL(f'event_reservations{event_id}')), ' or ')
 	if not request.query.get('waitlist'):
-		header = CAT(header, A('waitlist', _href=URL('event_reservations/'+str(event_id)+'/select', vars=dict(waitlist=True))), ' or ')
+		header = CAT(header, A('waitlist', _href=URL(f'event_reservations/{event_id}/select', vars=dict(waitlist=True))), ' or ')
 	if not request.query.get('provisional'):
-		header = CAT(header, A('provisional', _href=URL('event_reservations/'+str(event_id)+'/select', vars=dict(provisional=True))), ' not checked out')
+		header = CAT(header, A('provisional', _href=URL(f'event_reservations/{event_id}/select', vars=dict(provisional=True))), ' (not checked out)')
+
+	pre_action_buttons = [GridActionButton(lambda row: URL(f"reservation/{row.Reservations.Member}/{event_id}"), text='Edit', append_id=False)]
 
 	grid = Grid(path, eval(query),
 			left=db.Members.on(db.Members.id == db.Reservations.Member),
 			orderby=db.Reservations.Created if request.query.get('waitlist') else db.Reservations.Lastname|db.Reservations.Firstname,
-			fields=[db.Reservations.Member,db.Members.Membership, db.Members.Paiddate,
-						db.Reservations.Affiliation, db.Reservations.Notes, db.Reservations.Wait,
-						db.Reservations.conf, db.Reservations.Cost, db.Reservations.TBC],
-			headings=['Member', 'Type', 'Until', 'College', 'Notes', 'Wait', 'Conf', 'Cost', 'Tbc'],
-						details=False, editable = False, create = False, deletable = False,
-						rows_per_page=200)
+			columns=[db.Reservations.Member,db.Members.Membership, db.Members.Paiddate,
+						db.Reservations.Affiliation, db.Reservations.Notes,
+						db.Reservations.Cost, db.Reservations.TBC, db.Reservations.Conf,
+						db.Reservations.Wait, db.Reservations.id],
+			headings=['Member', 'Type', 'Until', 'College', 'Notes', 'Paid', 'Tbc', 'Conf', 'Wait'],
+			pre_action_buttons=pre_action_buttons,
+			details=False, editable = False, create = False, deletable = False,
+			rows_per_page=200, grid_class_style=GridClassStyleBulma, formstyle=FormStyleBulma)
+	return locals()
+
+def collegelist(sponsors=[]):
+	colleges = db().select(db.Colleges.ALL, orderby=db.Colleges.Oxbridge|db.Colleges.Name).find(lambda c: c.Oxbridge==True or c.id in sponsors)
+	return [(c.id, c.Name) for c in colleges if c.Name != 'Cambridge University' and c.Name != 'Oxford University']
+	
+@action('reservation/<member_id:int>/<event_id:int>', method=['POST', 'GET'])
+@action('reservation/<member_id:int>/<event_id:int>/<path:path>', method=['POST', 'GET'])
+@action.uses("grid.html", db, session, flash)
+@checkaccess('read')
+def reservation(member_id, event_id, path=None):
+# ...reservation/member_id/event_id/...
+#this controller is for dealing with the addition/modification of an expanded reservation
+	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
+	member = db.Members[member_id]
+	event = db.Events[event_id]
+	host_reservation = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)&(db.Reservations.Host==True)).select().first()
+	
+	back = session.get('url_prev')
+	header = H5('Member Reservation')
+
+	#set up reservations form, we have both member and event id's
+	db.Reservations.Member.default = member.id
+	db.Reservations.Event.default=event.id
+	clist = collegelist(sponsors = event.Sponsors or [])
+	db.Reservations.Affiliation.requires=requires=IS_EMPTY_OR(IS_IN_SET(clist))
+
+	total_party_count = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)).count()
+	if host_reservation:
+		#update member's name from member record in case corrected
+		host_reservation.update_record(Title=member.Title, Firstname=member.Firstname,
+					Lastname=member.Lastname, Suffix=member.Suffix) 
+			
+	if len(event.Selections)>0:
+		db.Reservations.Selection.requires=IS_IN_SET(event.Selections, zero='please select from dropdown list')
+	else:
+		db.Reservations.Selection.writable = db.Reservations.Selection.readable = False
+		
+	if len(event.Tickets)>0:
+		db.Reservations.Ticket.requires=IS_EMPTY_OR(IS_IN_SET(event.Tickets))
+		db.Reservations.Ticket.default = event.Tickets[0]
+	else:
+		db.Reservations.Ticket.writable = db.Reservations.Ticket.readable = False
+	
+	db.Reservations.Unitcost.writable=db.Reservations.Unitcost.readable=False
+	db.Reservations.Event.writable=db.Reservations.Event.readable=False
+	db.Reservations.Provisional.writable = db.Reservations.Provisional.readable = True
+
+	if path and path != 'select':	#editing or creating reservation
+		db.Reservations.Survey.readable = True
+		db.Reservations.Comment.readable = True
+		if host_reservation and (path=='new' or host_reservation.id!=int(path[5:])):
+			#this is a new guest reservation, or we are revising a guest reservation
+			db.Reservations.Host.default=False
+			db.Reservations.Firstname.writable=True
+			db.Reservations.Lastname.writable=True
+		else:
+			#creating or revising the host reservation
+			db.Reservations.Title.default = member.Title
+			db.Reservations.Firstname.default = member.Firstname
+			db.Reservations.Lastname.default = member.Lastname
+			db.Reservations.Suffix.default = member.Suffix
+			db.Reservations.Paid.writable=db.Reservations.Paid.readable=True
+			db.Reservations.Charged.writable=db.Reservations.Charged.readable=True
+			db.Reservations.Checkout.writable=db.Reservations.Checkout.readable=True
+			if event.Tickets:
+				for t in event.Tickets:
+					if t.startswith(member.Membership or '~'): db.Reservations.Ticket.default = t
+			aff = db(db.Colleges.Name == primary_affiliation(member_id)).select().first()
+			if aff: db.Reservations.Affiliation.default = aff.id
+		
+	def validate(form):
+		if form.vars.Ticket:
+			form.vars.Unitcost=decimal.Decimal(re.match('.*[^0-9.]([0-9]+\.?[0-9]{0,2})$',  form.vars.Ticket).group(1))
+		if path.startswith('edit'):	#revising existing reservation
+			if form.vars.Waitlist=='on':	#waitlisted, make sure provisional cleared
+				form.vars.Provisional=None
+				if host_reservation.id==int(path[5:]):	#host reservation is waitlisted
+					db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)&(db.Reservations.Host==False)).update(
+						Waitlist=True, Provisional=False, Modified=datetime.datetime.now())	#move any guests to the waitlist
+			elif host_reservation.id==int(path[5:]) and host_reservation.Waitlist==True:
+				#moving host reservation off the waitlist 
+				db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)&(db.Reservations.Host==False)).update(
+					Waitlist=False, Modified=datetime.datetime.now())	#move any guests off the waitlist
+			db.Reservations[form.vars.id].update_record(Modified = datetime.datetime.now())
+
+	grid = Grid(path, (db.Reservations.Member==member.id)&(db.Reservations.Event==event.id),
+			orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname,
+			columns=[db.Reservations.Lastname, db.Reservations.Firstname, db.Reservations.Affiliation, 
+					db.Reservations.Notes, db.Reservations.Selection, db.Reservations.Ticket,
+					db.Reservations.Provisional, db.Reservations.Waitlist, db.Reservations.Modified],
+			deletable=lambda r: write and (total_party_count==1 or r.id != host_reservation.id),
+			details=not write, editable=write, grid_class_style=GridClassStyleBulma,
+			formstyle=FormStyleBulma, create=write, validation=validate)
 	return locals()
 
 @action('doorlist_export/<event_id:int>', method=['GET'])
@@ -689,7 +788,7 @@ def composemail():
 		[Field('template', 'reference EMProtos',
 			requires=IS_IN_DB(db, 'EMProtos.id','%(Subject)s', orderby=~db.EMProtos.Modified),
 			comment='Optional: select an existing mail template')],
-			submit_value='Use Template', formstyle=FormStyleBootstrap4,
+			submit_value='Use Template', formstyle=FormStyleBulma,
 			form_name="template_form")
 	if form.accepted:
 		request.query['proto'] = form.vars.get('template')
@@ -717,7 +816,7 @@ def composemail():
 		form=None
 		fields.append(Field('delete', 'boolean', comment='tick to delete template; sends no message'))
 	form2 = Form(fields, form_name="message_form", keep_values=True,
-					submit_value = 'Send', formstyle=FormStyleBootstrap4)
+					submit_value = 'Send', formstyle=FormStyleBulma)
 			
 	if form2.accepted:
 		if proto:
@@ -814,7 +913,7 @@ def bcc_export():
 def login():
 	form = Form([Field('email', 'string',
 				requires=[IS_NOT_EMPTY(), IS_EMAIL()], default = session.get('email'))],
-				formstyle=FormStyleBootstrap4)
+				formstyle=FormStyleBulma)
 	header = P("Please specify your email to login, you will receive a verification email there.")
  
 	if form.accepted:
@@ -892,7 +991,7 @@ def accessdenied():
 		DIV("You do not have permission for that, please contact ",
       		A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL),
 			" if you think this is wrong."),
-		P(A('Go back', _href=session.get('prev_url'))))
+		P(A('Go back', _href=session.get('urll_prev'))))
 	return locals()
 
 @action('logout')
@@ -906,7 +1005,7 @@ def logout():
 @checkaccess('admin')
 def db_restore():
 	form = Form([Field('filespec', 'string', requires=IS_NOT_EMPTY(),
-					   default='db_backup.csv')], formstyle=FormStyleBootstrap4)
+					   default='db_backup.csv')], formstyle=FormStyleBulma)
 	header = P(SOCIETY_DOMAIN+" database will be restored from this file in app base directory. Click Submit to proceed")
 	
 	if form.accepted:

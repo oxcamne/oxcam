@@ -244,17 +244,17 @@ db.define_table('Reservations',
 	Field('Waitlist', 'boolean', default=False),	#now meaningfull in each individual reservation
 	
 	#following fields meaningfull only on the member's own reservation (Host==True)
-	Field.Virtual('Cost', lambda r: res_totalcost(r['Member'], r['Event']) or ''),
-	Field.Virtual('Tbc', lambda r: res_tbc(r['Member'], r['Event']) or ''),	#tickets only
-	Field.Virtual('TBC', lambda r: res_tbc(r['Member'], r['Event'], True) or ''),	#include dues
+	Field.Virtual('Cost', lambda r: res_totalcost(r['Member'], r['Event']) or '', readable=False),
+	Field.Virtual('Tbc', lambda r: res_tbc(r['Member'], r['Event']) or '', readable=False),	#tickets only
+	Field.Virtual('TBC', lambda r: res_tbc(r['Member'], r['Event'], True) or '', readable=False),	#include dues
 	Field('Paid', 'decimal(8,2)', readable=False, writable=False,
 				requires=IS_EMPTY_OR(IS_DECIMAL_IN_RANGE(0, 10000))), #total paid, confirmed by download from Stripe, Bank
 	Field('Charged', 'decimal(6,2)', readable=False, writable=False),	#payment made, not yet downloaded from Stripe
 	Field('Checkout', 'string', readable=False, writable=False),	#session.vars of incomplete checkout
-	Field.Virtual('conf', lambda r: db((db.Reservations.Member==r['Member'])& \
+	Field.Virtual('Conf', lambda r: db((db.Reservations.Member==r['Member'])& \
 								(db.Reservations.Event==r['Event'])&(db.Reservations.Provisional==False)& \
-								(db.Reservations.Waitlist==False)).count()),
-	Field.Virtual('Wait', lambda r: res_wait(r['Member'], r['Event']) or ''),
+								(db.Reservations.Waitlist==False)).count(), readable=False),
+	Field.Virtual('Wait', lambda r: res_wait(r['Member'], r['Event']) or '', readable=False),
 	
 	Field('Created', 'datetime', default=datetime.datetime.now(), readable=False, writable=False),
 	Field('Modified', 'datetime', default=datetime.datetime.now(), writable=False),

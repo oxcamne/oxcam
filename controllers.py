@@ -474,7 +474,11 @@ def event_reservations(event_id, path=None):
 # ...event_reservatins/event_id/...
 # request.query: waitlist=True, provisional=True
 	db.Reservations.id.readable=db.Reservations.Event.readable=False
-	db.Reservations.Provisional.readable=True
+	if path=='select':
+		db.Reservations.Cost.readable=True
+		db.Reservations.TBC.readable=True
+		db.Reservations.Conf.readable=True
+		db.Reservations.Wait.readable=True
 	back=URL(f'event_reservations/{event_id}/select', vars=request.query, scheme=True)
 
 	event = db.Events[event_id]
@@ -515,7 +519,7 @@ select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 			columns=[db.Reservations.Member,db.Members.Membership, db.Members.Paiddate,
 						db.Reservations.Affiliation, db.Reservations.Notes,
 						db.Reservations.Cost, db.Reservations.TBC, db.Reservations.Conf,
-						db.Reservations.Wait, db.Reservations.id],
+						db.Reservations.Wait],
 			headings=['Member', 'Type', 'Until', 'College', 'Notes', 'Paid', 'Tbc', 'Conf', 'Wait'],
 			pre_action_buttons=pre_action_buttons,
 			details=False, editable = False, create = False, deletable = False,
@@ -590,7 +594,7 @@ def reservation(member_id, event_id, path=None):
 					if t.startswith(member.Membership or '~'): db.Reservations.Ticket.default = t
 			aff = db(db.Colleges.Name == primary_affiliation(member_id)).select().first()
 			if aff: db.Reservations.Affiliation.default = aff.id
-		
+
 	def validate(form):
 		if form.vars.Ticket:
 			form.vars.Unitcost=decimal.Decimal(re.match('.*[^0-9.]([0-9]+\.?[0-9]{0,2})$',  form.vars.Ticket).group(1))

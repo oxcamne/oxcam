@@ -1,6 +1,5 @@
 [[
-from py4web.core import response
 response.headers['Content-Type']=content_type
-response.headers['Content-disposition'] = f'attachment; filename={filename}'
-response.write(stream.getvalue(), escape=False)
+response.headers['Content-disposition'] = f'attachment; filename="{filename}"'
+=XML(stream.getvalue())
 ]]

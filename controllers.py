@@ -25,7 +25,7 @@ session, db, T, auth, and tempates are examples of Fixtures.
 Warning: Fixtures MUST be declared with @action.uses({fixtures}) else your app will result in undefined behavior
 """
 
-from py4web import action, request, abort, redirect, URL, Field, DAL
+from py4web import action, request, response, abort, redirect, URL, Field, DAL
 from yatl.helpers import *
 from .common import db, session, T, cache, auth, logger, authenticated, unauthenticated, flash
 from .settings_private import *
@@ -34,9 +34,8 @@ from .models import primary_email, res_tbc, member_name, member_affiliations, pr
 from py4web.utils.grid import Grid, GridClassStyleBulma, Column
 from py4web.utils.form import Form, FormStyleBulma
 from pydal.validators import *
-#from py4web.core import response
 from py4web.utils.factories import Inject
-import datetime, random, re, markmin, stripe, csv, decimal
+import datetime, random, re, markmin, stripe, csv, decimal, io
 from io import StringIO
 
 class GridActionButton:
@@ -69,7 +68,7 @@ for an explanation see the blog article from which I cribbed
 def checkaccess(requiredaccess):
 	def wrap(f):
 		def wrapped_f(*args, **kwds):
-			session['urll_prev'] = session.get('url')
+			session['url_prev'] = session.get('url')
 			session['url']=request.url
 			if not session.get('logged_in') == True:    #logged in
 				if db(db.Members.id>0).count()==0:
@@ -147,7 +146,8 @@ def members(path=None):
 		header = CAT(H5('Member Record'), A('back', _href=back))
 		if path.startswith('edit'):
 			header= CAT(header,
-	       			P(A('OxCam affiliation(s)', _href=URL('affiliations', path[5:])), XML('<br>'),
+	       			P(A('Member reservations', _href=URL('member_reservations', path[5:])), XML('<br>'),
+					A('OxCam affiliation(s)', _href=URL('affiliations', path[5:])), XML('<br>'),
 					A('Email addresses and subscriptions', _href=URL('emails', path[5:])), XML('<br>'),
 					A('Dues payments', _href=URL('dues', path[5:])), XML('<br>'),
 					A('Send Email to Member', _href=URL('composemail',
@@ -266,7 +266,7 @@ using an optional operator (=, <, >, <=, >=) together with a value."))
 					db.Members.Affiliations,
 					db.Members.Access, db.Members.Notes],
 			headings=['Name', 'Status', 'Until', 'College', 'Access', 'Notes'],
-			details=not write, editable=write, create=write,
+			details=not write, editable=write, create=write, show_id=True,
 			grid_class_style=GridClassStyleBulma,
 			formstyle=FormStyleBulma,
 			search_form=search_form,
@@ -276,29 +276,67 @@ using an optional operator (=, <, >, <=, >=) together with a value."))
 	return locals()
 
 @action('members_export', method=['GET'])
-@action.uses("download.html", db, session, flash)#, Inject(response=response))
-#@action.uses(db, session, flash)
+@action.uses("download.html", db, session, flash, Inject(response=response))
 @checkaccess('write')
 def members_export():
 	stream = StringIO()
-	content_type = 'text/csv'
+	content_type = "text/csv"
 	filename = 'members.csv'
 	query = request.query.get('query')
 	left = request.query.get('left')
 	rows = db(eval(query)).select(db.Members.ALL, left=left, orderby=db.Members.Lastname|db.Members.Firstname)
 	try:
-		#with open('members.csv', 'w', encoding='utf-8', newline='') as csvfile:
 		writer=csv.writer(stream)
-			#writer=csv.writer(csvfile)
 		writer.writerow(['Name', 'Affiliations', 'Emails']+db.Members.fields)
 		for row in rows:
 			data = [member_name(row.id), member_affiliations(row.id), member_emails(row.id)]+[row[field] for field in db.Members.fields]
 			writer.writerow(data)
-		flash.set("Selected Members exported to server side py4web/members.csv")
 	except Exception as e:
 		flash.set(e)
-#	redirect(URL('members/select'))
+		redirect(URL('members/select'))
 	return locals()	
+
+@action('member_reservations/<member_id:int>', method=['POST', 'GET'])
+@action('member_reservations/<member_id:int>/<path:path>', method=['POST', 'GET'])
+@action.uses("grid.html", db, session, flash)
+@checkaccess('read')
+def member_reservations(member_id, path=None):
+# .../member_reservations/member_id/...
+	db.Reservations.Member.readable=False
+
+	header = CAT(H5('Member Reservations'),
+	      		H6(member_name(member_id)),
+				A('Add New Reservation', _href=URL(f'add_member_reservation/{member_id}', scheme=True)), XML('<br>'),
+				A('back', _href=URL(f'members/edit/{member_id}', scheme=True)))
+
+	pre_action_buttons = [GridActionButton(lambda row: URL(f"reservation/{member_id}/{row.Reservations.Event}"), text='Edit', append_id=False)]
+
+	grid = Grid(path, (db.Reservations.Member==member_id)&(db.Reservations.Host==True),
+			left=db.Events.on(db.Events.id == db.Reservations.Event),
+			orderby=~db.Events.DateTime,
+			pre_action_buttons=pre_action_buttons,
+			columns=[db.Reservations.Member, db.Events.DateTime, db.Reservations.Event, db.Reservations.Wait,
+					db.Reservations.Conf, db.Reservations.Cost,
+					db.Reservations.Paid, db.Reservations.Charged, db.Reservations.TBC],
+			details=False, editable = False, create = False, deletable = False)
+	return locals()
+	
+@action('add_member_reservation/<member_id:int>', method=['POST', 'GET'])
+@action.uses("form.html", db, session, flash)
+@checkaccess('write')
+def add_member_reservation(member_id):
+	header = CAT(H5('Add New Reservation'),
+	      		H6(member_name(member_id)),
+				A('back', _href=URL(f'members/edit/{member_id}', scheme=True)))
+
+	form=Form([Field('event', 'reference db.Events',
+		  requires=IS_IN_DB(db, 'Events', '%(Description)s', orderby = ~db.Events.DateTime,
+		      				zero='Please select event for new reservation from dropdown.'))],
+		formstyle=FormStyleBulma)
+	
+	if form.accepted:
+		redirect(URL(f"reservation/{member_id}/{form.vars.get('event')}"))
+	return locals()
 
 @action('affiliations/<member_id:int>', method=['POST', 'GET'])
 @action('affiliations/<member_id:int>/<path:path>', method=['POST', 'GET'])
@@ -309,9 +347,8 @@ def affiliations(member_id, path=None):
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 	db.Affiliations.Member.default=member_id
 
-	member=db.Members[member_id]
 	header = CAT(H5('Member Affiliations'),
-	      		H6(f"{member.Lastname}, {member.Title or ''} {member.Firstname} {member.Suffix or ''}"),
+	      		H6(member_name(member_id)),
 				P(A('back', _href=URL(f'members/edit/{member_id}', scheme=True))))
 	footer = "Multiple affiliations are listed in order modified. The topmost one \
 is used on name badges etc."
@@ -350,9 +387,8 @@ def emails(member_id, path=None):
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 	db.Emails.Member.default=member_id
 
-	member=db.Members[member_id]
 	header = CAT(H5('Member Emails'),
-	      		H6(f"{member.Lastname}, {member.Title or ''} {member.Firstname} {member.Suffix or ''}"),
+	      		H6(member_name(member_id)),
 				P(A('back', _href=URL(f'members/edit/{member_id}', scheme=True))))
 	footer = "Note, the most recently edited (topmost) email is used for messages \
 directed to the individual member, and appears in the Members Directory. Notices \
@@ -396,7 +432,7 @@ def dues(member_id, path=None):
 	db.Dues.Nowpaid.default = newpaiddate(member.Paiddate)
 
 	header = CAT(H5('Member Dues'),
-	      		H6(f"{member.Lastname}, {member.Title or ''} {member.Firstname} {member.Suffix or ''}"),
+	      		H6(member_name(member_id)),
 				P(A('back', _href=URL(f'members/edit/{member_id}', scheme=True))))
 
 	def dues_validated(form):
@@ -542,8 +578,17 @@ def reservation(member_id, event_id, path=None):
 	event = db.Events[event_id]
 	host_reservation = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)&(db.Reservations.Host==True)).select().first()
 	
-	back = session.get('url_prev')
-	header = H5('Member Reservation')
+	if path:
+		back = session.get('url')
+		if path=='select':
+			back = session.get('back')
+	else:
+		back = session.get('url_prev')
+		session['back'] = back
+
+	header = CAT(H5('Member Reservation'),
+	      		XML(markmin.markmin2html(evtconfirm(event.id, member.id))),
+	      		A('back', _href=back))
 
 	#set up reservations form, we have both member and event id's
 	db.Reservations.Member.default = member.id
@@ -596,11 +641,11 @@ def reservation(member_id, event_id, path=None):
 			if aff: db.Reservations.Affiliation.default = aff.id
 
 	def validate(form):
-		if form.vars.Ticket:
-			form.vars.Unitcost=decimal.Decimal(re.match('.*[^0-9.]([0-9]+\.?[0-9]{0,2})$',  form.vars.Ticket).group(1))
+		if form.vars.get('Ticket'):
+			form.vars['Unitcost']=decimal.Decimal(re.match('.*[^0-9.]([0-9]+\.?[0-9]{0,2})$',  form.vars.get('Ticket')).group(1))
 		if path.startswith('edit'):	#revising existing reservation
-			if form.vars.Waitlist=='on':	#waitlisted, make sure provisional cleared
-				form.vars.Provisional=None
+			if form.vars.get('Waitlist')==True:	#waitlisted, make sure provisional cleared
+				form.vars['Provisional']=False
 				if host_reservation.id==int(path[5:]):	#host reservation is waitlisted
 					db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)&(db.Reservations.Host==False)).update(
 						Waitlist=True, Provisional=False, Modified=datetime.datetime.now())	#move any guests to the waitlist
@@ -608,46 +653,48 @@ def reservation(member_id, event_id, path=None):
 				#moving host reservation off the waitlist 
 				db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)&(db.Reservations.Host==False)).update(
 					Waitlist=False, Modified=datetime.datetime.now())	#move any guests off the waitlist
-			db.Reservations[form.vars.id].update_record(Modified = datetime.datetime.now())
+			db.Reservations[form.vars.get('id')].update_record(Modified = datetime.datetime.now())
 
 	grid = Grid(path, (db.Reservations.Member==member.id)&(db.Reservations.Event==event.id),
 			orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname,
 			columns=[db.Reservations.Lastname, db.Reservations.Firstname, db.Reservations.Affiliation, 
 					db.Reservations.Notes, db.Reservations.Selection, db.Reservations.Ticket,
-					db.Reservations.Provisional, db.Reservations.Waitlist, db.Reservations.Modified],
+					db.Reservations.Provisional, db.Reservations.Waitlist],
+			headings=['Last', 'First', 'College', 'Notes', 'Menu', 'Ticket', 'Prvsnl', 'Waitlist'],
 			deletable=lambda r: write and (total_party_count==1 or r.id != host_reservation.id),
 			details=not write, editable=write, grid_class_style=GridClassStyleBulma,
 			formstyle=FormStyleBulma, create=write, validation=validate)
 	return locals()
 
 @action('doorlist_export/<event_id:int>', method=['GET'])
-@action.uses(db, session, flash)
+@action.uses("download.html", db, session, flash, Inject(response=response))
 @checkaccess('read')
 def doorlist_export(event_id):
+	stream = StringIO()
+	content_type = "text/csv"
+	filename = 'doorlist.csv'
 	hosts = db((db.Reservations.Event==event_id)&(db.Reservations.Host==True)&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)).select(
 					orderby=db.Reservations.Lastname|db.Reservations.Firstname,
 					left=db.Members.on(db.Reservations.Member == db.Members.id))
 	try:
-		with open('doorlist.csv', 'w', encoding='utf-8', newline='') as csvfile:
-			writer=csv.writer(csvfile)
-			writer.writerow(['HostLast','HostFirst','Notes','LastName','FirstName','CollegeName','Selection','Table','Ticket',
-								'Email','Cell','Survey','Comment'])
-			for host in hosts:
-				guests=db((db.Reservations.Event==event_id)&(db.Reservations.Member==host.Reservations.Member)\
-						&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).select(
-					orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname)
-					
-				for guest in guests:
-					email = primary_email(host.Members.id) if host.Reservations.id==guest.id else ''
-					writer.writerow([host.Reservations.Lastname, host.Reservations.Firstname, guest.Notes or '',
-										guest.Lastname, guest.Firstname, guest.Affiliation.Name if guest.Affiliation else '',
-										guest.Selection or '', '', guest.Ticket or '', email,
-										host.Members.Cellphone if host.Reservations.id==guest.id else '',
-										guest.Survey or '', guest.Comment or ''])
-		flash.set("Doorlist exported to server side py4web/doorlist.csv")
+		writer=csv.writer(stream)
+		writer.writerow(['HostLast','HostFirst','Notes','LastName','FirstName','CollegeName','Selection','Table','Ticket',
+							'Email','Cell','Survey','Comment'])
+		for host in hosts:
+			guests=db((db.Reservations.Event==event_id)&(db.Reservations.Member==host.Reservations.Member)\
+					&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).select(
+				orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname)
+				
+			for guest in guests:
+				email = primary_email(host.Members.id) if host.Reservations.id==guest.id else ''
+				writer.writerow([host.Reservations.Lastname, host.Reservations.Firstname, guest.Notes or '',
+									guest.Lastname, guest.Firstname, guest.Affiliation.Name if guest.Affiliation else '',
+									guest.Selection or '', '', guest.Ticket or '', email,
+									host.Members.Cellphone if host.Reservations.id==guest.id else '',
+									guest.Survey or '', guest.Comment or ''])
 	except Exception as e:
 		flash.set(e)
-	redirect(request.query.get('back'))
+	return locals()
 	
 @action('event_copy/<event_id:int>', method=['GET'])
 @action.uses(db, session, flash)
@@ -662,24 +709,25 @@ def event_copy(event_id):
 	redirect(URL('events/select'))
 
 @action('events_export', method=['GET'])
-@action.uses(db, session, flash)
+@action.uses("download.html", db, session, flash, Inject(response=response))
 @checkaccess('write')
 def events_export():
+	stream = StringIO()
+	content_type = "text/csv"
+	filename = 'events.csv'
 	rows = db(db.Events.id>0).select(db.Events.ALL, orderby=~db.Events.DateTime)
 	try:
-		with open('events.csv', 'w', encoding='utf-8', newline='') as csvfile:
-			writer=csv.writer(csvfile)
-			writer.writerow(db.Events.fields+['Revenue', 'Unpaid', 'Provisional','Waitlist', 'Attendees'])
-			for r in rows:
-				data = [r[field] for field in db.Events.fields]+[event_revenue(r.id), event_unpaid(r.id),
-						db((db.Reservations.Event==r.id)&(db.Reservations.Provisional==True)).count(),
-						db((db.Reservations.Event==r.id)&(db.Reservations.Waitlist==True)).count(),
-						db((db.Reservations.Event==r.id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).count()]
-				writer.writerow(data)
-		flash.set("Events exported to server side py4web/events.csv")
+		writer=csv.writer(stream)
+		writer.writerow(db.Events.fields+['Revenue', 'Unpaid', 'Provisional','Waitlist', 'Attendees'])
+		for r in rows:
+			data = [r[field] for field in db.Events.fields]+[event_revenue(r.id), event_unpaid(r.id),
+					db((db.Reservations.Event==r.id)&(db.Reservations.Provisional==True)).count(),
+					db((db.Reservations.Event==r.id)&(db.Reservations.Waitlist==True)).count(),
+					db((db.Reservations.Event==r.id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).count()]
+			writer.writerow(data)
 	except Exception as e:
 		flash.set(e)
-	redirect(URL('events/select'))
+	return locals()
 
 def emailparse(body, subject, query):
 #this function validates and expands boilerplate <...> elements except the ones left til the last minute	
@@ -728,16 +776,16 @@ def evtconfirm(event_id, member_id, justpaid=0):
 	event = db.Events[event_id]
 	resvtns = db((db.Reservations.Event==event_id)&(db.Reservations.Member==member_id)).select(
 					orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname)
-	if not resvtns: return ''
-	tbc = res_tbc(member_id, event_id) or 0
-	tbcdues = res_tbc(member_id, event_id, True) or 0
-	cost = res_totalcost(member_id, event_id) or 0
 	body = '------------------------\n'
 	body += '**Event:**|' + (event.Description or '') + '\n'
 	body += '**Venue:**|' + (event.Venue or '') + '\n'
 	body += '**Date:**|' + event.DateTime.strftime("%A %B %d, %Y") + '\n'
 	body += '**Time:**|' + event.DateTime.strftime("%I:%M%p") + '\n'
 	body += '------------------------\n'
+	if not resvtns: return body
+	tbc = res_tbc(member_id, event_id) or 0
+	tbcdues = res_tbc(member_id, event_id, True) or 0
+	cost = res_totalcost(member_id, event_id) or 0
 	body += '------------------------\n'
 	body += '**Name**|**Affiliation**|**Selection**|**Ticket Cost**\n'
 	for t in resvtns:
@@ -891,26 +939,27 @@ def composemail():
 	return locals()
 
 @action('bcc_export', method=['GET'])
-@action.uses(db, session, flash)
+@action.uses("download.html", db, session, flash, Inject(response=response))
 @checkaccess('write')
 def bcc_export():
+	stream = StringIO()
+	content_type = "text/plain"
+	filename = 'bcc.txt'
 	query = request.query.get('query')
 	mailing_list = 'Mailings.contains'in query
 	left = request.query.get('left') or "db.Emails.on(db.Emails.Member==db.Members.id)"
 	rows = db(eval(query)).select(db.Members.id, db.Emails.Email, left=eval(left) if left else None,
 			       orderby=db.Members.id|~db.Emails.Modified, distinct=True)
 	try:
-		with open('bcc.txt', 'w', encoding='utf-8', newline='') as csvfile:
-			writer=csv.writer(csvfile)
-			id = 0
-			for row in rows:
-				if mailing_list or row.Members.id != id:	#allow only primary email
-					writer.writerow([row.Emails.Email])
-				id = row.Members.id
-		flash.set("Email addresses exported to server side py4web/bcc.txt")
+		writer=csv.writer(stream)
+		id = 0
+		for row in rows:
+			if mailing_list or row.Members.id != id:	#allow only primary email
+				writer.writerow([row.Emails.Email])
+			id = row.Members.id
 	except Exception as e:
 		flash.set(e)
-	redirect(request.query.get('back'))
+	return locals()
 
 @action('login', method=['POST', 'GET'])
 @action.uses("form.html", db, session, flash)

@@ -125,8 +125,7 @@ def members(path=None):
 		Field('field', 'string', requires=IS_EMPTY_OR(IS_IN_SET(['Affiliation', 'Email']+db.Members.fields,
 					zero='field?'))),
 		Field('value', 'string')],
-		keep_values=True, formstyle=FormStyleBulma
-	)
+		keep_values=True, formstyle=FormStyleBulma)
 	
 	if path=='select':
 		db.Members.Name.readable = True
@@ -143,7 +142,8 @@ def members(path=None):
 			session['member_filter'] = member_filter
 		header = CAT(header, A("Send Email to Specific Address(es)", _href=URL('composemail', vars=dict(back=back))))
 	elif path:
-		header = CAT(H5('Member Record'), A('back', _href=back))
+		back = session.get('back') or back
+		header = CAT(A('back', _href=back), H5('Member Record'))
 		if path.startswith('edit'):
 			header= CAT(header,
 	       			P(A('Member reservations', _href=URL('member_reservations', path[5:])), XML('<br>'),
@@ -155,6 +155,8 @@ def members(path=None):
 		 					qdesc=member_name(path[5:]),
 		   					back=URL(f'members/edit/{path[5:]}', scheme=True)))))
 	       			)
+	else:
+		session['back'] = None
 
 	if search_form.vars.get('mailing_list'):
 		query.append(f"(db.Emails.Member==db.Members.id)&db.Emails.Mailings.contains({search_form.vars.get('mailing_list')})")
@@ -304,10 +306,10 @@ def member_reservations(member_id, path=None):
 # .../member_reservations/member_id/...
 	db.Reservations.Member.readable=False
 
-	header = CAT(H5('Member Reservations'),
+	header = CAT(A('back', _href=URL(f'members/edit/{member_id}', scheme=True)),
+				H5('Member Reservations'),
 	      		H6(member_name(member_id)),
-				A('Add New Reservation', _href=URL(f'add_member_reservation/{member_id}', scheme=True)), XML('<br>'),
-				A('back', _href=URL(f'members/edit/{member_id}', scheme=True)))
+				A('Add New Reservation', _href=URL(f'add_member_reservation/{member_id}', scheme=True)))
 
 	pre_action_buttons = [GridActionButton(lambda row: URL(f"reservation/{member_id}/{row.Reservations.Event}"), text='Edit', append_id=False)]
 
@@ -325,9 +327,10 @@ def member_reservations(member_id, path=None):
 @action.uses("form.html", db, session, flash)
 @checkaccess('write')
 def add_member_reservation(member_id):
-	header = CAT(H5('Add New Reservation'),
+	header = CAT(A('back', _href=URL(f'members/edit/{member_id}', scheme=True)),
+	      		H5('Add New Reservation'),
 	      		H6(member_name(member_id)),
-				A('back', _href=URL(f'members/edit/{member_id}', scheme=True)))
+				)
 
 	form=Form([Field('event', 'reference db.Events',
 		  requires=IS_IN_DB(db, 'Events', '%(Description)s', orderby = ~db.Events.DateTime,
@@ -347,9 +350,9 @@ def affiliations(member_id, path=None):
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 	db.Affiliations.Member.default=member_id
 
-	header = CAT(H5('Member Affiliations'),
-	      		H6(member_name(member_id)),
-				P(A('back', _href=URL(f'members/edit/{member_id}', scheme=True))))
+	header = CAT(A('back', _href=URL(f'members/edit/{member_id}', scheme=True)),
+	      		H5('Member Affiliations'),
+	      		H6(member_name(member_id)))
 	footer = "Multiple affiliations are listed in order modified. The topmost one \
 is used on name badges etc."
 
@@ -387,9 +390,9 @@ def emails(member_id, path=None):
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 	db.Emails.Member.default=member_id
 
-	header = CAT(H5('Member Emails'),
-	      		H6(member_name(member_id)),
-				P(A('back', _href=URL(f'members/edit/{member_id}', scheme=True))))
+	header = CAT(A('back', _href=URL(f'members/edit/{member_id}', scheme=True)),
+	      		H5('Member Emails'),
+	      		H6(member_name(member_id)))
 	footer = "Note, the most recently edited (topmost) email is used for messages \
 directed to the individual member, and appears in the Members Directory. Notices \
 are sent as specified in the Mailings Column."
@@ -431,9 +434,9 @@ def dues(member_id, path=None):
 	db.Dues.Prevpaid.default = member.Paiddate
 	db.Dues.Nowpaid.default = newpaiddate(member.Paiddate)
 
-	header = CAT(H5('Member Dues'),
-	      		H6(member_name(member_id)),
-				P(A('back', _href=URL(f'members/edit/{member_id}', scheme=True))))
+	header = CAT(A('back', _href=URL(f'members/edit/{member_id}', scheme=True)),
+	      		H5('Member Dues'),
+	      		H6(member_name(member_id)))
 
 	def dues_validated(form):
 		if (not form.vars.get('id')): 	#adding dues record
@@ -460,13 +463,17 @@ def events(path=None):
 
 	header = H5('Events')
 
-	if path=='select':
+	if not path:
+		session['back'] = None
+	elif path=='select':
 		footer = A("Export all Events as CSV file", _href=URL('events_export')) 
 		db.Events.Paid.readable = db.Events.Unpaid.readable = True
 		db.Events.Prvsnl.readable = db.Events.Wait.readable = db.Events.Attend.readable = True
-	elif path and path.startswith('edit'):
+	elif path=='new':
+		header = CAT(A('back', _href=back), H5('New Event'))
+	else:
 		url = URL('register', path[5:], scheme=True)
-		header = CAT(H5('Event Record'), A('back', _href=back), XML('<br>'),
+		header = CAT(A('back', _href=back), H5('Event Record'),
 	       			"Booking link is ", A(url, _href=url), XML('<br>'),
 	       			A('Make a Copy of This Event', _href=URL('event_copy', path[5:])))
 	       		
@@ -547,7 +554,8 @@ select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 	if not request.query.get('provisional'):
 		header = CAT(header, A('provisional', _href=URL(f'event_reservations/{event_id}/select', vars=dict(provisional=True))), ' (not checked out)')
 
-	pre_action_buttons = [GridActionButton(lambda row: URL(f"reservation/{row.Reservations.Member}/{event_id}"), text='Edit', append_id=False)]
+	pre_action_buttons = [GridActionButton(lambda row: URL(f"reservation/{row.Reservations.Member}/{event_id}"),
+							text='Edit', append_id=False)]
 
 	grid = Grid(path, eval(query),
 			left=db.Members.on(db.Members.id == db.Reservations.Member),
@@ -576,19 +584,29 @@ def reservation(member_id, event_id, path=None):
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 	member = db.Members[member_id]
 	event = db.Events[event_id]
-	host_reservation = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)&(db.Reservations.Host==True)).select().first()
+	all_guests = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)).select(orderby=~db.Reservations.Host)
+	host_reservation =all_guests.first()
 	
-	if path:
-		back = session.get('url')
-		if path=='select':
-			back = session.get('back')
-	else:
+	if not path:
 		back = session.get('url_prev')
 		session['back'] = back
+	elif path=='select':
+		back = session.get('back')
+	else:
+		back = URL('reservation', f'{member_id}/{event_id}/select')
 
-	header = CAT(H5('Member Reservation'),
-	      		XML(markmin.markmin2html(evtconfirm(event.id, member.id))),
-	      		A('back', _href=back))
+	header = CAT(A('back', _href=back), H5('Member Reservation'),
+	      		H6(member_name(member_id)),
+	      		XML(markmin.markmin2html(evtconfirm(event.id, member.id, event_only=True))))
+	if path and path=='select':
+		header = CAT(header, A('send email', _href=(URL('composemail', vars=dict(
+			query=f"(db.Members.id=={member_id})&(db.Members.id==db.Reservations.Member)&(db.Reservations.Event=={event_id})",
+			qdesc=member_name(member_id), left="db.Emails.on(db.Emails.Member==db.Members.id)", back=session['url'])))),
+			XML(" (use ")+"<reservation>",
+			XML(" to include confirmation and payment link)<br>"),	
+XML("Top row is the member's own reservation, additional rows are guests.<br>\
+Use Add Record to add the member, initially, then to add additional guests.<br>\
+Edit rows to move on/off waitlist or first row to record a check payment."))
 
 	#set up reservations form, we have both member and event id's
 	db.Reservations.Member.default = member.id
@@ -596,7 +614,6 @@ def reservation(member_id, event_id, path=None):
 	clist = collegelist(sponsors = event.Sponsors or [])
 	db.Reservations.Affiliation.requires=requires=IS_EMPTY_OR(IS_IN_SET(clist))
 
-	total_party_count = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)).count()
 	if host_reservation:
 		#update member's name from member record in case corrected
 		host_reservation.update_record(Title=member.Title, Firstname=member.Firstname,
@@ -617,7 +634,7 @@ def reservation(member_id, event_id, path=None):
 	db.Reservations.Event.writable=db.Reservations.Event.readable=False
 	db.Reservations.Provisional.writable = db.Reservations.Provisional.readable = True
 
-	if path and path != 'select':	#editing or creating reservation
+	if path and path != 'select' and not path.startswith('delete'):	#editing or creating reservation
 		db.Reservations.Survey.readable = True
 		db.Reservations.Comment.readable = True
 		if host_reservation and (path=='new' or host_reservation.id!=int(path[5:])):
@@ -640,19 +657,12 @@ def reservation(member_id, event_id, path=None):
 			aff = db(db.Colleges.Name == primary_affiliation(member_id)).select().first()
 			if aff: db.Reservations.Affiliation.default = aff.id
 
+	for row in all_guests:
+		if row.Ticket:
+			row.update_record(Unitcost=decimal.Decimal(re.match('.*[^0-9.]([0-9]+\.?[0-9]{0,2})$', row.Ticket).group(1)))
+
 	def validate(form):
-		if form.vars.get('Ticket'):
-			form.vars['Unitcost']=decimal.Decimal(re.match('.*[^0-9.]([0-9]+\.?[0-9]{0,2})$',  form.vars.get('Ticket')).group(1))
-		if path.startswith('edit'):	#revising existing reservation
-			if form.vars.get('Waitlist')==True:	#waitlisted, make sure provisional cleared
-				form.vars['Provisional']=False
-				if host_reservation.id==int(path[5:]):	#host reservation is waitlisted
-					db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)&(db.Reservations.Host==False)).update(
-						Waitlist=True, Provisional=False, Modified=datetime.datetime.now())	#move any guests to the waitlist
-			elif host_reservation.id==int(path[5:]) and host_reservation.Waitlist==True:
-				#moving host reservation off the waitlist 
-				db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)&(db.Reservations.Host==False)).update(
-					Waitlist=False, Modified=datetime.datetime.now())	#move any guests off the waitlist
+		if (form.vars.get('id')):
 			db.Reservations[form.vars.get('id')].update_record(Modified = datetime.datetime.now())
 
 	grid = Grid(path, (db.Reservations.Member==member.id)&(db.Reservations.Event==event.id),
@@ -661,9 +671,9 @@ def reservation(member_id, event_id, path=None):
 					db.Reservations.Notes, db.Reservations.Selection, db.Reservations.Ticket,
 					db.Reservations.Provisional, db.Reservations.Waitlist],
 			headings=['Last', 'First', 'College', 'Notes', 'Menu', 'Ticket', 'Prvsnl', 'Waitlist'],
-			deletable=lambda r: write and (total_party_count==1 or r.id != host_reservation.id),
+			deletable=lambda r: write and (len(all_guests)==1 or r.id != host_reservation.id),
 			details=not write, editable=write, grid_class_style=GridClassStyleBulma,
-			formstyle=FormStyleBulma, create=write, validation=validate)
+			formstyle=FormStyleBulma, create=write, validation=validate,show_id=True)
 	return locals()
 
 @action('doorlist_export/<event_id:int>', method=['GET'])
@@ -772,7 +782,7 @@ def member_profile(member):
 	return body
 	
 #create confirmation of event
-def evtconfirm(event_id, member_id, justpaid=0):
+def evtconfirm(event_id, member_id, justpaid=0, event_only=False):
 	event = db.Events[event_id]
 	resvtns = db((db.Reservations.Event==event_id)&(db.Reservations.Member==member_id)).select(
 					orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname)
@@ -782,7 +792,7 @@ def evtconfirm(event_id, member_id, justpaid=0):
 	body += '**Date:**|' + event.DateTime.strftime("%A %B %d, %Y") + '\n'
 	body += '**Time:**|' + event.DateTime.strftime("%I:%M%p") + '\n'
 	body += '------------------------\n'
-	if not resvtns: return body
+	if event_only or not resvtns: return body
 	tbc = res_tbc(member_id, event_id) or 0
 	tbcdues = res_tbc(member_id, event_id, True) or 0
 	cost = res_totalcost(member_id, event_id) or 0
@@ -827,8 +837,7 @@ def composemail():
 	qdesc = request.query.get('qdesc')
 	left = request.query.get('left')
 
-	header = CAT(H5("Send Email"),
-	      		P(A('back', _href=request.query.get('back'))))
+	header = CAT(A('back', _href=request.query.get('back')), H5("Send Email"))
 	source = [row['Email'] for row in db((db.Emails.Member == session['member_id']) & \
 	   (db.Emails.Email.contains(SOCIETY_DOMAIN.lower()))).select(
 			db.Emails.Email, orderby=~db.Emails.Modified)]
@@ -901,7 +910,7 @@ def composemail():
 					unsubscribe = URL('member',  'mail_lists', scheme=True)
 					bodyparts.append((f"\n\n''This message addressed to {qdesc} [[unsubscribe {unsubscribe}]]''", None))
 				bodyparts.append((f"\n\n''{VISIT_WEBSITE_INSTRUCTIONS}''", None))
-				rows = db(eval(query)).select(*select_fields, left=eval(left) if left!='' else None, distinct=True)
+				rows = db(eval(query)).select(*select_fields, left=eval(left) if left!=None else None, distinct=True)
 				for row in rows:
 					body = ''
 					member = db.Members[row.get(db.Members.id)]

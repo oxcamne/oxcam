@@ -1,12 +1,23 @@
 [[extend 'layout.html']]
 <div>
     [[try:
+        =form
+    except:
+        pass
+    pass]]
+</div>
+<div>
+    [[try:
         =header
     except:
         pass
     pass]]
 </div>
-[[=grid.render()]]
+    [[try:
+        =grid.render()
+    except:
+        pass
+    pass]]
 <div>
     [[try:
         =footer

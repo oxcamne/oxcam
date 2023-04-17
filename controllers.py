@@ -31,8 +31,8 @@ from .common import db, session, T, cache, auth, logger, authenticated, unauthen
 from .settings_private import *
 from .models import primary_email, res_tbc, member_name, member_affiliations, primary_matriculation, \
 			member_emails, event_revenue, event_unpaid, res_totalcost, primary_affiliation
-from py4web.utils.grid import Grid, GridClassStyleBulma, Column
-from py4web.utils.form import Form, FormStyleBulma
+from py4web.utils.grid import Grid, GridClassStyleBulma, Column, GridClassStyleBootstrap5, GridClassStyle
+from py4web.utils.form import Form, FormStyleBulma, FormStyleBootstrap4, FormStyleDefault
 from pydal.validators import *
 from py4web.utils.factories import Inject
 import datetime, random, re, markmin, stripe, csv, decimal, io
@@ -234,9 +234,9 @@ def members(path=None):
 				P(A("Send Notice to "+qdesc, _href=URL('composemail',
 					vars=dict(query=query, left=left or '', qdesc=qdesc, back=back)))))
 		header = CAT(header,
-	       P("Use filter to select a mailing list or apply other filters. Selecting an event selects \
+	       P(XML("Use filter to select a mailing list or apply other filters. Selecting an event selects \
 (or excludes from a mailing list) attendees. You can filter on a member record field \
-using an optional operator (=, <, >, <=, >=) together with a value."))
+using an optional operator (=, <, >, <=, >=) together with a value.")))
 		footer = A("Export selected records as CSV file", _href=URL('members_export',
 						vars=dict(query=query, left=left or '', qdesc=qdesc)))
 
@@ -494,10 +494,10 @@ def events(path=None):
 
 	grid = Grid(path, db.Events.id>0,
 	     	orderby=~db.Events.DateTime,
-		    headings=['Datetime', 'Description', 'Venue','Speaker', 'Paid','TBC', 'Conf', 'Wait'],
+		    headings=['Datetime', 'Event', 'Venue','Speaker', 'Paid','TBC', 'Conf', 'Wait'],
 			fields=[db.Events.DateTime, db.Events.Description, db.Events.Venue, db.Events.Speaker,
 	    			db.Events.Paid, db.Events.Unpaid, db.Events.Attend, db.Events.Wait],
-			search_queries=[["Description", lambda value: db.Events.Description.like('%'+value+'%')],
+			search_queries=[["Event", lambda value: db.Events.Description.like('%'+value+'%')],
 		    				["Venue", lambda value: db.Events.Venue.like('%'+value+'%')],
 						    ["Speaker", lambda value: db.Events.Speaker.like('%'+value+'%')]],
 			pre_action_buttons=pre_action_buttons,
@@ -528,7 +528,7 @@ def event_reservations(event_id, path=None):
 	header = CAT(A('back', _href=URL('events/select')),
 	      		H5('Provisional Reservations' if request.query.get('provisional') else 'Waitlist' if request.query.get('waitlist') else 'Reservations'),
 				H6(f"{event.DateTime}, {event.Description}"),
-				"Use the 'Edit' buttons to drill down on a reservation and view detail or edit individual reservations.", XML('<br>'))
+				XML("Use the 'Edit' buttons to drill down on a reservation and view detail or edit individual reservations."), XML('<br>'))
 	query = f'(db.Reservations.Event=={event_id})'
 	#for waitlist or provisional, have to include hosts with waitlisted or provisional guests
 	if request.query.get('waitlist') or request.query.get('provisional'):
@@ -546,13 +546,13 @@ select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 			left  = "[db.Emails.on(db.Emails.Member==db.Reservations.Member),db.Members.on(db.Members.id==db.Reservations.Member)]",	
 			qdesc=f"{event.Description} {'Waitlist' if request.query.get('waitlist') else 'Attendees'}",
 			back=back))), XML('<br>'))
-	header = CAT(header, 'Display: ')
+	header = CAT(header, XML('Display: '))
 	if request.query.get('waitlist') or request.query.get('provisional'):
 		header = CAT(header, A('reservations', _href=URL(f'event_reservations{event_id}')), ' or ')
 	if not request.query.get('waitlist'):
 		header = CAT(header, A('waitlist', _href=URL(f'event_reservations/{event_id}/select', vars=dict(waitlist=True))), ' or ')
 	if not request.query.get('provisional'):
-		header = CAT(header, A('provisional', _href=URL(f'event_reservations/{event_id}/select', vars=dict(provisional=True))), ' (not checked out)')
+		header = CAT(header, A('provisional', _href=URL(f'event_reservations/{event_id}/select', vars=dict(provisional=True))), XML(' (not checked out)'))
 
 	pre_action_buttons = [GridActionButton(lambda row: URL(f"reservation/{row.Reservations.Member}/{event_id}"),
 							text='Edit', append_id=False)]
@@ -602,11 +602,12 @@ def reservation(member_id, event_id, path=None):
 		header = CAT(header, A('send email', _href=(URL('composemail', vars=dict(
 			query=f"(db.Members.id=={member_id})&(db.Members.id==db.Reservations.Member)&(db.Reservations.Event=={event_id})",
 			qdesc=member_name(member_id), left="db.Emails.on(db.Emails.Member==db.Members.id)", back=session['url'])))),
-			XML(" (use ")+"<reservation>",
-			XML(" to include confirmation and payment link)<br>"),	
-XML("Top row is the member's own reservation, additional rows are guests.<br>\
+			XML(" (use "), "<reservation>", XML(" to include confirmation and payment link)<br>"),
+			A('view member record', _href=URL(f'members/edit/{member_id}')),
+			XML("<br>Top row is the member's own reservation, additional rows are guests.<br>\
 Use Add Record to add the member, initially, then to add additional guests.<br>\
-Edit rows to move on/off waitlist or first row to record a check payment."))
+Edit rows to move on/off waitlist or first row to record a check payment.<br>\
+Moving member on/off waitlist will also affect all guests."))
 
 	#set up reservations form, we have both member and event id's
 	db.Reservations.Member.default = member.id
@@ -633,6 +634,7 @@ Edit rows to move on/off waitlist or first row to record a check payment."))
 	db.Reservations.Unitcost.writable=db.Reservations.Unitcost.readable=False
 	db.Reservations.Event.writable=db.Reservations.Event.readable=False
 	db.Reservations.Provisional.writable = db.Reservations.Provisional.readable = True
+	db.Reservations.Member.readable = False
 
 	if path and path != 'select' and not path.startswith('delete'):	#editing or creating reservation
 		db.Reservations.Survey.readable = True
@@ -651,6 +653,7 @@ Edit rows to move on/off waitlist or first row to record a check payment."))
 			db.Reservations.Paid.writable=db.Reservations.Paid.readable=True
 			db.Reservations.Charged.writable=db.Reservations.Charged.readable=True
 			db.Reservations.Checkout.writable=db.Reservations.Checkout.readable=True
+			db.Reservations.Firstname.readable=db.Reservations.Lastname.readable=False
 			if event.Tickets:
 				for t in event.Tickets:
 					if t.startswith(member.Membership or '~'): db.Reservations.Ticket.default = t
@@ -658,11 +661,18 @@ Edit rows to move on/off waitlist or first row to record a check payment."))
 			if aff: db.Reservations.Affiliation.default = aff.id
 
 	for row in all_guests:
+		wait = row.Waitlist
+		if row.id != member_id and session.get('wait_change'):
+			wait = host_reservation.Waitlist
 		if row.Ticket:
-			row.update_record(Unitcost=decimal.Decimal(re.match('.*[^0-9.]([0-9]+\.?[0-9]{0,2})$', row.Ticket).group(1)))
-
+			row.update_record(Unitcost=decimal.Decimal(re.match('.*[^0-9.]([0-9]+\.?[0-9]{0,2})$',
+						       row.Ticket).group(1)), Waitlist=wait)
+	session['wait_change'] = True
+	
 	def validate(form):
 		if (form.vars.get('id')):
+			if form.vars.get('id') == member_id and form.vars.get('Waitlist') != host_reservation.Waitlist:
+				session['wait_change'] = True
 			db.Reservations[form.vars.get('id')].update_record(Modified = datetime.datetime.now())
 
 	grid = Grid(path, (db.Reservations.Member==member.id)&(db.Reservations.Event==event.id),
@@ -858,7 +868,7 @@ def composemail():
 	proto = db(db.EMProtos.id == request.query.get('proto')).select().first()
 	fields =[Field('sender', 'string', requires=IS_IN_SET(source), default=source[0])]
 	if query:
-		header = CAT(header, P(f'To: {qdesc}'))
+		header = CAT(header, XML(f'To: {qdesc}'))
 		footer = A("Export bcc list for use in email", _href=URL('bcc_export',
 						vars=dict(query=query, left=left or '', back=request.query.get('back'))))
 	else:
@@ -990,7 +1000,7 @@ def login():
 				tokens= [token], remote_addr = request.remote_addr,
 				when_issued = datetime.datetime.now(),
 				url = session['url'])
-		log = 'login '+request.remote_addr+' '+form.vars['email']+' '+request.environ['HTTP_USER_AGENT']+' '+session['url']
+		log = 'login '+request.remote_addr+' '+form.vars['email']+' '+request.environ['HTTP_USER_AGENT']+' '+(session.get('url') or '')
 		logger.info(log)
 		message = HTML(DIV(
 					A("Please click to continue to "+SOCIETY_DOMAIN, _href=URL('validate', id, token, scheme=True)),
@@ -1061,6 +1071,37 @@ def accessdenied():
 def logout():
 	session['logged_in'] = False
 	redirect(URL('index'))
+
+@action('db_tool', method=['POST', 'GET'])
+@action('db_tool/<path:path>', method=['POST', 'GET'])
+@action.uses("grid.html", db, session, flash)
+@checkaccess('admin')
+def db_tool(path=None):
+	form = Form([Field('query'),
+	      		Field('do_update', 'boolean'),
+			    Field('field_update')],
+				keep_values=True, formstyle=FormStyleDefault)
+	
+	header = "The \"query\" is a condition like \"db.table1.field1=='value'\". Something like \"db.table1.field1==db.table2.field2\" results in a SQL JOIN.\
+Use (...)&(...) for AND, (...)|(...) for OR, and ~(...) for NOT to build more complex queries.\
+\"field_update\" is an optional expression like \"field1='newvalue'\". You cannot update the results of a JOIN"
+
+	if form.accepted:
+		try:
+			grid = Grid(path, eval(form.vars.get('query')),
+					details=False, editable=False, create=False, deletable=False,
+					grid_class_style=GridClassStyle, show_id=True,
+					)
+			if form.vars.get('do_update'):
+				rows = db(eval(form.vars.get('query'))).select()
+				for row in rows:
+					update_string = 'row.update_record('+form.vars.get('field_update')+')'
+					eval(update_string)
+				flash.set(f"{len(rows)} records updated, Submit again to see results")
+				form.vars['do_update']=False
+		except Exception as e:
+			flash.set(e)
+	return locals()
 
 @action("db_restore", method=['POST', 'GET'])
 @action.uses("form.html", db, session, flash)

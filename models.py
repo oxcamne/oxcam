@@ -270,7 +270,7 @@ db.define_table('EMProtos',
 db.define_table('CoA',
 	Field('Name', 'string'),
 	Field('Notes', 'string'),
-	singular='Bank', plural='Banks', format='%(Name)s')
+	format='%(Name)s')
 db.CoA.Name.requires = [IS_NOT_EMPTY(), IS_NOT_IN_DB(db, 'CoA.Name')]
 
 def bank_balance(bank_id, timestamp=datetime.datetime.now(), balance=0):
@@ -288,7 +288,7 @@ db.define_table('Bank_Accounts',
 	Field('Name', 'string'),
 	Field('Balance', 'decimal(9,2)',
 				requires=IS_EMPTY_OR(IS_DECIMAL_IN_RANGE(0, 100000))),	#used to maintain PayPal, Stripe and Bank balances
-	Field.Virtual('Accrued', lambda r: bank_accrual(r.Bank_Accounts.id)),
+	Field.Virtual('Accrued', lambda r: bank_accrual(r['id'])),
 	Field('Bankurl', 'string', comment=" URL for the bank's login page"),
 	Field('Csvheaders', 'string', length=2048, comment=" List of column headings in downloaded CSV file (copy first line of file)"),
 	Field('Reference', 'string', comment=" List of columns forming a unique ID for each transaction"),
@@ -325,5 +325,23 @@ db.define_table('AccTrans',
 	Field('Notes', 'text'),
 	singular='Transaction', plural='Transaction_List')
 db.AccTrans.CheckNumber.requires=IS_EMPTY_OR(IS_NOT_IN_DB(db, 'AccTrans.CheckNumber'))
+
+#OxCamNE load commonly used metadata. This is no longer used in py4web
+db.define_table('Metadata',
+	Field('Name', 'string'),
+	Field('Code', 'text'),
+	Field('Notes', 'text'),
+	Field('Modified', 'datetime', writable=False),
+	format='%(Name)s')
+db.Metadata.Name.requires=[IS_NOT_EMPTY(), IS_NOT_IN_DB(db, 'Metadata.Name')]
+
+db.define_table('emailqueue',	#used for notices or messages targetted via membership database
+	Field('subject', 'string'),
+	Field('body', 'text'),	#already in HTML, but contains {{greeting}} to be substituted individually
+	Field('reply_to', 'string'),	#the sender's selected Society email address
+	Field('targets', 'list:reference Emails'),	#emails now in their own table
+	Field('event', 'reference Events'),		#if references reservations, else None
+	Field('Created', 'datetime', writable=False),
+	Field('Modified', 'datetime', writable=False))
 
 db.commit()

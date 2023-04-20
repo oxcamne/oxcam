@@ -29,14 +29,18 @@ from py4web import action, request, response, abort, redirect, URL, Field, DAL
 from yatl.helpers import *
 from .common import db, session, T, cache, auth, logger, authenticated, unauthenticated, flash
 from .settings_private import *
-from .models import primary_email, res_tbc, member_name, member_affiliations, primary_matriculation, \
-			member_emails, event_revenue, event_unpaid, res_totalcost, primary_affiliation
+from .models import *
+#from .models import primary_email, res_tbc, member_name, member_affiliations, primary_matriculation
+#from .models import member_emails, event_revenue, event_unpaid, res_totalcost, primary_affiliation, bank_accrual
 from py4web.utils.grid import Grid, GridClassStyleBulma, Column, GridClassStyleBootstrap5, GridClassStyle
 from py4web.utils.form import Form, FormStyleBulma, FormStyleBootstrap4, FormStyleDefault
 from pydal.validators import *
 from py4web.utils.factories import Inject
 import datetime, random, re, markmin, stripe, csv, decimal, io
 from io import StringIO
+
+grid_style = GridClassStyleBulma
+form_style = FormStyleBulma
 
 class GridActionButton:
     def __init__(
@@ -140,13 +144,13 @@ def members(path=None):
 			if search_form.vars.get('good_standing'):
 				member_filter['good_standing'] = 'On'
 			session['member_filter'] = member_filter
-		header = CAT(header, A("Send Email to Specific Address(es)", _href=URL('composemail', vars=dict(back=back))))
+		header = CAT(header, A("Send Email to Specific Address(es)", _href=URL('composemail', vars=dict(back=back))), XML('<br>'))
 	elif path:
 		back = session.get('back') or back
 		header = CAT(A('back', _href=back), H5('Member Record'))
 		if path.startswith('edit'):
 			header= CAT(header,
-	       			P(A('Member reservations', _href=URL('member_reservations', path[5:])), XML('<br>'),
+	       			A('Member reservations', _href=URL('member_reservations', path[5:])), XML('<br>'),
 					A('OxCam affiliation(s)', _href=URL('affiliations', path[5:])), XML('<br>'),
 					A('Email addresses and subscriptions', _href=URL('emails', path[5:])), XML('<br>'),
 					A('Dues payments', _href=URL('dues', path[5:])), XML('<br>'),
@@ -154,7 +158,6 @@ def members(path=None):
 					 	vars=dict(query=f"db.Members.id=={path[5:]}", left='',
 		 					qdesc=member_name(path[5:]),
 		   					back=URL(f'members/edit/{path[5:]}', scheme=True)))))
-	       			)
 	else:
 		session['back'] = None
 
@@ -231,25 +234,15 @@ def members(path=None):
 	if path=='select':
 		if qdesc:
 			header = CAT(header,
-				P(A("Send Notice to "+qdesc, _href=URL('composemail',
-					vars=dict(query=query, left=left or '', qdesc=qdesc, back=back)))))
+				A("Send Notice", _href=URL('composemail',
+					vars=dict(query=query, left=left or '', qdesc=qdesc, back=back))),
+				XML(f" to {qdesc}<br>"))
 		header = CAT(header,
-	       P(XML("Use filter to select a mailing list or apply other filters. Selecting an event selects \
-(or excludes from a mailing list) attendees. You can filter on a member record field \
-using an optional operator (=, <, >, <=, >=) together with a value.")))
+	       XML("Use filter to select a mailing list or apply other filters.<br>Selecting an event selects \
+(or excludes from a mailing list) attendees.<br>You can filter on a member record field \
+using an optional operator (=, <, >, <=, >=) together with a value."))
 		footer = A("Export selected records as CSV file", _href=URL('members_export',
 						vars=dict(query=query, left=left or '', qdesc=qdesc)))
-
-	def mod_member(form):
-		if len(form.errors)>0:
-			flash.set("Error(s) in form, please check")
-			return
-		if (form.vars.get('id')):
-			db.Members[form.vars.get('id')].update_record(Modified = datetime.datetime.now())
-		if form.vars.get('Paiddate'):
-			dues = db(db.Dues.Member == form.vars.get('id')).select(orderby=~db.Dues.Date).first()
-			if dues:
-				dues.update_record(Nowpaid = form.vars.get('Paiddate'))
 
 	def member_deletable(id): #deletable if not member, never paid dues or attended recorded event, or on mailing list
 		m = db.Members[id]
@@ -261,6 +254,19 @@ using an optional operator (=, <, >, <=, >=) together with a value.")))
 				not ifmailings and db(db.Dues.Member == id).count()==0 and \
 				db(db.Reservations.Member == id).count()==0 and not m.President
 
+	def validate(form):
+		if len(form.errors)>0:
+			flash.set("Error(s) in form, please check")
+			return
+		if not form.vars.get('id'):
+			return	#adding record
+		
+		db.Members[form.vars.get('id')].update_record(Modified = datetime.datetime.now())
+		if form.vars.get('Paiddate'):
+			dues = db(db.Dues.Member == form.vars.get('id')).select(orderby=~db.Dues.Date).first()
+			if dues:
+				dues.update_record(Nowpaid = form.vars.get('Paiddate'))
+
 	grid = Grid(path, eval(query), left=eval(left) if left else None,
 	     	orderby=db.Members.Lastname|db.Members.Firstname,
 			columns=[db.Members.Name,
@@ -269,10 +275,10 @@ using an optional operator (=, <, >, <=, >=) together with a value.")))
 					db.Members.Access, db.Members.Notes],
 			headings=['Name', 'Status', 'Until', 'College', 'Access', 'Notes'],
 			details=not write, editable=write, create=write, show_id=True,
-			grid_class_style=GridClassStyleBulma,
-			formstyle=FormStyleBulma,
+			grid_class_style=grid_style,
+			formstyle=form_style,
 			search_form=search_form,
-			validation=mod_member,
+			validation=validate,
 			deletable=lambda r: member_deletable(r['id'])
 			)
 	return locals()
@@ -320,6 +326,8 @@ def member_reservations(member_id, path=None):
 			columns=[db.Reservations.Member, db.Events.DateTime, db.Reservations.Event, db.Reservations.Wait,
 					db.Reservations.Conf, db.Reservations.Cost,
 					db.Reservations.Paid, db.Reservations.Charged, db.Reservations.TBC],
+			grid_class_style=grid_style,
+			formstyle=form_style,
 			details=False, editable = False, create = False, deletable = False)
 	return locals()
 	
@@ -357,6 +365,9 @@ def affiliations(member_id, path=None):
 is used on name badges etc."
 
 	def affiliation_modified(form):
+		if len(form.errors)>0:
+			flash.set("Error(s) in form, please check")
+			return
 		if (form.vars.get('id')):
 			db.Affiliations[form.vars.get('id')].update_record(Modified = datetime.datetime.now())
 
@@ -365,8 +376,8 @@ is used on name badges etc."
 			columns=[db.Affiliations.College, db.Affiliations.Matr, db.Affiliations.Notes],
 			details=not write, editable=write, create=write, deletable=write,
 			validation=affiliation_modified,
-			grid_class_style=GridClassStyleBulma,
-			formstyle=FormStyleBulma,
+			grid_class_style=grid_style,
+			formstyle=form_style,
 			)
 	return locals()
 	
@@ -398,6 +409,9 @@ directed to the individual member, and appears in the Members Directory. Notices
 are sent as specified in the Mailings Column."
 
 	def email_modified(form):
+		if len(form.errors)>0:
+			flash.set("Error(s) in form, please check")
+			return
 		if (form.vars.get('id')):
 			db.Emails[form.vars.get('id')].update_record(Modified = datetime.datetime.now())
 			update_Stripe_email(db.Members[form.vars.get('id')])
@@ -407,8 +421,8 @@ are sent as specified in the Mailings Column."
 			columns=[db.Emails.Email, db.Emails.Mailings],
 			details=not write, editable=write, create=write, deletable=write,
 			validation=email_modified,
-			grid_class_style=GridClassStyleBulma,
-			formstyle=FormStyleBulma,
+			grid_class_style=grid_style,
+			formstyle=form_style,
 			)
 	return locals()
 
@@ -439,6 +453,9 @@ def dues(member_id, path=None):
 	      		H6(member_name(member_id)))
 
 	def dues_validated(form):
+		if len(form.errors)>0:
+			flash.set("Error(s) in form, please check")
+			return
 		if (not form.vars.get('id')): 	#adding dues record
 			member.update_record(Membership=form.vars.get('Status'), Paiddate=form.vars.get('Nowpaid'), Modified=datetime.datetime.now(),
 								Charged=None)
@@ -448,8 +465,8 @@ def dues(member_id, path=None):
 			columns=[db.Dues.Amount, db.Dues.Date, db.Dues.Notes, db.Dues.Prevpaid, db.Dues.Nowpaid],
 			details=not write, editable=write, create=write, deletable=write,
 			validation=dues_validated,
-			grid_class_style=GridClassStyleBulma,
-			formstyle=FormStyleBulma,
+			grid_class_style=grid_style,
+			formstyle=form_style,
 			)
 	return locals()
 	
@@ -480,12 +497,9 @@ def events(path=None):
 	pre_action_buttons = [GridActionButton(text='Rsvtns', url=URL('event_reservations'), append_id=True)]
 
 	def checktickets(form):
-		#problem - a single ticket specifier comes back as a string, not a list!!!
-		if isinstance(form.vars['Tickets'], str):
-				form.vars['Tickets'] = [form.vars['Tickets']]
 		for t in form.vars['Tickets']:
 			if t!='' and not re.match(r'[^\$]*\$[0-9]+\.?[0-9]{0,2}$', t):
-				form.errors['Tickets'] = "'%s' is not a good ticket definition"%(t)
+				form.errors['Tickets'] = f"{t} is not a good ticket definition"
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
@@ -497,15 +511,15 @@ def events(path=None):
 		    headings=['Datetime', 'Event', 'Venue','Speaker', 'Paid','TBC', 'Conf', 'Wait'],
 			fields=[db.Events.DateTime, db.Events.Description, db.Events.Venue, db.Events.Speaker,
 	    			db.Events.Paid, db.Events.Unpaid, db.Events.Attend, db.Events.Wait],
-			search_queries=[["Event", lambda value: db.Events.Description.like('%'+value+'%')],
-		    				["Venue", lambda value: db.Events.Venue.like('%'+value+'%')],
-						    ["Speaker", lambda value: db.Events.Speaker.like('%'+value+'%')]],
+			search_queries=[["Event", lambda value: db.Events.Description.like(f'%{value}%')],
+		    				["Venue", lambda value: db.Events.Venue.like(f'%{value}%')],
+						    ["Speaker", lambda value: db.Events.Speaker.like(f'%{value}%')]],
 			pre_action_buttons=pre_action_buttons,
 			details=not write, editable=write, create=write,
 			deletable=lambda r: write and db(db.Reservations.Event == r['id']).count() == 0 and db(db.AccTrans.Event == r['id']).count() == 0,
 			validation=checktickets,
-			grid_class_style=GridClassStyleBulma,
-			formstyle=FormStyleBulma,
+			grid_class_style=grid_style,
+			formstyle=form_style,
 			)
 	return locals()
 		
@@ -567,7 +581,7 @@ select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 			headings=['Member', 'Type', 'Until', 'College', 'Notes', 'Paid', 'Tbc', 'Conf', 'Wait'],
 			pre_action_buttons=pre_action_buttons,
 			details=False, editable = False, create = False, deletable = False,
-			rows_per_page=200, grid_class_style=GridClassStyleBulma, formstyle=FormStyleBulma)
+			rows_per_page=200, grid_class_style=grid_style, formstyle=form_style)
 	return locals()
 
 def collegelist(sponsors=[]):
@@ -595,9 +609,10 @@ def reservation(member_id, event_id, path=None):
 	else:
 		back = URL('reservation', f'{member_id}/{event_id}/select')
 
-	header = CAT(A('back', _href=back), H5('Member Reservation'),
+	if path:
+		header = CAT(A('back', _href=back), H5('Member Reservation'),
 	      		H6(member_name(member_id)),
-	      		XML(markmin.markmin2html(evtconfirm(event.id, member.id, event_only=True))))
+	      		XML(markmin.markmin2html(evtconfirm(event.id, member.id, event_only=path != 'select'))))
 	if path and path=='select':
 		header = CAT(header, A('send email', _href=(URL('composemail', vars=dict(
 			query=f"(db.Members.id=={member_id})&(db.Members.id==db.Reservations.Member)&(db.Reservations.Event=={event_id})",
@@ -661,29 +676,30 @@ Moving member on/off waitlist will also affect all guests."))
 			if aff: db.Reservations.Affiliation.default = aff.id
 
 	for row in all_guests:
-		wait = row.Waitlist
-		if row.id != member_id and session.get('wait_change'):
-			wait = host_reservation.Waitlist
 		if row.Ticket:
-			row.update_record(Unitcost=decimal.Decimal(re.match('.*[^0-9.]([0-9]+\.?[0-9]{0,2})$',
-						       row.Ticket).group(1)), Waitlist=wait)
-	session['wait_change'] = True
+			row.update_record(Unitcost=decimal.Decimal(re.match('.*[^0-9.]([0-9]+\.?[0-9]{0,2})$', row.Ticket).group(1)))
 	
 	def validate(form):
+		if form.vars.get('Waitlist') and form.vars.get('Provisional'):
+			form.errors['Waitlist'] = "Waitlist and Provisional should not both be set"
+		if len(form.errors)>0:
+			flash.set("Error(s) in form, please check")
+			return
 		if (form.vars.get('id')):
-			if form.vars.get('id') == member_id and form.vars.get('Waitlist') != host_reservation.Waitlist:
-				session['wait_change'] = True
-			db.Reservations[form.vars.get('id')].update_record(Modified = datetime.datetime.now())
+			if int(form.vars.get('id')) == host_reservation.id and form.vars.get('Waitlist') != host_reservation.Waitlist:
+				for row in all_guests:
+					if row.id != host_reservation.id and not row.Provisional:
+						row.update_record(Waitlist = form.vars.get('Waitlist'))
 
 	grid = Grid(path, (db.Reservations.Member==member.id)&(db.Reservations.Event==event.id),
 			orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname,
-			columns=[db.Reservations.Lastname, db.Reservations.Firstname, db.Reservations.Affiliation, 
-					db.Reservations.Notes, db.Reservations.Selection, db.Reservations.Ticket,
+			columns=[db.Reservations.Lastname, db.Reservations.Firstname, 
+					db.Reservations.Notes, db.Reservations.Ticket,
 					db.Reservations.Provisional, db.Reservations.Waitlist],
-			headings=['Last', 'First', 'College', 'Notes', 'Menu', 'Ticket', 'Prvsnl', 'Waitlist'],
+			headings=['Last', 'First', 'Notes', 'Ticket', 'Prvsnl', 'Waitlist'],
 			deletable=lambda r: write and (len(all_guests)==1 or r.id != host_reservation.id),
-			details=not write, editable=write, grid_class_style=GridClassStyleBulma,
-			formstyle=FormStyleBulma, create=write, validation=validate,show_id=True)
+			details=not write, editable=write, grid_class_style=grid_style,
+			formstyle=form_style, create=write, validation=validate,show_id=True)
 	return locals()
 
 @action('doorlist_export/<event_id:int>', method=['GET'])
@@ -747,6 +763,273 @@ def events_export():
 			writer.writerow(data)
 	except Exception as e:
 		flash.set(e)
+	return locals()
+		
+@action('accounting', method=['POST', 'GET'])
+@action('accounting/<path:path>', method=['POST', 'GET'])
+@action.uses("grid.html", db, session, flash)
+@checkaccess('accounting')
+def accounting(path=None):
+
+	if path and path=='select':
+		header = CAT(H5('Banks'),
+				"Use Upload to load a file you've downloaded from bank/payment processor into accounting")
+	else:
+		header = CAT(A('back', _href=URL('accounting')) , H5('Banks'))
+	
+	pre_action_buttons = [GridActionButton(URL('bank_file'), text='Upload', append_id=True),
+		GridActionButton(lambda r: URL('transactions', vars=dict(query=f"db.AccTrans.Bank=={r['id']}")),
+							text='Transactions', append_id=False)
+	]
+
+	grid = Grid(path, db.Bank_Accounts.id>0,
+				orderby=db.Bank_Accounts.Name,
+				columns=[db.Bank_Accounts.Name, db.Bank_Accounts.Accrued, db.Bank_Accounts.Balance],
+				pre_action_buttons=pre_action_buttons,
+				deletable=False, details=False, editable=True, create=True,
+				grid_class_style=grid_style,
+				formstyle=form_style,
+	)		
+	return locals()
+
+@action('bank_file/<bank_id:int>', method=['POST', 'GET'])
+@action.uses("form.html", db, session, flash)
+@checkaccess('accounting')
+def bank_file(bank_id):
+#upload and process a csv file from a bank or payment processor
+#	.../bank_id		bank_id is reference to bank in Bank Accounts
+	bank = db.Bank_Accounts[bank_id]
+	bkrecent = db((db.AccTrans.Bank==bank.id)&(db.AccTrans.Accrual!=True)).select(orderby=~db.AccTrans.Timestamp, limitby=(0,1)).first()
+	unalloc = db(db.CoA.Name == 'Unallocated').select().first()
+	acdues = db(db.CoA.Name == "Membership Dues").select().first()
+	actkts = db(db.CoA.Name == "Ticket sales").select().first()
+
+	header = CAT(H5(f"{bank.Name} Transactions"),
+	      		UL(LI(XML(f"To download data since {markmin.markmin2html('``**'+str(bkrecent.Timestamp.date())+'**``:red')}:")),
+					LI(A('Login to Society Account', _href={bank.Bankurl}, _target='blank')),
+					LI(XML(f"{markmin.markmin2html(bank.HowTo)}"))
+				)
+	)
+	footer = f"Current Balance = {'$%8.2f'%(bank.Balance)}"
+	stripe.api_key = STRIPE_SKEY
+	
+	form = Form([Field('downloaded_file', 'upload', uploadfield = False),
+					Field('override', 'boolean', comment = ' tick to accept new transactions unconditionally, e.g. for a brand new account')],
+				submit_button = 'Import')
+	
+	if not form.accepted:
+		return locals()
+
+	stored = 0
+	unmatched = 0
+	overlap = False
+	lastrow = None
+	isok = True
+				
+	def getfields(cols, separator=''):
+		if not cols: return None
+		lcols= cols.split(',')
+		s = ''
+		for c in lcols:
+			if s != '': s += separator
+			s += row[c]
+		return s
+	def getdecimal(col):
+		if not col: return 0
+		sign = 1
+		if col.startswith('-'):
+			col = col[1:]
+			sign = -1
+		s = getfields(col)
+		if not s or s == '': return 0
+		#remove currency symbol, thousands commas, and deal with either '-' or (...) accounting format
+		m = re.match('^([-\(]*)[^0-9]*([0-9.,-]*)\)*$', s)
+		s = ('-' if m.group(1)!='' else '')+m.group(2).replace(',', '')
+		return decimal.Decimal(s)*sign
+
+#in the file, transactions may be in chronological order or the reverse (Stripe), so store them all in memory
+#before processing. We first read from the file, to determine that there is overlap with previously processed files
+#(at least one previously stored transaction in the file, or the override is set).
+	file_transactions = []
+	
+	try:
+		f = io.TextIOWrapper(form.vars.get('downloaded_file').file, encoding='utf-8')
+		
+		reader = csv.DictReader(f)
+		headers = bank.Csvheaders.split(',')
+		if headers != reader.fieldnames:
+			raise Exception('File does not match expected column names')
+		
+		for row in reader:
+			lastrow = row
+			try:
+				timestamp = datetime.datetime.strptime(getfields(bank.Date), bank.Datefmt)
+			except:
+				continue #special case, Cambridge Trust. Deposits made on the day the transactions are downloaded
+				#are sent with date and time, but no reference. These early reports fail this timestamp conversion
+
+			reference = getfields(bank.Reference)
+			if db(db.AccTrans.Reference==reference).count() > 0:
+				overlap = True
+			else:
+				file_transactions.insert(0,row) #reverse order so we process chronologically
+			
+		if overlap == False and request.vars.override!='on':
+			raise Exception('file should start on or before '+bkrecent.Timestamp.date().strftime(bank.Datefmt))
+
+		#now process the new transactions.				
+		for row in file_transactions:
+			reference = getfields(bank.Reference)
+			timestamp = datetime.datetime.strptime(getfields(bank.Date), bank.Datefmt)
+			if bank.Time:	#time is in a separate column
+				time = datetime.datetime.strptime(getfields(bank.Time), bank.Timefmt)
+				timestamp = datetime.datetime.combine(timestamp, time.time())
+			
+			#do the accounting
+			checknumber = getfields(bank.CheckNumber)
+			amount = getdecimal(bank.Amount)
+			fee = getdecimal(bank.Fee)
+			notes = getfields(bank.Notes, ' ')
+			account=unalloc.id
+
+			#process the special rules for this processor
+			for r in bank.Rules:
+				rule = eval(r)
+				value = row[rule[0]]
+				if value and re.compile(rule[1]).match(value):	#rule applies
+					account = db(db.CoA.Name == rule[2]).select().first().id
+			
+			stored = stored + 1
+			bank.update_record(Balance = (bank.Balance or 0) + amount + fee)
+
+			if checknumber:		#see if there is an accrued and possibly split entry
+				rows = db((db.AccTrans.Accrual==True)&(db.AccTrans.Bank==bank.id)&(db.AccTrans.CheckNumber==checknumber)).select()
+				accrued=0
+				for trans in rows: accrued+=trans.Amount
+				if accrued==amount:
+					for trans in rows:
+						trans.update_record(Accrual=False, Timestamp=timestamp, Reference=reference)
+					continue	#on to next transaction
+			elif bank.Name=='Stripe':	#try to identify charges
+				try:
+					charge = stripe.Charge.retrieve(row[bank.Source])
+					member = db(db.Members.Stripe_id==charge.customer).select().first()
+					notes = f"{member_name(member.id)} {primary_email(member.id)}"
+					if row[bank.Type]=='charge':
+						if charge.description=='Subscription update' or (member.Charged and amount>=member.Charged):
+							#dues paid, charge may also cover an event (auto renewal or manual)
+							if (charge.description or '').startswith('Subscription'):
+								customer = stripe.Customer.retrieve(charge.customer)
+								notes += ' Subscription: '+ customer.subscriptions.data[0].id
+								member.update_record(Stripe_next=datetime.datetime.fromtimestamp(customer.subscriptions.data[0].current_period_end).date())
+							duesprice = stripe.Price.retrieve(eval(f'STRIPE_{member.Membership.upper()}'))
+							duesamount = decimal.Decimal(duesprice.unit_amount)/100
+							duesfee = (duesamount * fee)/amount	#prorate fee
+							nowpaid = newpaiddate(member.Paiddate, timestamp=timestamp)
+							db.Dues.insert(Member=member.id, Amount=duesamount, Date=timestamp.date(),
+								Notes='Stripe', Prevpaid=member.Paiddate, Nowpaid=nowpaid, Status=member.Membership)
+							member.update_record(Paiddate=nowpaid, Charged=None)
+							db.AccTrans.insert(Bank = bank.id, Account = acdues.id, Amount = duesamount,
+									Fee = duesfee, Accrual = False, Timestamp = timestamp,
+									Reference = reference, Notes = notes)
+							fee -= duesfee
+							amount -= duesamount
+						if amount==0:
+							continue	#done with this row
+							
+						resvtn=db((db.Reservations.Member==member.id)&(db.Reservations.Charged>=amount)).select(
+								orderby=db.Reservations.Modified).first()
+						if resvtn:
+							db.AccTrans.insert(Bank = bank.id, Account = actkts.id, Amount = amount, Fee = fee,
+								Timestamp = timestamp, Event = resvtn.Event, Reference = reference, Accrual = False, Notes = notes)
+							resvtn.update_record(Paid=(resvtn.Paid or 0) + amount, Charged = resvtn.Charged - amount, Checkout=None)
+							continue
+							
+						#if paid reservation not found, store unallocated
+				except Exception as e:
+					pass	#if fails, leave unallocated
+				
+			db.AccTrans.insert(Bank = bank.id, Account = account, Amount = amount,
+					Fee = fee if fee!=0 else None, Timestamp = timestamp,
+					CheckNumber = checknumber, Reference = reference, Accrual = False, Notes = notes)
+			if account==unalloc.id: unmatched += 1
+								
+		flash.set(f'{stored} new transactions processed, {unmatched} to allocate, new balance = ${bank.Balance}')
+	except Exception as e:
+		flash.set(f"{str(lastrow)}: {str(e)}")
+		isok = False
+#	if isok:
+#		redirect(URL('acctrans', vars=dict(query='db.AccTrans.Bank=='+str(bank.id))))
+	return locals()
+
+@action('transactions', method=['POST', 'GET'])
+@action('transactions/<path:path>', method=['POST', 'GET'])
+@action.uses("grid.html", db, session, flash)
+@checkaccess('accounting')
+def transactions(path=None):
+	db.AccTrans.Fee.writable = False
+
+	if not path:
+		session['bank_query'] = request.query.get('query')
+		session['bank_left'] = request.query.get('left')
+	query = session.get('bank_query')
+	left = session.get('bank_left')
+
+	bank_id_match=re.match('db.AccTrans.Bank==([0-9]+)$', query)
+	bank_id = int(bank_id_match.group(1)) if bank_id_match else None
+
+	if path and path.startswith('edit'):	#editing AccTrans record
+		db.AccTrans.Amount.comment = 'to split transaction, enter amount of a split piece'
+		db.AccTrans.CheckNumber.writable = False
+		db.AccTrans.CheckNumber.requires = None
+		transaction = db.AccTrans[path[5:]]
+		if transaction.Accrual:
+			db.AccTrans.Fee.readable = db.AccTrans.Fee.writable = False
+			db.AccTrans.Timestamp.writable=True
+		if transaction.Amount>0:
+			db.AccTrans.Amount.requires=IS_DECIMAL_IN_RANGE(0, transaction.Amount)
+		else:
+			db.AccTrans.Amount.requires=IS_DECIMAL_IN_RANGE(transaction.Amount, 0)
+			
+	if path=='new':	#adding AccTrans accrual
+		db.AccTrans.Amount.comment='enter full amount of check as a negative number; split using Edit if multiple accounts',
+		db.AccTrans.Timestamp.writable=True
+		db.AccTrans.Amount.requires=IS_DECIMAL_IN_RANGE(-100000, 0)
+		db.AccTrans.Bank.default = bank_id
+		
+	def validate(form):
+		if len(form.errors)>0:
+			flash.set("Error(s) in form, please check")
+			return
+		if not form.vars.get('id'): #must be creating an accrual
+			return
+		new_amount = decimal.Decimal(form.vars.get('Amount'))
+		fee = transaction.Fee
+		if new_amount!=transaction.Amount:	#new split
+			if transaction.Fee:
+				fee = (transaction.Fee*new_amount/transaction.Amount).quantize(decimal.Decimal('0.01'))
+			db.AccTrans.insert(Timestamp=transaction.Timestamp, Bank=transaction.Bank,
+								Account=transaction.Account, Event=transaction.Event,
+								Amount=transaction.Amount-new_amount, Fee=transaction.Fee - fee,
+								CheckNumber=transaction.CheckNumber, Accrual=transaction.Accrual,
+								 Reference=transaction.Reference,Notes=form.vars.get('Notes'))	#the residual piece
+			db.AccTrans[form.vars.get('id')].update_record(Fee=fee)
+			
+	search_queries = [
+		["Account", lambda value: db.AccTrans.Account.belongs([r.id for r in db(db.CoA.Name.like(f'%{value}%')).select(db.CoA.id)])],
+		["Event", lambda value: db.AccTrans.Event.belongs([r.id for r in db(db.Events.Description.like(f'%{value}%')).select(db.Events.id)])],
+		["Notes", lambda value: db.AccTrans.Notes.like(f'%{value}%')],
+	]
+	
+	grid = Grid(path, eval(query), left=eval(left) if left else None,
+			orderby=~db.AccTrans.Timestamp,
+			columns=[db.AccTrans.Timestamp, db.AccTrans.Bank, db.AccTrans.Account, db.AccTrans.Event,
+	 				db.AccTrans.Amount, db.AccTrans.Fee, db.AccTrans.CheckNumber, db.AccTrans.Accrual,
+					db.AccTrans.Notes],
+			headings=['Timestamp', 'Bank', 'Account','Event','Amt', 'Fee', 'Chk#', 'Accr', 'Notes'],
+			validation=validate, search_queries=search_queries, show_id=True,
+			deletable=lambda r: r.Accrual, details=False, editable=True, create=bank_id!=None,
+			field_id=db.AccTrans.id, grid_class_style=grid_style, formstyle=form_style)
 	return locals()
 
 def emailparse(body, subject, query):
@@ -1090,7 +1373,7 @@ Use (...)&(...) for AND, (...)|(...) for OR, and ~(...) for NOT to build more co
 		try:
 			grid = Grid(path, eval(form.vars.get('query')),
 					details=False, editable=False, create=False, deletable=False,
-					grid_class_style=GridClassStyle, show_id=True,
+					grid_class_style=GridClassStyle, formstyle=form_style, show_id=True,
 					)
 			if form.vars.get('do_update'):
 				rows = db(eval(form.vars.get('query'))).select()

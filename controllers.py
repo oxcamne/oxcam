@@ -39,8 +39,8 @@ from py4web.utils.factories import Inject
 import datetime, random, re, markmin, stripe, csv, decimal, io
 from io import StringIO
 
-grid_style = GridClassStyleBulma
-form_style = FormStyleBulma
+grid_style = GridClassStyleBootstrap5
+form_style = FormStyleBootstrap4
 
 class GridActionButton:
     def __init__(
@@ -234,9 +234,8 @@ def members(path=None):
 	if path=='select':
 		if qdesc:
 			header = CAT(header,
-				A("Send Notice", _href=URL('composemail',
-					vars=dict(query=query, left=left or '', qdesc=qdesc, back=back))),
-				XML(f" to {qdesc}<br>"))
+				A(f"Send Notice to {qdesc}", _href=URL('composemail',
+					vars=dict(query=query, left=left or '', qdesc=qdesc, back=back))), XML('<br>'))
 		header = CAT(header,
 	       XML("Use filter to select a mailing list or apply other filters.<br>Selecting an event selects \
 (or excludes from a mailing list) attendees.<br>You can filter on a member record field \
@@ -562,7 +561,7 @@ select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 			back=back))), XML('<br>'))
 	header = CAT(header, XML('Display: '))
 	if request.query.get('waitlist') or request.query.get('provisional'):
-		header = CAT(header, A('reservations', _href=URL(f'event_reservations{event_id}')), ' or ')
+		header = CAT(header, A('reservations', _href=URL(f'event_reservations/{event_id}')), ' or ')
 	if not request.query.get('waitlist'):
 		header = CAT(header, A('waitlist', _href=URL(f'event_reservations/{event_id}/select', vars=dict(waitlist=True))), ' or ')
 	if not request.query.get('provisional'):
@@ -612,7 +611,7 @@ def reservation(member_id, event_id, path=None):
 	if path:
 		header = CAT(A('back', _href=back), H5('Member Reservation'),
 	      		H6(member_name(member_id)),
-	      		XML(markmin.markmin2html(evtconfirm(event.id, member.id, event_only=path != 'select'))))
+	      		XML(markmin.markmin2html(event_confirm(event.id, member.id, event_only=path != 'select'))))
 	if path and path=='select':
 		header = CAT(header, A('send email', _href=(URL('composemail', vars=dict(
 			query=f"(db.Members.id=={member_id})&(db.Members.id==db.Reservations.Member)&(db.Reservations.Event=={event_id})",
@@ -694,9 +693,8 @@ Moving member on/off waitlist will also affect all guests."))
 	grid = Grid(path, (db.Reservations.Member==member.id)&(db.Reservations.Event==event.id),
 			orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname,
 			columns=[db.Reservations.Lastname, db.Reservations.Firstname, 
-					db.Reservations.Notes, db.Reservations.Ticket,
-					db.Reservations.Provisional, db.Reservations.Waitlist],
-			headings=['Last', 'First', 'Notes', 'Ticket', 'Prvsnl', 'Waitlist'],
+					db.Reservations.Notes, db.Reservations.Status],
+			headings=['Last', 'First', 'Notes', 'Status'],
 			deletable=lambda r: write and (len(all_guests)==1 or r.id != host_reservation.id),
 			details=not write, editable=write, grid_class_style=grid_style,
 			formstyle=form_style, create=write, validation=validate,show_id=True)
@@ -764,6 +762,219 @@ def events_export():
 	except Exception as e:
 		flash.set(e)
 	return locals()
+	
+@action('get_date_range', method=['POST', 'GET'])
+@action.uses("form.html", db, session, flash)
+@checkaccess('read')
+def get_date_range():
+# vars:	function: controller to be given the date range
+#		title: heading for date range screen
+#		range: ytd - year to date
+#				 taxyear - prior full calendar year
+#		otherwise one full year ending now
+	today = datetime.datetime.now().date()
+	year_ago = (datetime.datetime.now() - datetime.timedelta(days=365) + datetime.timedelta(days=1)).date()
+	year_begin = datetime.date(datetime.datetime.now().year, 1, 1)	#start of current calendar 
+	prev_year_begin = datetime.date(datetime.datetime.now().year-1, 1, 1)
+	prev_year_end = datetime.date(datetime.datetime.now().year-1, 12, 31)
+
+	header=H5(request.query.get('title'))		
+
+	def checkform(form):
+		if form.vars.start > form.vars.end:
+			form.errors.end = 'end should not be before start!'
+		
+	form=Form(
+		[Field('start', 'date', requires=[IS_NOT_EMPTY(),IS_DATE(format='%Y-%m-%d')],
+			default = year_begin if request.query.get('range')=='ytd' else prev_year_begin if request.query.get('range')=='taxyear' else year_ago),
+		Field('end', 'date', requires=[IS_NOT_EMPTY(),IS_DATE(format='%Y-%m-%d')],
+			default = today if request.query.get('range')!='taxyear' else prev_year_end)]
+	)
+	
+	if form.accepted:
+		redirect(URL(request.query.get('function'), vars=dict(title=request.query.get('title'),
+					start=form.vars.get('start'), end=form.vars.get('end'))))	
+	return locals()
+			
+def get_banks(startdatetime, enddatetime):
+	assets = {}
+	rows = db(db.Bank_Accounts.id>0).select(db.Bank_Accounts.id, db.Bank_Accounts.Name, db.Bank_Accounts.Balance)
+	for r in rows:
+		d = [(bank_balance(r.id, startdatetime, balance=r.Balance), None, None),
+				(bank_balance(r.id, enddatetime, balance=r.Balance), None, None),
+				r.Name + f'{r.Name} balance']
+		assets[r.Name] = d
+	return assets
+
+def tdnum(value, query=None, left=None, th=False):
+	#return number as TD or TH
+	nums = f'${value:,.2f}' if value >= 0 else f'(${-value:,.2f})'
+	numsq = A(nums, _href=URL('transactions', vars=dict(query=query,left=left))) if query else nums
+	return TH(numsq, _style=f'text-align:right{"; color:Red" if value <0 else ""}') if th==True else TD(numsq, _style=f'text-align:right{"; color:Red" if value <0 else ""}')
+	
+@action('financial_statement', method=['GET'])
+@action.uses("message.html", db, session, flash)
+@checkaccess('accounting')
+def financial_statement():
+	start = request.query.get('start')
+	end = request.query.get('end')
+	startdatetime = datetime.datetime.fromisoformat(start)
+	enddatetime = datetime.datetime.fromisoformat(end)+datetime.timedelta(days=1)
+	startdate = datetime.date.fromisoformat(start)
+	enddate = datetime.date.fromisoformat(end)
+	title = f"Financial Statement for period {request.query.get('start')} to {request.query.get('end')}"
+
+	if not start or not end:
+		redirect(URL('get_date_range', vars=dict(function='financial_statement',title='Financial Statement')))
+		
+	message = CAT(H5(title), H6('Assets'))
+
+	sumamt = db.AccTrans.Amount.sum()
+	sumfee = db.AccTrans.Fee.sum()
+
+	def accrual(query, datetime):
+		query+=f"&(((db.AccTrans.Timestamp<'{datetime}')&(db.AccTrans.Accrual==True))|((db.AccTrans.Timestamp>='{datetime}')&(db.Events.DateTime<'{datetime}')))"
+		left="db.Events.on(db.Events.id==db.AccTrans.Event)"
+		r = db(eval(query)).select(sumamt, left = eval(left)).first()
+		return (r[sumamt] or 0, query, left)
+		
+	def prepaid(query, datetime):
+		query+=f"&((db.AccTrans.Timestamp<'{datetime}')&(db.AccTrans.Accrual!=True)&(db.Events.DateTime>='{datetime}'))"
+		left="db.Events.on(db.Events.id==db.AccTrans.Event)"
+		r = db(eval(query)).select(sumamt, left = eval(left)).first()
+		return (-(r[sumamt] or 0), query, left)
+		
+	def prepaiddues(date_time):
+		end = (date_time + datetime.timedelta(days=365)).date()
+		date = date_time.date()
+		rows = db((db.Dues.Nowpaid > end) & (db.Dues.Date < date)).select()
+		prepaid = 0
+		for r in rows:
+			yr = r.Prevpaid.year if r.Prevpaid else r.Date.year
+			if yr < r.Date.year: yr = r.Date.year
+			prepaid -= r.Amount * (r.Nowpaid.year - end.year) / (r.Nowpaid.year - yr)
+		return (prepaid, None, None)
+	
+	assets = get_banks(startdatetime, enddatetime)
+	
+	assets['Accounts Payable'] = [accrual('(db.AccTrans.Amount<0)', startdatetime),
+								accrual('(db.AccTrans.Amount<0)', enddatetime),'Pending event/accrued expenses']
+	assets['Accounts Receivable'] = [accrual('(db.AccTrans.Amount>0)', startdatetime),
+								accrual('(db.AccTrans.Amount>0)', enddatetime),'Pending event revenue']
+	assets['Prepaid Expenses'] = [prepaid('(db.AccTrans.Amount<0)', startdatetime),
+								prepaid('(db.AccTrans.Amount<0)', enddatetime), 'Event expenses prepaid']
+	assets['Prepaid Events'] = [prepaid('(db.AccTrans.Amount>0)', startdatetime),
+								prepaid('(db.AccTrans.Amount>0)', enddatetime), 'Event revenue prepaid']
+	assets['Prepaid Dues'] = [prepaiddues(startdatetime), prepaiddues(enddatetime),'Dues prepaid for future years']
+	
+	#now build the report
+	rows = [THEAD(TR(TH('Description'), TH(f'{start}'), TH(f'{end}'), TH('Net Change'), TH('Notes')))]
+	totals = [0, 0]
+	for a in sorted(assets):
+		if assets[a][0][0] + assets[a][1][0] > 0: #positive balances, treat as asset
+			rows.append(TR(TD(a), tdnum(assets[a][0][0], assets[a][0][1], assets[a][0][2]),
+								tdnum(assets[a][1][0], assets[a][1][1], assets[a][1][2]),
+								tdnum(assets[a][1][0]-assets[a][0][0]), TD(assets[a][2])))
+			totals[0] += assets[a][0][0]
+			totals[1] += assets[a][1][0]
+	rows.append(THEAD(TR(TH('Total'), tdnum(totals[0], th=True), tdnum(totals[1], th=True), tdnum(totals[1]-totals[0], th=True))))
+	message = CAT(message, TABLE(*rows))
+
+	rows = [THEAD(TR(TH('Description'), TH(f'{start}'), TH(f'{end}'), TH('Net Change'), TH('Notes')))]
+	ltotals = [0, 0]
+	for a in sorted(assets):
+		if assets[a][0][0] + assets[a][1][0] <= 0 and not (assets[a][0][0]==0 and assets[a][1][0]==0): #negative balances, treat as liability
+			rows.append(TR(TD(a), tdnum(-assets[a][0][0], assets[a][0][1], assets[a][0][2]),
+								tdnum(-assets[a][1][0], assets[a][1][1], assets[a][1][2]),
+								tdnum(assets[a][0][0]-assets[a][1][0]), TD(assets[a][2])))
+			ltotals[0] -= assets[a][0][0]
+			ltotals[1] -= assets[a][1][0]
+	rows.append(TR(TD('Reserve Fund'), tdnum(totals[0]-ltotals[0]), tdnum(totals[1]-ltotals[1]),
+					tdnum(totals[1]-totals[0]-ltotals[1]+ltotals[0]), TD('Uncommitted Funds')))
+	rows.append(THEAD(TR(TH('Total'), tdnum(totals[0], th=True), tdnum(totals[1], th=True), tdnum(totals[1]-totals[0], th=True))))
+	message = CAT(message, H6('\nLiabilities'), TABLE(*rows))
+	
+	transfer = db(db.CoA.Name=='Transfer').select().first().id	#ignore transfer transactions
+	query = f"(((db.AccTrans.Event != None) & (db.Events.DateTime >= '{startdatetime}') & (db.Events.DateTime < '{enddatetime}')) | \
+((db.AccTrans.Event == None) & (db.AccTrans.Account != {transfer}) & \
+(db.AccTrans.Timestamp >= '{startdatetime}') & (db.AccTrans.Timestamp < '{enddatetime}')))"
+	
+	left = 'db.Events.on(db.Events.id == db.AccTrans.Event)'
+
+	events = db(eval(query)).select(db.AccTrans.Event, db.Events.Description, db.Events.DateTime,
+					left = eval(left), orderby = db.Events.DateTime, groupby = db.Events.DateTime)
+
+	rows = [THEAD(TR(TH('Event'), TH('Date'), TH('Revenue'), TH('Expense'), TH('Net Revenue')))]
+	totrev = totexp = 0
+	for e in events:
+		name = 'Admin' if e.AccTrans.Event == None else e.Events.Description
+		date = '' if e.AccTrans.Event == None else e.Events.DateTime.date()
+		rev = exp = 0
+		accounts = db(eval(query+'&(db.AccTrans.Event==e.AccTrans.Event)')).select(sumamt, sumfee,
+					left = eval(left), orderby = db.AccTrans.Account, groupby = db.AccTrans.Account)
+		for a in accounts:
+			if a[sumamt] >= 0:
+				rev += a[sumamt]
+			else:
+				exp += a[sumamt]
+			exp += a[sumfee] or 0
+		rows.append(TR(TD(A(name[0:25], _href=URL(f'financial_detail/{e.AccTrans.Event or 0}', vars=dict(query=query, left=left, title=title)))), 
+		 				TD(date), tdnum(rev), tdnum(exp), tdnum(rev + exp)))
+		totrev += rev
+		totexp += exp
+	rows.append(THEAD(TR(TH('Total'), TH(''), tdnum(totrev, th=True),
+		      tdnum(totexp, th=True), tdnum(totrev+totexp, th=True))))
+	message  = CAT(message, H6('\nAdmin & Event Cash Flow'), TABLE(*rows))
+	return locals()
+	
+@action('financial_detail/<event:int>', method=['GET'])
+@action.uses("message.html", db, session, flash)
+@checkaccess('accounting')
+def financial_detail(event, query=None, left=None, title=''):
+#shared by financial_statement and tax_statement
+	back = session.get('url_prev')
+	query = request.query.get('query')
+	left = request.query.get('left')
+	title = request.query.get('title')
+	if event==0:
+		event = None		#admin expenses
+	else:
+		event_record = db.Events[event]
+
+	message = CAT(A('back', _href=back), H5(f'\n{title}'), H6(f'\n{event_record.Description if event else "Administrative Revenue/Expense"}'))
+	sumamt = db.AccTrans.Amount.sum()
+	sumfee = db.AccTrans.Fee.sum()
+
+	accts = db(eval(f"{query}&(db.AccTrans.Event=={event})")).select(db.CoA.id, db.CoA.Name, db.AccTrans.id,
+				db.AccTrans.Event, db.Events.Description, sumamt, sumfee, groupby=db.AccTrans.Account,
+				left=eval(f'[db.CoA.on(db.CoA.id == db.AccTrans.Account), {left}]'))
+	accts = accts.sort(lambda r: r.CoA.Name)
+	
+	totrev = totexp = cardfees = 0
+	rows = [THEAD(TR(TH('Account'), TH('Amount')))]
+	for acct in accts:
+		if acct[sumamt] >= 0:
+			rows.append(TR(TD(A(acct.CoA.Name[0:25], _href=URL('transactions',
+							vars=dict(query=f"{query}&(db.AccTrans.Account=={acct.CoA.id})&(db.Events.id=={event})",  left=left)))),
+						tdnum(acct[sumamt])))
+			totrev += acct[sumamt]
+			cardfees -= acct[sumfee] or 0
+	rows.append(THEAD(TR(TH('Total'), tdnum(totrev, th=True))))
+	message = CAT(message, H6('\nRevenue'), TABLE(*rows))
+
+	rows = [THEAD(TR(TH('Account'), TH('Amount')))]
+	for acct in accts:
+		if acct[sumamt] < 0:
+			rows.append(TR(TD(A(acct.CoA.Name[0:25], _href=URL('transactions',
+							vars=dict(query=f"{query}&(db.AccTrans.Account=={acct.CoA.id})&(db.Events.id=={event})",  left=left)))),
+						tdnum(-acct[sumamt])))
+			totexp -= acct[sumamt]
+			cardfees -= acct[sumfee] or 0
+	rows.append(TR(TD('Card Fees'), tdnum(cardfees)))
+	rows.append(THEAD(TR(TH('Total'), tdnum(totexp + cardfees, th=True))))
+	rows.append(THEAD(TR(TH('Net Revenue'), tdnum(totrev - totexp - cardfees, th=True))))
+	message = CAT(message, H6('\nRevenue'), TABLE(*rows))
+	return locals()
 		
 @action('accounting', method=['POST', 'GET'])
 @action('accounting/<path:path>', method=['POST', 'GET'])
@@ -773,6 +984,8 @@ def accounting(path=None):
 
 	if path and path=='select':
 		header = CAT(H5('Banks'),
+	       		A('Financial Statement', _href=URL('get_date_range', vars=dict(
+					function='financial_statement', title='Financial Statement'))), XML('<br>'),
 				"Use Upload to load a file you've downloaded from bank/payment processor into accounting")
 	else:
 		header = CAT(A('back', _href=URL('accounting')) , H5('Banks'))
@@ -803,18 +1016,18 @@ def bank_file(bank_id):
 	unalloc = db(db.CoA.Name == 'Unallocated').select().first()
 	acdues = db(db.CoA.Name == "Membership Dues").select().first()
 	actkts = db(db.CoA.Name == "Ticket sales").select().first()
+	origin = 'since account start'
 
-	header = CAT(H5(f"{bank.Name} Transactions"),
-	      		UL(LI(XML(f"To download data since {markmin.markmin2html('``**'+str(bkrecent.Timestamp.date())+'**``:red')}:")),
-					LI(A('Login to Society Account', _href={bank.Bankurl}, _target='blank')),
-					LI(XML(f"{markmin.markmin2html(bank.HowTo)}"))
-				)
-	)
+	header = CAT(A('back', _href=URL('accounting')),
+				H5(f"{bank.Name} Transactions"),
+				XML(f"To download data since {markmin.markmin2html(f'``**{str(bkrecent.Timestamp.date()) if bkrecent else origin}**``:red')}:"), XML('<br>'),
+				A('Login to Society Account', _href={bank.Bankurl}, _target='blank'), XML('<br>'),
+				XML(f"{markmin.markmin2html(bank.HowTo)}"))
+	
 	footer = f"Current Balance = {'$%8.2f'%(bank.Balance)}"
 	stripe.api_key = STRIPE_SKEY
 	
-	form = Form([Field('downloaded_file', 'upload', uploadfield = False),
-					Field('override', 'boolean', comment = ' tick to accept new transactions unconditionally, e.g. for a brand new account')],
+	form = Form([Field('downloaded_file', 'upload', uploadfield = False)],
 				submit_button = 'Import')
 	
 	if not form.accepted:
@@ -822,7 +1035,7 @@ def bank_file(bank_id):
 
 	stored = 0
 	unmatched = 0
-	overlap = False
+	overlap = bkrecent==None
 	lastrow = None
 	isok = True
 				
@@ -849,7 +1062,7 @@ def bank_file(bank_id):
 
 #in the file, transactions may be in chronological order or the reverse (Stripe), so store them all in memory
 #before processing. We first read from the file, to determine that there is overlap with previously processed files
-#(at least one previously stored transaction in the file, or the override is set).
+#(at least one previously stored transaction in the file).
 	file_transactions = []
 	
 	try:
@@ -874,7 +1087,7 @@ def bank_file(bank_id):
 			else:
 				file_transactions.insert(0,row) #reverse order so we process chronologically
 			
-		if overlap == False and request.vars.override!='on':
+		if overlap == False:
 			raise Exception('file should start on or before '+bkrecent.Timestamp.date().strftime(bank.Datefmt))
 
 		#now process the new transactions.				
@@ -958,8 +1171,8 @@ def bank_file(bank_id):
 	except Exception as e:
 		flash.set(f"{str(lastrow)}: {str(e)}")
 		isok = False
-#	if isok:
-#		redirect(URL('acctrans', vars=dict(query='db.AccTrans.Bank=='+str(bank.id))))
+	if isok:
+		redirect(URL('transactions', vars=dict(query=f'db.AccTrans.Bank=={bank.id}')))
 	return locals()
 
 @action('transactions', method=['POST', 'GET'])
@@ -969,16 +1182,15 @@ def bank_file(bank_id):
 def transactions(path=None):
 	db.AccTrans.Fee.writable = False
 
+	back = URL('transactions/select', scheme=True)
 	if not path:
 		session['bank_query'] = request.query.get('query')
 		session['bank_left'] = request.query.get('left')
-	query = session.get('bank_query')
-	left = session.get('bank_left')
-
-	bank_id_match=re.match('db.AccTrans.Bank==([0-9]+)$', query)
-	bank_id = int(bank_id_match.group(1)) if bank_id_match else None
-
-	if path and path.startswith('edit'):	#editing AccTrans record
+		back = session.get('url_prev')
+		session['back'] = back
+	elif path=='select':
+		back = session.get('back')
+	elif path.startswith('edit'):	#editing AccTrans record
 		db.AccTrans.Amount.comment = 'to split transaction, enter amount of a split piece'
 		db.AccTrans.CheckNumber.writable = False
 		db.AccTrans.CheckNumber.requires = None
@@ -990,13 +1202,20 @@ def transactions(path=None):
 			db.AccTrans.Amount.requires=IS_DECIMAL_IN_RANGE(0, transaction.Amount)
 		else:
 			db.AccTrans.Amount.requires=IS_DECIMAL_IN_RANGE(transaction.Amount, 0)
-			
-	if path=='new':	#adding AccTrans accrual
+	elif path=='new':	#adding AccTrans accrual
 		db.AccTrans.Amount.comment='enter full amount of check as a negative number; split using Edit if multiple accounts',
 		db.AccTrans.Timestamp.writable=True
 		db.AccTrans.Amount.requires=IS_DECIMAL_IN_RANGE(-100000, 0)
-		db.AccTrans.Bank.default = bank_id
-		
+
+	query = session.get('bank_query')
+	left = session.get('bank_left')
+
+	bank_id_match=re.match('db.AccTrans.Bank==([0-9]+)$', query)
+	bank_id = int(bank_id_match.group(1)) if bank_id_match else None
+	db.AccTrans.Bank.default = bank_id
+	
+	header = CAT(A('back', _href=back), H5('Accounting Transactions'))
+
 	def validate(form):
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
@@ -1075,7 +1294,7 @@ def member_profile(member):
 	return body
 	
 #create confirmation of event
-def evtconfirm(event_id, member_id, justpaid=0, event_only=False):
+def event_confirm(event_id, member_id, justpaid=0, event_only=False):
 	event = db.Events[event_id]
 	resvtns = db((db.Reservations.Event==event_id)&(db.Reservations.Member==member_id)).select(
 					orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname)
@@ -1096,12 +1315,7 @@ def evtconfirm(event_id, member_id, justpaid=0, event_only=False):
 		body += (t.Affiliation.Name if t.Affiliation else '') +'|'
 		body += (t.Selection or '') + '|'
 		body += '$%6.2f'%(t.Unitcost or 0.00) + '|'
-		if t.Waitlist:
-			body += '%s\n'%('``**waitlisted**``:red')
-		elif t.Provisional:
-			body += '%s\n'%('``**unconfirmed**``:red')
-		else:
-			body += '\n'
+		body += f'``**{res_status(t.id)}**``:red\n' if t.Waitlist or t.Provisional else '\n'
 	if tbcdues > tbc:
 		body += 'Membership Dues|||$%6.2f\n'%(tbcdues - tbc)
 	body += '**Total cost**|||**$%6.2f**\n'%(cost + tbcdues - tbc)
@@ -1110,7 +1324,7 @@ def evtconfirm(event_id, member_id, justpaid=0, event_only=False):
 		body += '**Net amount due**|||**$%6.2f**\n'%(tbcdues-justpaid)
 	body += '------------------------\n'
 	if (tbcdues)>justpaid:
-		body += 'To pay online please visit '+URL('member', 'registration', args=[event.id], scheme=True, host=SOCIETY_SUBDOMAIN)
+		body += 'To pay online please visit '+URL(f'register/{event_id}', scheme=True)
 	elif event.Notes and not resvtns[0].Waitlist and not resvtns[0].Provisional:
 		body += '\n\n%s\n'%event.Notes
 	return body
@@ -1225,7 +1439,7 @@ def composemail():
 						elif part[1] == 'member':
 							body += member_profile(member)
 						elif part[1] == 'reservation':
-							body += evtconfirm(row.get(db.Reservations.Event), member.id)
+							body += event_confirm(row.get(db.Reservations.Event), member.id)
 					message = HTML(XML(msgformat(body)))
 					auth.sender.send(to=to, subject=form2.vars['subject'], bcc=bcc, body=message)
 				flash.set(f"{len(rows)} emails sent to {qdesc}")

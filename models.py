@@ -220,6 +220,10 @@ def res_wait(member_id, event_id):
 	wait = db((db.Reservations.Member==member_id)&(db.Reservations.Event==event_id)&(db.Reservations.Waitlist==True)).count()
 	return wait if wait!=0 else None
 
+def res_status(reservation_id):
+	r= db.Reservations[reservation_id]
+	return 'waitlisted' if r.Waitlist else 'unconfirmed' if r.Provisional else ''
+
 #table includes primary reservation records plus guest records for each guest.
 #Member(host) must have record in Members.
 #Primary reservation record has Host==True
@@ -247,6 +251,7 @@ db.define_table('Reservations',
 	Field.Virtual('Cost', lambda r: res_totalcost(r['Member'], r['Event']) or '', readable=False),
 	Field.Virtual('Tbc', lambda r: res_tbc(r['Member'], r['Event']) or '', readable=False),	#tickets only
 	Field.Virtual('TBC', lambda r: res_tbc(r['Member'], r['Event'], True) or '', readable=False),	#include dues
+	Field.Virtual('Status', lambda r: res_status(r['id'])),
 	Field('Paid', 'decimal(8,2)', readable=False, writable=False,
 				requires=IS_EMPTY_OR(IS_DECIMAL_IN_RANGE(0, 10000))), #total paid, confirmed by download from Stripe, Bank
 	Field('Charged', 'decimal(6,2)', readable=False, writable=False),	#payment made, not yet downloaded from Stripe

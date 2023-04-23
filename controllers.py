@@ -30,8 +30,6 @@ from yatl.helpers import *
 from .common import db, session, T, cache, auth, logger, authenticated, unauthenticated, flash
 from .settings_private import *
 from .models import *
-#from .models import primary_email, res_tbc, member_name, member_affiliations, primary_matriculation
-#from .models import member_emails, event_revenue, event_unpaid, res_totalcost, primary_affiliation, bank_accrual
 from py4web.utils.grid import Grid, GridClassStyleBulma, Column, GridClassStyleBootstrap5, GridClassStyle
 from py4web.utils.form import Form, FormStyleBulma, FormStyleBootstrap4, FormStyleDefault
 from pydal.validators import *
@@ -160,6 +158,8 @@ def members(path=None):
 		   					back=URL(f'members/edit/{path[5:]}', scheme=True)))))
 	else:
 		session['back'] = None
+		session['member_filter'] = None
+		redirect(URL('members/select'))
 
 	if search_form.vars.get('mailing_list'):
 		query.append(f"(db.Emails.Member==db.Members.id)&db.Emails.Mailings.contains({search_form.vars.get('mailing_list')})")
@@ -811,6 +811,58 @@ def tdnum(value, query=None, left=None, th=False):
 	nums = f'${value:,.2f}' if value >= 0 else f'(${-value:,.2f})'
 	numsq = A(nums, _href=URL('transactions', vars=dict(query=query,left=left))) if query else nums
 	return TH(numsq, _style=f'text-align:right{"; color:Red" if value <0 else ""}') if th==True else TD(numsq, _style=f'text-align:right{"; color:Red" if value <0 else ""}')
+
+def financial_content(event, query=None, left=None):
+#shared by financial_statement and tax_statement
+	if event:
+		event_record = db.Events[event]
+
+	message = H6(f'\n{event_record.Description if event else "Administrative Revenue/Expense"}')
+	sumamt = db.AccTrans.Amount.sum()
+	sumfee = db.AccTrans.Fee.sum()
+
+	accts = db(eval(f"{query}&(db.AccTrans.Event=={event})")).select(db.CoA.id, db.CoA.Name, db.AccTrans.id,
+				db.AccTrans.Event, db.Events.Description, sumamt, sumfee, groupby=db.AccTrans.Account,
+				left=eval(f'[db.CoA.on(db.CoA.id == db.AccTrans.Account), {left}]'))
+	accts = accts.sort(lambda r: r.CoA.Name)
+	
+	totrev = totexp = cardfees = 0
+	rows = [THEAD(TR(TH('Account'), TH('Amount')))]
+	for acct in accts:
+		if acct[sumamt] >= 0:
+			rows.append(TR(TD(A(acct.CoA.Name[0:25], _href=URL('transactions',
+							vars=dict(query=f"{query}&(db.AccTrans.Account=={acct.CoA.id})&(db.Events.id=={event})",  left=left)))),
+						tdnum(acct[sumamt])))
+			totrev += acct[sumamt]
+			cardfees -= acct[sumfee] or 0
+	rows.append(THEAD(TR(TH('Total'), tdnum(totrev, th=True))))
+	message = CAT(message, H6('\nRevenue'), TABLE(*rows))
+
+	rows = [THEAD(TR(TH('Account'), TH('Amount')))]
+	for acct in accts:
+		if acct[sumamt] < 0:
+			rows.append(TR(TD(A(acct.CoA.Name[0:25], _href=URL('transactions',
+							vars=dict(query=f"{query}&(db.AccTrans.Account=={acct.CoA.id})&(db.Events.id=={event})",  left=left)))),
+						tdnum(-acct[sumamt])))
+			totexp -= acct[sumamt]
+			cardfees -= acct[sumfee] or 0
+	rows.append(TR(TD('Card Fees'), tdnum(cardfees)))
+	rows.append(THEAD(TR(TH('Total'), tdnum(totexp + cardfees, th=True))))
+	rows.append(THEAD(TR(TH('Net Revenue'), tdnum(totrev - totexp - cardfees, th=True))))
+	return CAT(message, H6('\nRevenue'), TABLE(*rows))
+
+@action('financial_detail/<event:int>', method=['GET'])
+@action.uses("message.html", db, session, flash)
+@checkaccess('accounting')
+def financial_detail(event, query=None, left=None, title=''):
+	back = session.get('url_prev')
+	query = request.query.get('query')
+	left = request.query.get('left')
+	title = request.query.get('title')
+
+	message = CAT(A('back', _href=back), H5(f'{title}'),
+			financial_content(event if event!=0 else None, query, left))
+	return locals()
 	
 @action('financial_statement', method=['GET'])
 @action.uses("message.html", db, session, flash)
@@ -822,7 +874,9 @@ def financial_statement():
 	enddatetime = datetime.datetime.fromisoformat(end)+datetime.timedelta(days=1)
 	startdate = datetime.date.fromisoformat(start)
 	enddate = datetime.date.fromisoformat(end)
+	title = f"Financial Statement for period {start} to {end}"
 	title = f"Financial Statement for period {request.query.get('start')} to {request.query.get('end')}"
+	title = f"Financial Statement for period {start} to {end}"
 
 	if not start or not end:
 		redirect(URL('get_date_range', vars=dict(function='financial_statement',title='Financial Statement')))
@@ -927,53 +981,90 @@ def financial_statement():
 	message  = CAT(message, H6('\nAdmin & Event Cash Flow'), TABLE(*rows))
 	return locals()
 	
-@action('financial_detail/<event:int>', method=['GET'])
+@action('tax_statement', method=['GET'])
 @action.uses("message.html", db, session, flash)
 @checkaccess('accounting')
-def financial_detail(event, query=None, left=None, title=''):
-#shared by financial_statement and tax_statement
-	back = session.get('url_prev')
-	query = request.query.get('query')
-	left = request.query.get('left')
-	title = request.query.get('title')
-	if event==0:
-		event = None		#admin expenses
-	else:
-		event_record = db.Events[event]
+def tax_statement():
+	start = request.query.get('start')
+	end = request.query.get('end')
+	startdatetime = datetime.datetime.fromisoformat(start)
+	enddatetime = datetime.datetime.fromisoformat(end)+datetime.timedelta(days=1)
+	startdate = datetime.date.fromisoformat(start)
+	enddate = datetime.date.fromisoformat(end)
+	title = f"Financial Statement (cash based) for period {start} to {end}"
 
-	message = CAT(A('back', _href=back), H5(f'\n{title}'), H6(f'\n{event_record.Description if event else "Administrative Revenue/Expense"}'))
+	if not start or not end:
+		redirect(URL('get_date_range', vars=dict(function='financial_statement',title='Financial Statement')))
+		
+	message = CAT(H5(title), H6('Account Balances'))
+
 	sumamt = db.AccTrans.Amount.sum()
 	sumfee = db.AccTrans.Fee.sum()
+	tktacct = db(db.CoA.Name=='Ticket sales').select().first().id
+	sponacct = db(db.CoA.Name=='Sponsorships').select().first().id
+	xferacct = db(db.CoA.Name=='Transfer').select().first().id	#ignore transfer transactions
 
-	accts = db(eval(f"{query}&(db.AccTrans.Event=={event})")).select(db.CoA.id, db.CoA.Name, db.AccTrans.id,
-				db.AccTrans.Event, db.Events.Description, sumamt, sumfee, groupby=db.AccTrans.Account,
-				left=eval(f'[db.CoA.on(db.CoA.id == db.AccTrans.Account), {left}]'))
-	accts = accts.sort(lambda r: r.CoA.Name)
+	query = f"((db.AccTrans.Timestamp>='{startdatetime}')&(db.AccTrans.Timestamp < '{enddatetime}') & (db.AccTrans.Accrual!=True))"
+	left = 'db.Events.on(db.Events.id == db.AccTrans.Event)'
 	
-	totrev = totexp = cardfees = 0
-	rows = [THEAD(TR(TH('Account'), TH('Amount')))]
-	for acct in accts:
-		if acct[sumamt] >= 0:
-			rows.append(TR(TD(A(acct.CoA.Name[0:25], _href=URL('transactions',
-							vars=dict(query=f"{query}&(db.AccTrans.Account=={acct.CoA.id})&(db.Events.id=={event})",  left=left)))),
-						tdnum(acct[sumamt])))
-			totrev += acct[sumamt]
-			cardfees -= acct[sumfee] or 0
-	rows.append(THEAD(TR(TH('Total'), tdnum(totrev, th=True))))
-	message = CAT(message, H6('\nRevenue'), TABLE(*rows))
+	assets = get_banks(startdatetime, enddatetime)
+	totals = [0, 0]
+	rows = [THEAD(TR(TH('Description'), TH(start), TH(end), TH('Net Change'), TH('Notes')))]
+	for a in sorted(assets):
+		if assets[a][0][0] != 0 or assets[a][1][0] != 0:
+			rows.append(TR(TD(a), tdnum(assets[a][0][0], assets[a][0][1], assets[a][0][2]),
+								tdnum(assets[a][1][0], assets[a][1][1], assets[a][1][2]),
+								tdnum(assets[a][1][0]-assets[a][0][0]), TD(assets[a][2])))
+			totals[0] += assets[a][0][0]
+			totals[1] += assets[a][1][0]
+	rows.append(THEAD(TR(TH('Total'), tdnum(totals[0], th=True), tdnum(totals[1], th=True), tdnum(totals[1]-totals[0], th=True))))
+	message = CAT(message, TABLE(*rows))
 
-	rows = [THEAD(TR(TH('Account'), TH('Amount')))]
-	for acct in accts:
-		if acct[sumamt] < 0:
-			rows.append(TR(TD(A(acct.CoA.Name[0:25], _href=URL('transactions',
-							vars=dict(query=f"{query}&(db.AccTrans.Account=={acct.CoA.id})&(db.Events.id=={event})",  left=left)))),
-						tdnum(-acct[sumamt])))
-			totexp -= acct[sumamt]
-			cardfees -= acct[sumfee] or 0
-	rows.append(TR(TD('Card Fees'), tdnum(cardfees)))
-	rows.append(THEAD(TR(TH('Total'), tdnum(totexp + cardfees, th=True))))
-	rows.append(THEAD(TR(TH('Net Revenue'), tdnum(totrev - totexp - cardfees, th=True))))
-	message = CAT(message, H6('\nRevenue'), TABLE(*rows))
+	tottkt = totspon = totrev = totexp = 0
+	allrev = allexp = 0
+	allrevexp = db(eval(f"{query}&(db.AccTrans.Account!={xferacct})")).select(sumamt, sumfee,
+					orderby=db.AccTrans.Account, groupby=db.AccTrans.Account)
+	for t in allrevexp:
+		if t[sumamt] >= 0:
+			allrev += t[sumamt]
+		else:
+			allexp += t[sumamt]
+		allexp += (t[sumfee] or 0)
+
+	events = db(eval(f"{query}&(db.AccTrans.Event!=None)")).select(db.Events.DateTime, db.Events.Description,
+					db.Events.id, left = eval(left), orderby = db.Events.DateTime, groupby = db.Events.DateTime)
+	rows =[THEAD(TR(TH('Event'), TH('Ticket Sales'), TH('Sponsorships'), TH('Revenue'), TH('Expense'), TH('Notes')))]
+	for e in events:
+		trans = db(eval(f"{query}&(db.AccTrans.Event=={e.id})")).select(db.AccTrans.Account, sumamt, sumfee,
+					left = eval(left), orderby = db.AccTrans.Account, groupby = db.AccTrans.Account)
+		tkt = trans.find(lambda t: t.AccTrans.Account == tktacct).first()
+		spon = trans.find(lambda t: t.AccTrans.Account == sponacct).first()
+		revenue = expense = 0
+		for a in trans:
+			if a[sumamt] >= 0:
+				revenue += (a[sumamt] or 0)
+			else:
+				expense += (a[sumamt] or 0)
+			expense += (a[sumfee] or 0)
+
+		rows.append(TR(TD(A(e.Description[0:25], _href=URL('financial_detail', vars=dict(event=e.id, title=title, query=query, left=left)))),
+					tdnum(tkt[sumamt] if tkt else 0), tdnum(spon[sumamt] if spon else 0),
+					tdnum(revenue), tdnum(expense), TD(e.DateTime.date())))
+		if spon:
+			spontr = db(eval(f"{query}&(db.AccTrans.Event=={e.id})&(db.AccTrans.Account=={sponacct})")).select(
+					db.AccTrans.Amount, db.AccTrans.Notes, left = eval(left))
+			for t in spontr:
+				rows.append(TR(TD(''), TD(''), tdnum(t.Amount), TD(''),TD(''), TD(t.Notes)))
+		tottkt += tkt[sumamt] if tkt else 0
+		totspon += spon[sumamt] if spon else 0
+		totrev += revenue
+		totexp += expense
+	rows.append(THEAD(TR(TH('Totals'), tdnum(tottkt, th=True), tdnum(totspon, th=True), tdnum(totrev, th=True), tdnum(totexp, th=True))))
+	rows.append(THEAD(TR(TH('with Other Exp./Rev.'), TH(''), TH(''), tdnum(allrev, th=True), tdnum(allexp, th=True))))
+	rows.append(THEAD(TR(TH('Overall Net Revenue'), TH(''), TH(''), tdnum(allrev+allexp, th=True))))
+	message = CAT(message, H6('Events'), TABLE(*rows))
+
+	message = CAT(message, financial_content(None, query=query, left=left))
 	return locals()
 		
 @action('accounting', method=['POST', 'GET'])
@@ -986,6 +1077,8 @@ def accounting(path=None):
 		header = CAT(H5('Banks'),
 	       		A('Financial Statement', _href=URL('get_date_range', vars=dict(
 					function='financial_statement', title='Financial Statement'))), XML('<br>'),
+	       		A('Tax Statement', _href=URL('get_date_range', vars=dict(
+					function='tax_statement', title='Tax Statement', range='taxyear'))), XML('<br>'),
 				"Use Upload to load a file you've downloaded from bank/payment processor into accounting")
 	else:
 		header = CAT(A('back', _href=URL('accounting')) , H5('Banks'))

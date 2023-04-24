@@ -271,8 +271,8 @@ using an optional operator (=, <, >, <=, >=) together with a value."))
 			columns=[db.Members.Name,
 	    			db.Members.Membership, db.Members.Paiddate,
 					db.Members.Affiliations,
-					db.Members.Access, db.Members.Notes],
-			headings=['Name', 'Status', 'Until', 'College', 'Access', 'Notes'],
+					db.Members.Access],
+			headings=['Name', 'Status', 'Until', 'College', 'Access'],
 			details=not write, editable=write, create=write, show_id=True,
 			grid_class_style=grid_style,
 			formstyle=form_style,
@@ -507,9 +507,9 @@ def events(path=None):
 
 	grid = Grid(path, db.Events.id>0,
 	     	orderby=~db.Events.DateTime,
-		    headings=['Datetime', 'Event', 'Venue','Speaker', 'Paid','TBC', 'Conf', 'Wait'],
+		    headings=['Datetime', 'Event', 'Venue','Speaker','TBC', 'Conf', 'Wait'],
 			fields=[db.Events.DateTime, db.Events.Description, db.Events.Venue, db.Events.Speaker,
-	    			db.Events.Paid, db.Events.Unpaid, db.Events.Attend, db.Events.Wait],
+	    			db.Events.Unpaid, db.Events.Attend, db.Events.Wait],
 			search_queries=[["Event", lambda value: db.Events.Description.like(f'%{value}%')],
 		    				["Venue", lambda value: db.Events.Venue.like(f'%{value}%')],
 						    ["Speaker", lambda value: db.Events.Speaker.like(f'%{value}%')]],
@@ -564,6 +564,7 @@ select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 		header = CAT(header, A('reservations', _href=URL(f'event_reservations/{event_id}')), ' or ')
 	if not request.query.get('waitlist'):
 		header = CAT(header, A('waitlist', _href=URL(f'event_reservations/{event_id}/select', vars=dict(waitlist=True))), ' or ')
+		
 	if not request.query.get('provisional'):
 		header = CAT(header, A('provisional', _href=URL(f'event_reservations/{event_id}/select', vars=dict(provisional=True))), XML(' (not checked out)'))
 
@@ -574,10 +575,9 @@ select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 			left=db.Members.on(db.Members.id == db.Reservations.Member),
 			orderby=db.Reservations.Created if request.query.get('waitlist') else db.Reservations.Lastname|db.Reservations.Firstname,
 			columns=[db.Reservations.Member,db.Members.Membership, db.Members.Paiddate,
-						db.Reservations.Affiliation, db.Reservations.Notes,
-						db.Reservations.Cost, db.Reservations.TBC, db.Reservations.Conf,
-						db.Reservations.Wait],
-			headings=['Member', 'Type', 'Until', 'College', 'Notes', 'Paid', 'Tbc', 'Conf', 'Wait'],
+						db.Reservations.Affiliation, db.Reservations.Notes, db.Reservations.TBC,
+						db.Reservations.Wait if request.query.get('waitlist') else db.Reservations.Prov if request.query.get('provisional') else db.Reservations.Conf],
+			headings=['Member', 'Type', 'Until', 'College', 'Notes', 'Tbc', '#'],
 			pre_action_buttons=pre_action_buttons,
 			details=False, editable = False, create = False, deletable = False,
 			rows_per_page=200, grid_class_style=grid_style, formstyle=form_style)
@@ -855,12 +855,15 @@ def financial_content(event, query=None, left=None):
 @action.uses("message.html", db, session, flash)
 @checkaccess('accounting')
 def financial_detail(event, query=None, left=None, title=''):
-	back = session.get('url_prev')
+	source = session.get('url_prev')
+	if 'transactions' not in source:
+		back = session.get('url_prev')
+		session['back'] = back
 	query = request.query.get('query')
 	left = request.query.get('left')
 	title = request.query.get('title')
 
-	message = CAT(A('back', _href=back), H5(f'{title}'),
+	message = CAT(A('back', _href=session.get('back')), H5(f'{title}'),
 			financial_content(event if event!=0 else None, query, left))
 	return locals()
 	
@@ -874,8 +877,6 @@ def financial_statement():
 	enddatetime = datetime.datetime.fromisoformat(end)+datetime.timedelta(days=1)
 	startdate = datetime.date.fromisoformat(start)
 	enddate = datetime.date.fromisoformat(end)
-	title = f"Financial Statement for period {start} to {end}"
-	title = f"Financial Statement for period {request.query.get('start')} to {request.query.get('end')}"
 	title = f"Financial Statement for period {start} to {end}"
 
 	if not start or not end:
@@ -1277,12 +1278,12 @@ def transactions(path=None):
 
 	back = URL('transactions/select', scheme=True)
 	if not path:
-		session['bank_query'] = request.query.get('query')
-		session['bank_left'] = request.query.get('left')
+		session['query'] = request.query.get('query')
+		session['left'] = request.query.get('left')
 		back = session.get('url_prev')
-		session['back'] = back
+		session['bank_back'] = back
 	elif path=='select':
-		back = session.get('back')
+		back = session.get('bank_back')
 	elif path.startswith('edit'):	#editing AccTrans record
 		db.AccTrans.Amount.comment = 'to split transaction, enter amount of a split piece'
 		db.AccTrans.CheckNumber.writable = False
@@ -1300,8 +1301,8 @@ def transactions(path=None):
 		db.AccTrans.Timestamp.writable=True
 		db.AccTrans.Amount.requires=IS_DECIMAL_IN_RANGE(-100000, 0)
 
-	query = session.get('bank_query')
-	left = session.get('bank_left')
+	query = session.get('query')
+	left = session.get('left')
 
 	bank_id_match=re.match('db.AccTrans.Bank==([0-9]+)$', query)
 	bank_id = int(bank_id_match.group(1)) if bank_id_match else None

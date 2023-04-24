@@ -260,7 +260,8 @@ db.define_table('Reservations',
 								(db.Reservations.Event==r['Event'])&(db.Reservations.Provisional==False)& \
 								(db.Reservations.Waitlist==False)).count(), readable=False),
 	Field.Virtual('Wait', lambda r: res_wait(r['Member'], r['Event']) or '', readable=False),
-	
+	Field.Virtual('Prov', lambda r: db((db.Reservations.Member==r['Member'])& \
+								(db.Reservations.Event==r['Event'])&(db.Reservations.Provisional==True)).count(), readable=False),
 	Field('Created', 'datetime', default=datetime.datetime.now(), readable=False, writable=False),
 	Field('Modified', 'datetime', default=datetime.datetime.now(), writable=False),
 	singular="Reservation", plural="Reservations")

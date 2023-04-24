@@ -1,23 +1,28 @@
 [[extend 'layout.html']]
-<div>
-    [[try:
-        =header
-    except:
-        pass
-    pass]]
-</div>
+
+<div class="section">
+    <div class="vars">
+        [[try:
+            =header
+          except:
+            pass
+          pass]]
+    </div>
+  </div>
 [[=form]]
-<div>
-    [[try:
-        =form2
-    except:
-        pass
-    pass]]
-</div>
-<div>
-    [[try:
-        =footer
-    except:
-        pass
-    pass]]
-</div>
+
+[[try:
+    =form2
+except:
+    pass
+pass]]
+
+<div class="section">
+    <div class="vars">
+        [[try:
+            =footer
+          except:
+            pass
+          pass]]
+    </div>
+  </div>

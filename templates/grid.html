@@ -1,27 +1,34 @@
 [[extend 'layout.html']]
-<div>
-    [[try:
-        =form
-    except:
-        pass
-    pass]]
+
+[[try:
+    =form
+except:
+    pass
+pass]]
+
+<div class="section">
+    <div class="vars">
+        [[try:
+            =header
+          except:
+            pass
+          pass]]
+    </div>
+  </div>
+
+[[try:
+    =grid.render()
+except:
+    pass
+pass]]
+
+<div class="section">
+  <div class="vars">
+      [[try:
+          =footer
+        except:
+          pass
+        pass]]
+  </div>
 </div>
-<div>
-    [[try:
-        =header
-    except:
-        pass
-    pass]]
-</div>
-    [[try:
-        =grid.render()
-    except:
-        pass
-    pass]]
-<div>
-    [[try:
-        =footer
-    except:
-        pass
-    pass]]
-</div>
+

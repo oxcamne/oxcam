@@ -106,7 +106,7 @@ def members(path=None):
 	left = None #only used if mailing list with excluded event attendees
 	qdesc = ""
 	errors = ''
-	header = H5('Member Records')
+	header = DIV(H5('Member Records'))
 	back = URL('members/select', scheme=True)
 
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
@@ -535,6 +535,7 @@ def event_reservations(event_id, path=None):
 		db.Reservations.TBC.readable=True
 		db.Reservations.Conf.readable=True
 		db.Reservations.Wait.readable=True
+		db.Reservations.Prov.readable=True
 	back=URL(f'event_reservations/{event_id}/select', vars=request.query, scheme=True)
 
 	event = db.Events[event_id]
@@ -859,8 +860,8 @@ def financial_detail(event, query=None, left=None, title=''):
 	if 'transactions' not in source:
 		back = session.get('url_prev')
 		session['back'] = back
-	query = request.query.get('query')
-	left = request.query.get('left')
+	query = session.get('query')
+	left = session.get('left')
 	title = request.query.get('title')
 
 	message = CAT(A('back', _href=session.get('back')), H5(f'{title}'),
@@ -950,14 +951,13 @@ def financial_statement():
 	message = CAT(message, H6('\nLiabilities'), TABLE(*rows))
 	
 	transfer = db(db.CoA.Name=='Transfer').select().first().id	#ignore transfer transactions
-	query = f"(((db.AccTrans.Event != None) & (db.Events.DateTime >= '{startdatetime}') & (db.Events.DateTime < '{enddatetime}')) | \
+	session['query'] = f"(((db.AccTrans.Event != None) & (db.Events.DateTime >= '{startdatetime}') & (db.Events.DateTime < '{enddatetime}')) | \
 ((db.AccTrans.Event == None) & (db.AccTrans.Account != {transfer}) & \
 (db.AccTrans.Timestamp >= '{startdatetime}') & (db.AccTrans.Timestamp < '{enddatetime}')))"
-	
-	left = 'db.Events.on(db.Events.id == db.AccTrans.Event)'
+	session['left'] = 'db.Events.on(db.Events.id == db.AccTrans.Event)'
 
-	events = db(eval(query)).select(db.AccTrans.Event, db.Events.Description, db.Events.DateTime,
-					left = eval(left), orderby = db.Events.DateTime, groupby = db.Events.DateTime)
+	events = db(eval(session.get('query'))).select(db.AccTrans.Event, db.Events.Description, db.Events.DateTime,
+					left = eval(session.get('left')), orderby = db.Events.DateTime, groupby = db.Events.DateTime)
 
 	rows = [THEAD(TR(TH('Event'), TH('Date'), TH('Revenue'), TH('Expense'), TH('Net Revenue')))]
 	totrev = totexp = 0
@@ -965,15 +965,15 @@ def financial_statement():
 		name = 'Admin' if e.AccTrans.Event == None else e.Events.Description
 		date = '' if e.AccTrans.Event == None else e.Events.DateTime.date()
 		rev = exp = 0
-		accounts = db(eval(query+'&(db.AccTrans.Event==e.AccTrans.Event)')).select(sumamt, sumfee,
-					left = eval(left), orderby = db.AccTrans.Account, groupby = db.AccTrans.Account)
+		accounts = db(eval(session.get('query')+'&(db.AccTrans.Event==e.AccTrans.Event)')).select(sumamt, sumfee,
+					left = eval(session.get('left')), orderby = db.AccTrans.Account, groupby = db.AccTrans.Account)
 		for a in accounts:
 			if a[sumamt] >= 0:
 				rev += a[sumamt]
 			else:
 				exp += a[sumamt]
 			exp += a[sumfee] or 0
-		rows.append(TR(TD(A(name[0:25], _href=URL(f'financial_detail/{e.AccTrans.Event or 0}', vars=dict(query=query, left=left, title=title)))), 
+		rows.append(TR(TD(A(name[0:25], _href=URL(f'financial_detail/{e.AccTrans.Event or 0}', vars=dict(title=title)))), 
 		 				TD(date), tdnum(rev), tdnum(exp), tdnum(rev + exp)))
 		totrev += rev
 		totexp += exp
@@ -1005,8 +1005,8 @@ def tax_statement():
 	sponacct = db(db.CoA.Name=='Sponsorships').select().first().id
 	xferacct = db(db.CoA.Name=='Transfer').select().first().id	#ignore transfer transactions
 
-	query = f"((db.AccTrans.Timestamp>='{startdatetime}')&(db.AccTrans.Timestamp < '{enddatetime}') & (db.AccTrans.Accrual!=True))"
-	left = 'db.Events.on(db.Events.id == db.AccTrans.Event)'
+	session['query'] = f"((db.AccTrans.Timestamp>='{startdatetime}')&(db.AccTrans.Timestamp < '{enddatetime}') & (db.AccTrans.Accrual!=True))"
+	session['left'] = 'db.Events.on(db.Events.id == db.AccTrans.Event)'
 	
 	assets = get_banks(startdatetime, enddatetime)
 	totals = [0, 0]
@@ -1023,7 +1023,7 @@ def tax_statement():
 
 	tottkt = totspon = totrev = totexp = 0
 	allrev = allexp = 0
-	allrevexp = db(eval(f"{query}&(db.AccTrans.Account!={xferacct})")).select(sumamt, sumfee,
+	allrevexp = db(eval(f"{session.get('query')}&(db.AccTrans.Account!={xferacct})")).select(sumamt, sumfee,
 					orderby=db.AccTrans.Account, groupby=db.AccTrans.Account)
 	for t in allrevexp:
 		if t[sumamt] >= 0:
@@ -1032,12 +1032,12 @@ def tax_statement():
 			allexp += t[sumamt]
 		allexp += (t[sumfee] or 0)
 
-	events = db(eval(f"{query}&(db.AccTrans.Event!=None)")).select(db.Events.DateTime, db.Events.Description,
-					db.Events.id, left = eval(left), orderby = db.Events.DateTime, groupby = db.Events.DateTime)
+	events = db(eval(f"{session.get('query')}&(db.AccTrans.Event!=None)")).select(db.Events.DateTime, db.Events.Description,
+					db.Events.id, left = eval(session.get('left')), orderby = db.Events.DateTime, groupby = db.Events.DateTime)
 	rows =[THEAD(TR(TH('Event'), TH('Ticket Sales'), TH('Sponsorships'), TH('Revenue'), TH('Expense'), TH('Notes')))]
 	for e in events:
-		trans = db(eval(f"{query}&(db.AccTrans.Event=={e.id})")).select(db.AccTrans.Account, sumamt, sumfee,
-					left = eval(left), orderby = db.AccTrans.Account, groupby = db.AccTrans.Account)
+		trans = db(eval(f"{session.get('query')}&(db.AccTrans.Event=={e.id})")).select(db.AccTrans.Account, sumamt, sumfee,
+					left = eval(session.get('left')), orderby = db.AccTrans.Account, groupby = db.AccTrans.Account)
 		tkt = trans.find(lambda t: t.AccTrans.Account == tktacct).first()
 		spon = trans.find(lambda t: t.AccTrans.Account == sponacct).first()
 		revenue = expense = 0
@@ -1048,12 +1048,12 @@ def tax_statement():
 				expense += (a[sumamt] or 0)
 			expense += (a[sumfee] or 0)
 
-		rows.append(TR(TD(A(e.Description[0:25], _href=URL('financial_detail', vars=dict(event=e.id, title=title, query=query, left=left)))),
+		rows.append(TR(TD(A(e.Description[0:25], _href=URL('financial_detail', vars=dict(event=e.id, title=title)))),
 					tdnum(tkt[sumamt] if tkt else 0), tdnum(spon[sumamt] if spon else 0),
 					tdnum(revenue), tdnum(expense), TD(e.DateTime.date())))
 		if spon:
-			spontr = db(eval(f"{query}&(db.AccTrans.Event=={e.id})&(db.AccTrans.Account=={sponacct})")).select(
-					db.AccTrans.Amount, db.AccTrans.Notes, left = eval(left))
+			spontr = db(eval(f"{session.get('query')}&(db.AccTrans.Event=={e.id})&(db.AccTrans.Account=={sponacct})")).select(
+					db.AccTrans.Amount, db.AccTrans.Notes, left = eval(session.get('left')))
 			for t in spontr:
 				rows.append(TR(TD(''), TD(''), tdnum(t.Amount), TD(''),TD(''), TD(t.Notes)))
 		tottkt += tkt[sumamt] if tkt else 0
@@ -1065,7 +1065,7 @@ def tax_statement():
 	rows.append(THEAD(TR(TH('Overall Net Revenue'), TH(''), TH(''), tdnum(allrev+allexp, th=True))))
 	message = CAT(message, H6('Events'), TABLE(*rows))
 
-	message = CAT(message, financial_content(None, query=query, left=left))
+	message = CAT(message, financial_content(None))
 	return locals()
 		
 @action('accounting', method=['POST', 'GET'])
@@ -1278,8 +1278,10 @@ def transactions(path=None):
 
 	back = URL('transactions/select', scheme=True)
 	if not path:
-		session['query'] = request.query.get('query')
-		session['left'] = request.query.get('left')
+		if request.query.get('query'):
+			session['query'] = request.query.get('query')
+		if request.query.get('left'):
+			session['left'] = request.query.get('left')
 		back = session.get('url_prev')
 		session['bank_back'] = back
 	elif path=='select':

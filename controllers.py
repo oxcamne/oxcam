@@ -106,7 +106,7 @@ def members(path=None):
 	left = None #only used if mailing list with excluded event attendees
 	qdesc = ""
 	errors = ''
-	header = DIV(H5('Member Records'))
+	header = H5('Member Records')
 	back = URL('members/select', scheme=True)
 
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
@@ -1048,7 +1048,7 @@ def tax_statement():
 				expense += (a[sumamt] or 0)
 			expense += (a[sumfee] or 0)
 
-		rows.append(TR(TD(A(e.Description[0:25], _href=URL('financial_detail', vars=dict(event=e.id, title=title)))),
+		rows.append(TR(TD(A(e.Description[0:25], _href=URL(f'financial_detail/{e.id}', vars=dict(title=title)))),
 					tdnum(tkt[sumamt] if tkt else 0), tdnum(spon[sumamt] if spon else 0),
 					tdnum(revenue), tdnum(expense), TD(e.DateTime.date())))
 		if spon:
@@ -1065,7 +1065,7 @@ def tax_statement():
 	rows.append(THEAD(TR(TH('Overall Net Revenue'), TH(''), TH(''), tdnum(allrev+allexp, th=True))))
 	message = CAT(message, H6('Events'), TABLE(*rows))
 
-	message = CAT(message, financial_content(None))
+	message = CAT(message, financial_content(None, query=session.get('query'), left=session.get('left')))
 	return locals()
 		
 @action('accounting', method=['POST', 'GET'])

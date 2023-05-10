@@ -133,15 +133,15 @@ def members(path=None):
 		db.Members.Name.readable = True
 		db.Members.Affiliations.readable = True
 		if len(search_form.vars) == 0:
-			search_form.vars = session.get('member_filter') or {}
+			search_form.vars = session.get('filter') or {}
 		else:
-			member_filter=dict(mailing_list=search_form.vars.get('mailing_list'),
+			filter=dict(mailing_list=search_form.vars.get('mailing_list'),
 						event=search_form.vars.get('event'),
 						field=search_form.vars.get('field'),
 						value=search_form.vars.get('value')) if len(search_form.vars)>0 else {}
 			if search_form.vars.get('good_standing'):
-				member_filter['good_standing'] = 'On'
-			session['member_filter'] = member_filter
+				filter['good_standing'] = 'On'
+			session['filter'] = filter
 		header = CAT(header, A("Send Email to Specific Address(es)", _href=URL('composemail', vars=dict(back=back))), XML('<br>'))
 	elif path:
 		back = session.get('back') or back
@@ -158,7 +158,7 @@ def members(path=None):
 		   					back=URL(f'members/edit/{path[5:]}', scheme=True)))))
 	else:
 		session['back'] = None
-		session['member_filter'] = None
+		session['filter'] = None
 		redirect(URL('members/select'))
 
 	if search_form.vars.get('mailing_list'):
@@ -400,6 +400,11 @@ def emails(member_id, path=None):
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 	db.Emails.Member.default=member_id
 
+	if path=='new':
+		db.Emails.Email.writable = True
+	elif path=='select':
+		update_Stripe_email(db.Members[member_id])
+
 	header = CAT(A('back', _href=URL(f'members/edit/{member_id}', scheme=True)),
 	      		H5('Member Emails'),
 	      		H6(member_name(member_id)))
@@ -413,7 +418,6 @@ are sent as specified in the Mailings Column."
 			return
 		if (form.vars.get('id')):
 			db.Emails[form.vars.get('id')].update_record(Modified = datetime.datetime.now())
-			update_Stripe_email(db.Members[form.vars.get('id')])
 
 	grid = Grid(path, db.Emails.Member==member_id,
 	     	orderby=~db.Emails.Modified,
@@ -813,8 +817,10 @@ def tdnum(value, query=None, left=None, th=False):
 	numsq = A(nums, _href=URL('transactions', vars=dict(query=query,left=left))) if query else nums
 	return TH(numsq, _style=f'text-align:right{"; color:Red" if value <0 else ""}') if th==True else TD(numsq, _style=f'text-align:right{"; color:Red" if value <0 else ""}')
 
-def financial_content(event, query=None, left=None):
+def financial_content(event):
 #shared by financial_statement and tax_statement
+	query = session.get('query')
+	left = session.get('left')
 	if event:
 		event_record = db.Events[event]
 
@@ -832,7 +838,7 @@ def financial_content(event, query=None, left=None):
 	for acct in accts:
 		if acct[sumamt] >= 0:
 			rows.append(TR(TD(A(acct.CoA.Name[0:25], _href=URL('transactions',
-							vars=dict(query=f"{query}&(db.AccTrans.Account=={acct.CoA.id})&(db.Events.id=={event})",  left=left)))),
+							vars=dict(query=f"{query}&(db.AccTrans.Account=={acct.CoA.id})&(db.Events.id=={event})", left=left)))),
 						tdnum(acct[sumamt])))
 			totrev += acct[sumamt]
 			cardfees -= acct[sumfee] or 0
@@ -843,7 +849,7 @@ def financial_content(event, query=None, left=None):
 	for acct in accts:
 		if acct[sumamt] < 0:
 			rows.append(TR(TD(A(acct.CoA.Name[0:25], _href=URL('transactions',
-							vars=dict(query=f"{query}&(db.AccTrans.Account=={acct.CoA.id})&(db.Events.id=={event})",  left=left)))),
+							vars=dict(query=f"{query}&(db.AccTrans.Account=={acct.CoA.id})&(db.Events.id=={event})", left=left)))),
 						tdnum(-acct[sumamt])))
 			totexp -= acct[sumamt]
 			cardfees -= acct[sumfee] or 0
@@ -855,17 +861,15 @@ def financial_content(event, query=None, left=None):
 @action('financial_detail/<event:int>', method=['GET'])
 @action.uses("message.html", db, session, flash)
 @checkaccess('accounting')
-def financial_detail(event, query=None, left=None, title=''):
+def financial_detail(event, title=''):
 	source = session.get('url_prev')
 	if 'transactions' not in source:
 		back = session.get('url_prev')
 		session['back'] = back
-	query = session.get('query')
-	left = session.get('left')
 	title = request.query.get('title')
 
 	message = CAT(A('back', _href=session.get('back')), H5(f'{title}'),
-			financial_content(event if event!=0 else None, query, left))
+			financial_content(event if event!=0 else None))
 	return locals()
 	
 @action('financial_statement', method=['GET'])
@@ -1065,7 +1069,7 @@ def tax_statement():
 	rows.append(THEAD(TR(TH('Overall Net Revenue'), TH(''), TH(''), tdnum(allrev+allexp, th=True))))
 	message = CAT(message, H6('Events'), TABLE(*rows))
 
-	message = CAT(message, financial_content(None, query=session.get('query'), left=session.get('left')))
+	message = CAT(message, financial_content(None))
 	return locals()
 		
 @action('accounting', method=['POST', 'GET'])
@@ -1083,6 +1087,11 @@ def accounting(path=None):
 				"Use Upload to load a file you've downloaded from bank/payment processor into accounting")
 	else:
 		header = CAT(A('back', _href=URL('accounting')) , H5('Banks'))
+		if not path:
+			session['query'] = None	#main query for financial or tax statement
+			session['left'] = None
+			session['query2'] = None	#supplementary query for transactions grid
+			session['left2'] = None
 	
 	pre_action_buttons = [GridActionButton(URL('bank_file'), text='Upload', append_id=True),
 		GridActionButton(lambda r: URL('transactions', vars=dict(query=f"db.AccTrans.Bank=={r['id']}")),
@@ -1130,7 +1139,7 @@ def bank_file(bank_id):
 	stored = 0
 	unmatched = 0
 	overlap = bkrecent==None
-	lastrow = None
+	row = None
 	isok = True
 				
 	def getfields(cols, separator=''):
@@ -1168,7 +1177,6 @@ def bank_file(bank_id):
 			raise Exception('File does not match expected column names')
 		
 		for row in reader:
-			lastrow = row
 			try:
 				timestamp = datetime.datetime.strptime(getfields(bank.Date), bank.Datefmt)
 			except:
@@ -1194,6 +1202,8 @@ def bank_file(bank_id):
 			
 			#do the accounting
 			checknumber = getfields(bank.CheckNumber)
+			if checknumber and not checknumber.strip().isdigit():
+				checknumber = None
 			amount = getdecimal(bank.Amount)
 			fee = getdecimal(bank.Fee)
 			notes = getfields(bank.Notes, ' ')
@@ -1263,7 +1273,7 @@ def bank_file(bank_id):
 								
 		flash.set(f'{stored} new transactions processed, {unmatched} to allocate, new balance = ${bank.Balance}')
 	except Exception as e:
-		flash.set(f"{str(lastrow)}: {str(e)}")
+		flash.set(f"{str(row)}: {str(e)}")
 		isok = False
 	if isok:
 		redirect(URL('transactions', vars=dict(query=f'db.AccTrans.Bank=={bank.id}')))
@@ -1278,10 +1288,8 @@ def transactions(path=None):
 
 	back = URL('transactions/select', scheme=True)
 	if not path:
-		if request.query.get('query'):
-			session['query'] = request.query.get('query')
-		if request.query.get('left'):
-			session['left'] = request.query.get('left')
+		session['query2'] = request.query.get('query')
+		session['left2'] = request.query.get('left')
 		back = session.get('url_prev')
 		session['bank_back'] = back
 	elif path=='select':
@@ -1303,8 +1311,8 @@ def transactions(path=None):
 		db.AccTrans.Timestamp.writable=True
 		db.AccTrans.Amount.requires=IS_DECIMAL_IN_RANGE(-100000, 0)
 
-	query = session.get('query')
-	left = session.get('left')
+	query = session.get('query2')
+	left = session.get('left2')
 
 	bank_id_match=re.match('db.AccTrans.Bank==([0-9]+)$', query)
 	bank_id = int(bank_id_match.group(1)) if bank_id_match else None
@@ -1483,6 +1491,7 @@ def composemail():
 					submit_value = 'Send', formstyle=FormStyleBulma)
 			
 	if form2.accepted:
+		sender = f"{SOCIETY_NAME} <{form2.vars['sender']}>"
 		if proto:
 			if form2.vars['delete']:
 				db(db.EMProtos.id == proto.id).delete()
@@ -1513,7 +1522,7 @@ def composemail():
 					unsubscribe = URL('member',  'mail_lists', scheme=True)
 					bodyparts.append((f"\n\n''This message addressed to {qdesc} [[unsubscribe {unsubscribe}]]''", None))
 				bodyparts.append((f"\n\n''{VISIT_WEBSITE_INSTRUCTIONS}''", None))
-				rows = db(eval(query)).select(*select_fields, left=eval(left) if left!=None else None, distinct=True)
+				rows = db(eval(query)).select(*select_fields, left=eval(left) if left!='' else None, distinct=True)
 				for row in rows:
 					body = ''
 					member = db.Members[row.get(db.Members.id)]
@@ -1537,7 +1546,7 @@ def composemail():
 						elif part[1] == 'reservation':
 							body += event_confirm(row.get(db.Reservations.Event), member.id)
 					message = HTML(XML(msgformat(body)))
-					auth.sender.send(to=to, subject=form2.vars['subject'], bcc=bcc, body=message)
+					auth.sender.send(to=to, sender=sender, bcc=bcc, subject=form2.vars['subject'], body=message)
 				flash.set(f"{len(rows)} emails sent to {qdesc}")
 			else:
 				to = re.compile('[^,;\s]+').findall(form2.vars['to'])
@@ -1546,7 +1555,7 @@ def composemail():
 					body += part[0]		
 				flash.set(f"Email sent to: {to}")
 				message = HTML(XML(msgformat(body)))
-				auth.sender.send(to=to, subject=form2.vars['subject'], bcc=bcc, body=message)
+				auth.sender.send(to=to, sender=sender, subject=form2.vars['subject'], bcc=bcc, body=message)
 			redirect(request.query.get('back'))
 	return locals()
 
@@ -1602,7 +1611,7 @@ def login():
 	   						A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL),
 							".")),
 					))
-		auth.sender.send(to=form.vars['email'], subject='Confirm Email',
+		auth.sender.send(to=form.vars['email'], subject='Please Confirm Email',
 							body=message)
 		form = None
 
@@ -1621,7 +1630,7 @@ def validate(id, token):
 	session['logged_in'] = True
 	session['id'] = user.id
 	session['email'] = user.email
-	session['member_filter'] = None
+	session['filter'] = None
 	log = 'verified '+request.remote_addr+' '+user.email
 	logger.info(log)
 	user.update_record(tokens=[])
@@ -1665,6 +1674,20 @@ def logout():
 	session['logged_in'] = False
 	redirect(URL('index'))
 
+# stripe_tool/Object/id (diagnostic tool)
+@action('stripe_tool/<object_type>/<object_id>', method=['GET'])
+@action.uses("generic.html", db, session, flash)
+@checkaccess('accounting')
+def stripe_tool(object_type, object_id):
+	pk = STRIPE_PKEY	#use the public key on the client side	
+	stripe.api_key = STRIPE_SKEY
+	object={}
+	try:
+		object = eval(f"stripe.{object_type}.retrieve('{object_id}')")
+	except Exception as e:
+		flash.set(str(e))
+	return locals()
+
 @action('db_tool', method=['POST', 'GET'])
 @action('db_tool/<path:path>', method=['POST', 'GET'])
 @action.uses("grid.html", db, session, flash)
@@ -1690,8 +1713,8 @@ Use (...)&(...) for AND, (...)|(...) for OR, and ~(...) for NOT to build more co
 				for row in rows:
 					update_string = 'row.update_record('+form.vars.get('field_update')+')'
 					eval(update_string)
-				flash.set(f"{len(rows)} records updated, Submit again to see results")
 				form.vars['do_update']=False
+				flash.set(f"{len(rows)} records updated, click Submit to see results")
 		except Exception as e:
 			flash.set(e)
 	return locals()
@@ -1700,24 +1723,33 @@ Use (...)&(...) for AND, (...)|(...) for OR, and ~(...) for NOT to build more co
 @action.uses("form.html", db, session, flash)
 @checkaccess('admin')
 def db_restore():
-	form = Form([Field('filespec', 'string', requires=IS_NOT_EMPTY(),
-					   default='db_backup.csv')], formstyle=FormStyleBulma)
-	header = P(SOCIETY_DOMAIN+" database will be restored from this file in app base directory. Click Submit to proceed")
+	header = f"Restore {SOCIETY_DOMAIN} database from backup file"
+	
+	form = Form([Field('backup_file', 'upload', uploadfield = False)],
+				submit_button = 'Import')
+	
+	if not form.accepted:
+		return locals()
 	
 	if form.accepted:
-		with open(form.vars['filespec'], 'r', encoding='utf-8', newline='') as dumpfile:
-			for tablename in db.tables:	#clear out existing database
-				db(db[tablename]).delete()
-			db.import_from_csv_file(dumpfile, id_map={})   #, restore=True won't work in MySQL)
-			flash.set("Database Restored from '"+form.vars['filespec']+"'")
+		try:
+			with io.TextIOWrapper(form.vars.get('backup_file').file, encoding='utf-8') as backup_file:
+				for tablename in db.tables:	#clear out existing database
+					db(db[tablename]).delete()
+				db.import_from_csv_file(backup_file, id_map={})   #, restore=True won't work in MySQL)
+				flash.set(f"{SOCIETY_DOMAIN} Database Restored from {form.vars.get('backup_file').raw_filename}")
+		except Exception as e:
+			flash.set(f"{str(e)}")
 
-	return locals()
+	return locals( )
 
 @action("db_backup")
-@action.uses("message.html", db, session)
+@action.uses("download.html", db, session, Inject(response=response))
 @checkaccess('admin')
 def db_backup():
-	with open('db_backup.csv', 'w', encoding='utf-8', newline='') as dumpfile:
-		db.export_to_csv_file(dumpfile)
-	return dict(message=SOCIETY_DOMAIN+" database backed up to 'db_backup.csv' in app base directory.")
+	stream = StringIO()
+	content_type = "text/csv"
+	filename = f'{SOCIETY_DOMAIN}_db_backup.csv'
+	db.export_to_csv_file(stream)
+	return locals()
 

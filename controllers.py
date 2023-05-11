@@ -37,8 +37,8 @@ from py4web.utils.factories import Inject
 import datetime, random, re, markmin, stripe, csv, decimal, io
 from io import StringIO
 
-grid_style = GridClassStyleBootstrap5
-form_style = FormStyleBootstrap4
+grid_style = GridClassStyleBulma
+form_style = FormStyleBulma
 
 class GridActionButton:
     def __init__(
@@ -1346,10 +1346,10 @@ def transactions(path=None):
 	
 	grid = Grid(path, eval(query), left=eval(left) if left else None,
 			orderby=~db.AccTrans.Timestamp,
-			columns=[db.AccTrans.Timestamp, db.AccTrans.Bank, db.AccTrans.Account, db.AccTrans.Event,
+			columns=[db.AccTrans.Timestamp, db.AccTrans.Account, db.AccTrans.Event,
 	 				db.AccTrans.Amount, db.AccTrans.Fee, db.AccTrans.CheckNumber, db.AccTrans.Accrual,
 					db.AccTrans.Notes],
-			headings=['Timestamp', 'Bank', 'Account','Event','Amt', 'Fee', 'Chk#', 'Accr', 'Notes'],
+			headings=['Timestamp', 'Account','Event','Amt', 'Fee', 'Chk#', 'Acc', 'Notes'],
 			validation=validate, search_queries=search_queries, show_id=True,
 			deletable=lambda r: r.Accrual, details=False, editable=True, create=bank_id!=None,
 			field_id=db.AccTrans.id, grid_class_style=grid_style, formstyle=form_style)
@@ -1701,22 +1701,28 @@ def db_tool(path=None):
 	header = "The \"query\" is a condition like \"db.table1.field1=='value'\". Something like \"db.table1.field1==db.table2.field2\" results in a SQL JOIN.\
 Use (...)&(...) for AND, (...)|(...) for OR, and ~(...) for NOT to build more complex queries.\
 \"field_update\" is an optional expression like \"field1='newvalue'\". You cannot update the results of a JOIN"
+	if not path:
+		session['query'] = None
 
-	if form.accepted:
-		try:
-			grid = Grid(path, eval(form.vars.get('query')),
-					details=False, editable=False, create=False, deletable=False,
-					grid_class_style=GridClassStyle, formstyle=form_style, show_id=True,
-					)
+	try:
+		if form.accepted:
+			session['query'] = query=form.vars.get('query')
+			rows = db(eval(form.vars.get('query'))).select()
 			if form.vars.get('do_update'):
-				rows = db(eval(form.vars.get('query'))).select()
 				for row in rows:
-					update_string = 'row.update_record('+form.vars.get('field_update')+')'
+					update_string = f"row.update_record({form.vars.get('field_update')})"
 					eval(update_string)
 				form.vars['do_update']=False
 				flash.set(f"{len(rows)} records updated, click Submit to see results")
-		except Exception as e:
-			flash.set(e)
+
+		form.vars['query'] = query = session.get('query')
+		if query:
+			grid = Grid(path, eval(form.vars.get('query')),
+					details=False, editable=True, create=True, deletable=True,
+					grid_class_style=GridClassStyle, formstyle=form_style, show_id=True,
+					)
+	except Exception as e:
+		flash.set(e)
 	return locals()
 
 @action("db_restore", method=['POST', 'GET'])
@@ -1738,6 +1744,7 @@ def db_restore():
 					db(db[tablename]).delete()
 				db.import_from_csv_file(backup_file, id_map={})   #, restore=True won't work in MySQL)
 				flash.set(f"{SOCIETY_DOMAIN} Database Restored from {form.vars.get('backup_file').raw_filename}")
+				redirect('login')
 		except Exception as e:
 			flash.set(f"{str(e)}")
 

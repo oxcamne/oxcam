@@ -240,8 +240,10 @@ def members(path=None):
 	       XML("Use filter to select a mailing list or apply other filters.<br>Selecting an event selects \
 (or excludes from a mailing list) attendees.<br>You can filter on a member record field \
 using an optional operator (=, <, >, <=, >=) together with a value."))
-		footer = A("Export selected records as CSV file", _href=URL('members_export',
-						vars=dict(query=query, left=left or '', qdesc=qdesc)))
+		footer = CAT(A("View recent Dues Payments", _href=URL('get_date_range',
+				vars=dict(function='dues_payments', title="Dues Payments"))), XML('<br>'),
+			A("Export selected records as CSV file", _href=URL('members_export',
+						vars=dict(query=query, left=left or '', qdesc=qdesc))))
 
 	def member_deletable(id): #deletable if not member, never paid dues or attended recorded event, or on mailing list
 		m = db.Members[id]
@@ -309,21 +311,17 @@ def members_export():
 @checkaccess('read')
 def member_reservations(member_id, path=None):
 # .../member_reservations/member_id/...
-	db.Reservations.Member.readable=False
-
 	header = CAT(A('back', _href=URL(f'members/edit/{member_id}', scheme=True)),
 				H5('Member Reservations'),
 	      		H6(member_name(member_id)),
 				A('Add New Reservation', _href=URL(f'add_member_reservation/{member_id}', scheme=True)))
 
-	pre_action_buttons = [GridActionButton(lambda row: URL(f"reservation/{member_id}/{row.Reservations.Event}"), text='Edit', append_id=False)]
-
 	grid = Grid(path, (db.Reservations.Member==member_id)&(db.Reservations.Host==True),
 			left=db.Events.on(db.Events.id == db.Reservations.Event),
 			orderby=~db.Events.DateTime,
-			pre_action_buttons=pre_action_buttons,
-			columns=[db.Reservations.Member, db.Events.DateTime, db.Reservations.Event, db.Reservations.Wait,
-					db.Reservations.Conf, db.Reservations.Cost,
+			columns=[db.Events.DateTime,
+	    			Column('event', lambda row: A(row.Reservations.Event.Description, _href=URL(f"reservation/{member_id}/{row.Reservations.Event}"))),
+	    			db.Reservations.Wait, db.Reservations.Conf, db.Reservations.Cost,
 					db.Reservations.Paid, db.Reservations.Charged, db.Reservations.TBC],
 			grid_class_style=grid_style,
 			formstyle=form_style,
@@ -473,6 +471,53 @@ def dues(member_id, path=None):
 			)
 	return locals()
 	
+@action('dues_payments', method=['GET'])
+@action('dues_payments/<path:path>', method=['GET'])
+@action.uses("grid.html", db, session, flash)
+@checkaccess('read')
+def dues_payments(path=None):
+	if not path:
+		session['query2'] = f"(db.Dues.Date >= \'{request.query.get('start')}\') & (db.Dues.Date <= \'{request.query.get('end')}\')"
+		session['back'] = session.get('url')
+	
+	header =H5('Dues Payments')
+	footer = A("Export as CSV file", _href=URL('dues_export'))
+
+	grid = Grid(path, eval(session.get('query2')),
+			orderby=~db.Dues.Date,
+			left=db.Members.on(db.Members.id == db.Dues.Member),
+			columns=[Column("Name", lambda row: A(member_name(row['Member']), _href=URL(f"members/edit/{row['Member']}"))),
+	    			Column("College", lambda row: primary_affiliation(row['Member'])),
+	    			Column("Matr", lambda row: primary_matriculation(row['Member'])),
+					db.Dues.Status, db.Dues.Date, db.Dues.Prevpaid, db.Dues.Nowpaid, db.Dues.Type],
+			deletable=False, details=False, editable=False, create=False,
+			grid_class_style=grid_style,
+			formstyle=form_style,
+			)
+	return locals()
+
+@action('dues_export', method=['GET'])
+@action.uses("download.html", db, session, flash, Inject(response=response))
+@checkaccess('read')
+def dues_export():
+	stream = StringIO()
+	content_type = "text/csv"
+	filename = 'dues.csv'
+	query = session['query2']
+	rows = db(eval(query)).select(orderby=~db.Dues.Date)
+	try:
+		writer=csv.writer(stream)
+		writer.writerow(['Member_id', 'Name', 'College', 'Matr', 'Status', 'Date', 'PrevDate', 'Type'])
+		for row in rows:
+			data = [row.Member, member_name(row.Member), primary_affiliation(row.Member), 
+	   				primary_matriculation(row.Member), row.Status, row.Date, row.Prevpaid or '',
+					dues_type(row.Date, row.Prevpaid)]
+			writer.writerow(data)
+	except Exception as e:
+		flash.set(e)
+		redirect(session['back'])
+	return locals()	
+	
 @action('events', method=['POST', 'GET'])
 @action('events/<path:path>', method=['POST', 'GET'])
 @action.uses("grid.html", db, session, flash)
@@ -497,8 +542,6 @@ def events(path=None):
 	       			"Booking link is ", A(url, _href=url), XML('<br>'),
 	       			A('Make a Copy of This Event', _href=URL('event_copy', path[5:])))
 	       		
-	pre_action_buttons = [GridActionButton(text='Rsvtns', url=URL('event_reservations'), append_id=True)]
-
 	def checktickets(form):
 		for t in form.vars['Tickets']:
 			if t!='' and not re.match(r'[^\$]*\$[0-9]+\.?[0-9]{0,2}$', t):
@@ -512,12 +555,13 @@ def events(path=None):
 	grid = Grid(path, db.Events.id>0,
 	     	orderby=~db.Events.DateTime,
 		    headings=['Datetime', 'Event', 'Venue','Speaker','TBC', 'Conf', 'Wait'],
-			fields=[db.Events.DateTime, db.Events.Description, db.Events.Venue, db.Events.Speaker,
+			columns=[db.Events.DateTime,
+					Column('event', lambda row: A(row['Description'], _href=URL(f"event_reservations/{row['id']}"))),
+	   				db.Events.Venue, db.Events.Speaker,
 	    			db.Events.Unpaid, db.Events.Attend, db.Events.Wait],
 			search_queries=[["Event", lambda value: db.Events.Description.like(f'%{value}%')],
 		    				["Venue", lambda value: db.Events.Venue.like(f'%{value}%')],
 						    ["Speaker", lambda value: db.Events.Speaker.like(f'%{value}%')]],
-			pre_action_buttons=pre_action_buttons,
 			details=not write, editable=write, create=write,
 			deletable=lambda r: write and db(db.Reservations.Event == r['id']).count() == 0 and db(db.AccTrans.Event == r['id']).count() == 0,
 			validation=checktickets,
@@ -572,18 +616,14 @@ select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 		
 	if not request.query.get('provisional'):
 		header = CAT(header, A('provisional', _href=URL(f'event_reservations/{event_id}/select', vars=dict(provisional=True))), XML(' (not checked out)'))
-
-	pre_action_buttons = [GridActionButton(lambda row: URL(f"reservation/{row.Reservations.Member}/{event_id}"),
-							text='Edit', append_id=False)]
-
 	grid = Grid(path, eval(query),
 			left=db.Members.on(db.Members.id == db.Reservations.Member),
 			orderby=db.Reservations.Created if request.query.get('waitlist') else db.Reservations.Lastname|db.Reservations.Firstname,
-			columns=[db.Reservations.Member,db.Members.Membership, db.Members.Paiddate,
+			columns=[Column('member', lambda row: A(member_name(row.Reservations.Member), _href=URL(f"reservation/{row.Reservations.Member}/{event_id}"))),
+	    				db.Members.Membership, db.Members.Paiddate,
 						db.Reservations.Affiliation, db.Reservations.Notes, db.Reservations.TBC,
 						db.Reservations.Wait if request.query.get('waitlist') else db.Reservations.Prov if request.query.get('provisional') else db.Reservations.Conf],
 			headings=['Member', 'Type', 'Until', 'College', 'Notes', 'Tbc', '#'],
-			pre_action_buttons=pre_action_buttons,
 			details=False, editable = False, create = False, deletable = False,
 			rows_per_page=200, grid_class_style=grid_style, formstyle=form_style)
 	return locals()

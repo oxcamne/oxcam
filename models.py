@@ -119,6 +119,9 @@ db.define_table('Emails',
 	Field('Modified', 'datetime', default=datetime.datetime.now(), writable=False),
 	singular="Email", plural="Emails", format='%(Email)s')
 
+def dues_type(date, prevpaid):
+	return 'new' if not prevpaid else 'renewal' if date <= prevpaid + datetime.timedelta(days=365) else 'reinstated'
+
 db.define_table('Dues',
 	Field('Member', 'reference Members', writable=False),
 	Field('Status', 'string', requires=IS_EMPTY_OR(IS_IN_SET(MEMBER_CATEGORIES)), writable=True, readable=True),
@@ -127,7 +130,7 @@ db.define_table('Dues',
 	Field('Notes', 'string', default=''),
 	Field('Prevpaid', 'date'), #used to track paid member history
 	Field('Nowpaid', 'date'), #paid date after this payment
-	#Field.Virtual('Type', lambda d: 'new' if not d.Dues.Prevpaid else ('renewal' if d.Dues.Date <= d.Dues.Prevpaid + datetime.timedelta(days=365) else 'reinstated')),
+	Field.Virtual('Type', lambda d: dues_type(d['Date'], d['Prevpaid'])),
 	singular="Dues", plural="Dues")
 	
 def event_revenue(event_id):	#revenue from confirmed tickets

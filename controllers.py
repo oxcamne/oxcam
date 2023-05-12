@@ -37,8 +37,8 @@ from py4web.utils.factories import Inject
 import datetime, random, re, markmin, stripe, csv, decimal, io
 from io import StringIO
 
-grid_style = GridClassStyleBootstrap5
-form_style = FormStyleBootstrap4
+grid_style = GridClassStyleBulma
+form_style = FormStyleBulma
 
 """
 decorator for validating login & access permission using a one-time code

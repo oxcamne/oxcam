@@ -37,28 +37,9 @@ from py4web.utils.factories import Inject
 import datetime, random, re, markmin, stripe, csv, decimal, io
 from io import StringIO
 
-grid_style = GridClassStyleBulma
-form_style = FormStyleBulma
+grid_style = GridClassStyleBootstrap5
+form_style = FormStyleBootstrap4
 
-class GridActionButton:
-    def __init__(
-        self,
-        url,
-        text=None,
-        icon=None,
-        additional_classes="",
-        message="",
-        append_id=False,
-        ignore_attribute_plugin=False,
-    ):
-        self.url = url
-        self.text = text
-        self.icon = icon
-        self.additional_classes = additional_classes
-        self.message = message
-        self.append_id = append_id
-        self.ignore_attribute_plugin = ignore_attribute_plugin
-	
 """
 decorator for validating login & access permission using a one-time code
 sent to email address.
@@ -142,12 +123,12 @@ def members(path=None):
 			if search_form.vars.get('good_standing'):
 				filter['good_standing'] = 'On'
 			session['filter'] = filter
-		header = CAT(header, A("Send Email to Specific Address(es)", _href=URL('composemail', vars=dict(back=back))), XML('<br>'))
+		header = CAT(header, BODY(A("Send Email to Specific Address(es)", _href=URL('composemail', vars=dict(back=back)))), XML('<br>'))
 	elif path:
 		back = session.get('back') or back
-		header = CAT(A('back', _href=back), H5('Member Record'))
+		header = CAT(BODY(A('back', _href=back)), H5('Member Record'))
 		if path.startswith('edit'):
-			header= CAT(header,
+			header= CAT(header, BODY(CAT(
 	       			A('Member reservations', _href=URL('member_reservations', path[5:])), XML('<br>'),
 					A('OxCam affiliation(s)', _href=URL('affiliations', path[5:])), XML('<br>'),
 					A('Email addresses and subscriptions', _href=URL('emails', path[5:])), XML('<br>'),
@@ -155,7 +136,7 @@ def members(path=None):
 					A('Send Email to Member', _href=URL('composemail',
 					 	vars=dict(query=f"db.Members.id=={path[5:]}", left='',
 		 					qdesc=member_name(path[5:]),
-		   					back=URL(f'members/edit/{path[5:]}', scheme=True)))))
+		   					back=URL(f'members/edit/{path[5:]}', scheme=True)))))))
 	else:
 		session['back'] = None
 		session['filter'] = None
@@ -234,16 +215,16 @@ def members(path=None):
 	if path=='select':
 		if qdesc:
 			header = CAT(header,
-				A(f"Send Notice to {qdesc}", _href=URL('composemail',
-					vars=dict(query=query, left=left or '', qdesc=qdesc, back=back))), XML('<br>'))
+				BODY(A(f"Send Notice to {qdesc}", _href=URL('composemail',
+					vars=dict(query=query, left=left or '', qdesc=qdesc, back=back)))), XML('<br>'))
 		header = CAT(header,
-	       XML("Use filter to select a mailing list or apply other filters.<br>Selecting an event selects \
+	       BODY(XML("Use filter to select a mailing list or apply other filters.<br>Selecting an event selects \
 (or excludes from a mailing list) attendees.<br>You can filter on a member record field \
-using an optional operator (=, <, >, <=, >=) together with a value."))
-		footer = CAT(A("View recent Dues Payments", _href=URL('get_date_range',
+using an optional operator (=, <, >, <=, >=) together with a value.")))
+		footer = BODY(CAT(A("View recent Dues Payments", _href=URL('get_date_range',
 				vars=dict(function='dues_payments', title="Dues Payments"))), XML('<br>'),
 			A("Export selected records as CSV file", _href=URL('members_export',
-						vars=dict(query=query, left=left or '', qdesc=qdesc))))
+						vars=dict(query=query, left=left or '', qdesc=qdesc)))))
 
 	def member_deletable(id): #deletable if not member, never paid dues or attended recorded event, or on mailing list
 		m = db.Members[id]
@@ -311,6 +292,7 @@ def members_export():
 @checkaccess('read')
 def member_reservations(member_id, path=None):
 # .../member_reservations/member_id/...
+	db.Reservations.Wait.readable = db.Reservations.Conf.readable = db.Reservations.Cost.readable = db.Reservations.TBC.readable = True
 	header = CAT(A('back', _href=URL(f'members/edit/{member_id}', scheme=True)),
 				H5('Member Reservations'),
 	      		H6(member_name(member_id)),
@@ -320,9 +302,9 @@ def member_reservations(member_id, path=None):
 			left=db.Events.on(db.Events.id == db.Reservations.Event),
 			orderby=~db.Events.DateTime,
 			columns=[db.Events.DateTime,
-	    			Column('event', lambda row: A(row.Reservations.Event.Description, _href=URL(f"reservation/{member_id}/{row.Reservations.Event}"))),
+	    			Column('event', lambda row: A(row.Reservations.Event.Description[0:23], _href=URL(f"reservation/{member_id}/{row.Reservations.Event}"))),
 	    			db.Reservations.Wait, db.Reservations.Conf, db.Reservations.Cost,
-					db.Reservations.Paid, db.Reservations.Charged, db.Reservations.TBC],
+					db.Reservations.TBC],
 			grid_class_style=grid_style,
 			formstyle=form_style,
 			details=False, editable = False, create = False, deletable = False)
@@ -486,7 +468,7 @@ def dues_payments(path=None):
 	grid = Grid(path, eval(session.get('query2')),
 			orderby=~db.Dues.Date,
 			left=db.Members.on(db.Members.id == db.Dues.Member),
-			columns=[Column("Name", lambda row: A(member_name(row['Member']), _href=URL(f"members/edit/{row['Member']}"))),
+			columns=[Column("Name", lambda row: A(member_name(row['Member'])[0:20], _href=URL(f"members/edit/{row['Member']}"))),
 	    			Column("College", lambda row: primary_affiliation(row['Member'])),
 	    			Column("Matr", lambda row: primary_matriculation(row['Member'])),
 					db.Dues.Status, db.Dues.Date, db.Dues.Prevpaid, db.Dues.Nowpaid, db.Dues.Type],
@@ -554,10 +536,10 @@ def events(path=None):
 
 	grid = Grid(path, db.Events.id>0,
 	     	orderby=~db.Events.DateTime,
-		    headings=['Datetime', 'Event', 'Venue','Speaker','TBC', 'Conf', 'Wait'],
+		    headings=['Datetime', 'Event', 'Venue','Speaker', 'Paid', 'TBC', 'Conf', 'Wait'],
 			columns=[db.Events.DateTime,
-					Column('event', lambda row: A(row['Description'], _href=URL(f"event_reservations/{row['id']}"))),
-	   				db.Events.Venue, db.Events.Speaker,
+					Column('event', lambda row: A(row.Description[0:23], _href=URL(f"event_reservations/{row['id']}"))),
+	   				db.Events.Venue, db.Events.Speaker, db.Events.Paid,
 	    			db.Events.Unpaid, db.Events.Attend, db.Events.Wait],
 			search_queries=[["Event", lambda value: db.Events.Description.like(f'%{value}%')],
 		    				["Venue", lambda value: db.Events.Venue.like(f'%{value}%')],
@@ -619,11 +601,11 @@ select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 	grid = Grid(path, eval(query),
 			left=db.Members.on(db.Members.id == db.Reservations.Member),
 			orderby=db.Reservations.Created if request.query.get('waitlist') else db.Reservations.Lastname|db.Reservations.Firstname,
-			columns=[Column('member', lambda row: A(member_name(row.Reservations.Member), _href=URL(f"reservation/{row.Reservations.Member}/{event_id}"))),
-	    				db.Members.Membership, db.Members.Paiddate,
-						db.Reservations.Affiliation, db.Reservations.Notes, db.Reservations.TBC,
+			columns=[Column('member', lambda row: A(member_name(row.Reservations.Member)[0:20], _href=URL(f"reservation/{row.Reservations.Member}/{event_id}"))),
+	    				db.Members.Membership, db.Members.Paiddate, db.Reservations.Affiliation, db.Reservations.Notes, 
+						db.Reservations.Cost, db.Reservations.TBC,
 						db.Reservations.Wait if request.query.get('waitlist') else db.Reservations.Prov if request.query.get('provisional') else db.Reservations.Conf],
-			headings=['Member', 'Type', 'Until', 'College', 'Notes', 'Tbc', '#'],
+			headings=['Member', 'Type', 'Until', 'College', 'Notes', 'Cost', 'Tbc', '#'],
 			details=False, editable = False, create = False, deletable = False,
 			rows_per_page=200, grid_class_style=grid_style, formstyle=form_style)
 	return locals()
@@ -1132,16 +1114,14 @@ def accounting(path=None):
 			session['left'] = None
 			session['query2'] = None	#supplementary query for transactions grid
 			session['left2'] = None
-	
-	pre_action_buttons = [GridActionButton(URL('bank_file'), text='Upload', append_id=True),
-		GridActionButton(lambda r: URL('transactions', vars=dict(query=f"db.AccTrans.Bank=={r['id']}")),
-							text='Transactions', append_id=False)
-	]
 
 	grid = Grid(path, db.Bank_Accounts.id>0,
 				orderby=db.Bank_Accounts.Name,
-				columns=[db.Bank_Accounts.Name, db.Bank_Accounts.Accrued, db.Bank_Accounts.Balance],
-				pre_action_buttons=pre_action_buttons,
+				columns=[db.Bank_Accounts.Name, db.Bank_Accounts.Accrued, db.Bank_Accounts.Balance,
+					Column('', lambda row: A('Upload', _href=URL(f'bank_file/{row.id}'))),
+					Column('', lambda row: A('Transactions', _href=URL('transactions',
+								vars=dict(query=f"db.AccTrans.Bank=={row.id}")))),
+				],
 				deletable=False, details=False, editable=True, create=True,
 				grid_class_style=grid_style,
 				formstyle=form_style,

@@ -1,10 +1,12 @@
 [[extend 'layout.html']]
 
-[[try:
+<div class="header">
+  [[try:
     =header
   except:
     pass
   pass]]
+</div>
 
 [[try:
     if form!=None:
@@ -22,8 +24,10 @@ except:
   pass
 pass]]
 
-[[try:
+<div class="header">
+  [[try:
     =footer
   except:
     pass
   pass]]
+</div>

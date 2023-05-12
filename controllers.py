@@ -87,7 +87,7 @@ def members(path=None):
 	left = None #only used if mailing list with excluded event attendees
 	qdesc = ""
 	errors = ''
-	header = BODY('Member Records')
+	header = H5('Member Records')
 	back = URL('members/select', scheme=True)
 
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
@@ -126,7 +126,7 @@ def members(path=None):
 		header = CAT(header, A("Send Email to Specific Address(es)", _href=URL('composemail', vars=dict(back=back))), XML('<br>'))
 	elif path:
 		back = session.get('back') or back
-		header = CAT(A('back', _href=back), BODY('Member Record'))
+		header = CAT(A('back', _href=back), H5('Member Record'))
 		if path.startswith('edit'):
 			header= CAT(header, 
 	       			A('Member reservations', _href=URL('member_reservations', path[5:])), XML('<br>'),

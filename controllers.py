@@ -87,7 +87,7 @@ def members(path=None):
 	left = None #only used if mailing list with excluded event attendees
 	qdesc = ""
 	errors = ''
-	header = H5('Member Records')
+	header = BODY('Member Records')
 	back = URL('members/select', scheme=True)
 
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
@@ -123,12 +123,12 @@ def members(path=None):
 			if search_form.vars.get('good_standing'):
 				filter['good_standing'] = 'On'
 			session['filter'] = filter
-		header = CAT(header, BODY(A("Send Email to Specific Address(es)", _href=URL('composemail', vars=dict(back=back)))), XML('<br>'))
+		header = CAT(header, A("Send Email to Specific Address(es)", _href=URL('composemail', vars=dict(back=back))), XML('<br>'))
 	elif path:
 		back = session.get('back') or back
-		header = CAT(BODY(A('back', _href=back)), H5('Member Record'))
+		header = CAT(A('back', _href=back), BODY('Member Record'))
 		if path.startswith('edit'):
-			header= CAT(header, BODY(CAT(
+			header= CAT(header, 
 	       			A('Member reservations', _href=URL('member_reservations', path[5:])), XML('<br>'),
 					A('OxCam affiliation(s)', _href=URL('affiliations', path[5:])), XML('<br>'),
 					A('Email addresses and subscriptions', _href=URL('emails', path[5:])), XML('<br>'),
@@ -136,7 +136,7 @@ def members(path=None):
 					A('Send Email to Member', _href=URL('composemail',
 					 	vars=dict(query=f"db.Members.id=={path[5:]}", left='',
 		 					qdesc=member_name(path[5:]),
-		   					back=URL(f'members/edit/{path[5:]}', scheme=True)))))))
+		   					back=URL(f'members/edit/{path[5:]}', scheme=True)))))
 	else:
 		session['back'] = None
 		session['filter'] = None
@@ -215,16 +215,16 @@ def members(path=None):
 	if path=='select':
 		if qdesc:
 			header = CAT(header,
-				BODY(A(f"Send Notice to {qdesc}", _href=URL('composemail',
-					vars=dict(query=query, left=left or '', qdesc=qdesc, back=back)))), XML('<br>'))
+				A(f"Send Notice to {qdesc}", _href=URL('composemail',
+					vars=dict(query=query, left=left or '', qdesc=qdesc, back=back))), XML('<br>'))
 		header = CAT(header,
-	       BODY(XML("Use filter to select a mailing list or apply other filters.<br>Selecting an event selects \
+	       XML("Use filter to select a mailing list or apply other filters.<br>Selecting an event selects \
 (or excludes from a mailing list) attendees.<br>You can filter on a member record field \
-using an optional operator (=, <, >, <=, >=) together with a value.")))
-		footer = BODY(CAT(A("View recent Dues Payments", _href=URL('get_date_range',
+using an optional operator (=, <, >, <=, >=) together with a value."))
+		footer = CAT(A("View recent Dues Payments", _href=URL('get_date_range',
 				vars=dict(function='dues_payments', title="Dues Payments"))), XML('<br>'),
 			A("Export selected records as CSV file", _href=URL('members_export',
-						vars=dict(query=query, left=left or '', qdesc=qdesc)))))
+						vars=dict(query=query, left=left or '', qdesc=qdesc))))
 
 	def member_deletable(id): #deletable if not member, never paid dues or attended recorded event, or on mailing list
 		m = db.Members[id]

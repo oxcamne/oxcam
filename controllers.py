@@ -878,7 +878,7 @@ def financial_content(event):
 	rows.append(TR(TD('Card Fees'), tdnum(cardfees)))
 	rows.append(THEAD(TR(TH('Total'), tdnum(totexp + cardfees, th=True))))
 	rows.append(THEAD(TR(TH('Net Revenue'), tdnum(totrev - totexp - cardfees, th=True))))
-	return CAT(message, H6('\nRevenue'), TABLE(*rows))
+	return CAT(message, H6('\nExpense'), TABLE(*rows))
 
 @action('financial_detail/<event:int>', method=['GET'])
 @action.uses("message.html", db, session, flash)
@@ -1566,7 +1566,7 @@ def composemail():
 						elif part[1] == 'reservation':
 							body += event_confirm(row.get(db.Reservations.Event), member.id)
 					message = HTML(XML(msgformat(body)))
-					auth.sender.send(to=to, sender=sender, bcc=bcc, subject=form2.vars['subject'], body=message)
+					auth.sender.send(to=to, sender=sender, reply_to=sender, bcc=bcc, subject=form2.vars['subject'], body=message)
 				flash.set(f"{len(rows)} emails sent to {qdesc}")
 			else:
 				to = re.compile('[^,;\s]+').findall(form2.vars['to'])
@@ -1575,7 +1575,7 @@ def composemail():
 					body += part[0]		
 				flash.set(f"Email sent to: {to}")
 				message = HTML(XML(msgformat(body)))
-				auth.sender.send(to=to, sender=sender, subject=form2.vars['subject'], bcc=bcc, body=message)
+				auth.sender.send(to=to, sender=sender, reply_to=sender, subject=form2.vars['subject'], bcc=bcc, body=message)
 			redirect(request.query.get('back'))
 	return locals()
 
@@ -1605,17 +1605,21 @@ def bcc_export():
 @action('login', method=['POST', 'GET'])
 @action.uses("form.html", db, session, flash)
 def login():
+	user = db(db.users.remote_addr==request.remote_addr).select().first()
 	form = Form([Field('email', 'string',
-				requires=[IS_NOT_EMPTY(), IS_EMAIL()], default = session.get('email'))],
+				requires=[IS_NOT_EMPTY(), IS_EMAIL()],
+				default = user.email if user else session.get('email'))],
 				formstyle=FormStyleBulma)
-	header = P("Please specify your email to login, you will receive a verification email there.")
+	header = P(XML(f"Please specify your email to login.<br />If you have signed in previously, please use the \
+same email as this identifies your record.<br />You can change your email after logging in via 'My account'.<br />If \
+you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}."))
  
 	if form.accepted:
 		user = db(db.users.email==form.vars['email'].lower()).select().first()
 		token = str(random.randint(10000,999999))
 		if user:
 			id = user.id
-			user.update_record(tokens= [token]+(user.tokens or []),
+			user.update_record(tokens= [token]+(user.tokens or []), url=session['url'],
 				remote_addr = request.remote_addr, when_issued = datetime.datetime.now())
 		else:
 			id = db.users.insert(email = form.vars['email'].lower(),
@@ -1694,18 +1698,26 @@ def logout():
 	session['logged_in'] = False
 	redirect(URL('index'))
 
-# stripe_tool/Object/id (diagnostic tool)
-@action('stripe_tool/<object_type>/<object_id>', method=['GET'])
-@action.uses("generic.html", db, session, flash)
+# stripe_tool (diagnostic tool)
+@action('stripe_tool', method=['GET', 'POST'])
+@action.uses("form.html", db, session, flash)
 @checkaccess('accounting')
-def stripe_tool(object_type, object_id):
+def stripe_tool():
+	form = Form([Field('object_type', comment="e.g. 'Customer', 'Subscription"),
+	      		Field('object_id')],
+				keep_values=True, formstyle=form_style)
 	pk = STRIPE_PKEY	#use the public key on the client side	
 	stripe.api_key = STRIPE_SKEY
+	header = H5('Stripe_Tool - inspect Stripe Objects')
+	footer = ""
 	object={}
-	try:
-		object = eval(f"stripe.{object_type}.retrieve('{object_id}')")
-	except Exception as e:
-		flash.set(str(e))
+
+	if form.accepted:
+		try:
+			object = eval(f"stripe.{form.vars.get('object_type')}.retrieve({form.vars.get('object_id')})")
+			footer = BEAUTIFY(object)
+		except Exception as e:
+			flash.set(str(e))
 	return locals()
 
 @action('db_tool', method=['POST', 'GET'])

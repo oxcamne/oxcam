@@ -95,7 +95,6 @@ def members(path=None):
 	if not admin:
 		db.Members.Access.writable = False
 	db.Members.City.requires=db.Members.State.requires=db.Members.Zip.requires=None
-	db.Members.Name.readable = False
 	db.Members.Affiliations.readable = False
 
 	search_form=Form([
@@ -173,10 +172,10 @@ def members(path=None):
 			value = m.group(2)
 			if fieldtype == 'string' or fieldtype == 'text':
 				if not operator:
-					query.append(f'db.Members.{field}.like("%{value}%")')
+					query.append(f'db.Members.{field}.ilike("%{value}%")')
 					qdesc += f' {field} contains {value}.'
 				elif operator == '=':
-					query.append(f'db.Members.{field}.like("{value}")')
+					query.append(f'db.Members.{field}.ilike("{value}")')
 					qdesc += f' {field} equals {value}.'
 				else:
 					query.append(f"(db.Members.{field}{operator}{value})")
@@ -223,6 +222,7 @@ def members(path=None):
 using an optional operator (=, <, >, <=, >=) together with a value."))
 		footer = CAT(A("View recent Dues Payments", _href=URL('get_date_range',
 				vars=dict(function='dues_payments', title="Dues Payments"))), XML('<br>'),
+			A("Export membership analytics as CSV file", _href=URL('member_analytics')), XML('<br>'),
 			A("Export selected records as CSV file", _href=URL('members_export',
 						vars=dict(query=query, left=left or '', qdesc=qdesc))))
 
@@ -285,6 +285,103 @@ def members_export():
 		flash.set(e)
 		redirect(URL('members/select'))
 	return locals()	
+
+def ageband(year, matr):
+	if matr:
+		age = year - matr + 19
+		if age >= 65:
+			ageband = '65+'
+		elif age >= 55:
+			ageband = '55-64'
+		elif age >= 45:
+			ageband = '45-54'
+		elif age >= 35:
+			ageband = '35-44'
+		elif age >= 25:
+			ageband = '25-35'
+		else:
+			ageband = '-25'
+	else:
+		ageband = 'unknown'
+	return ageband
+
+@action('member_analytics', method=['GET'])
+@action('member_analytics/<path:path>', method=['GET'])
+@action.uses("download.html", db, session, flash, Inject(response=response))
+@checkaccess('write')
+def member_analytics(path=None):
+	stream=StringIO()
+	content_type = "text/csv"
+	filename = 'member_analytics.csv'
+	writer=csv.writer(stream)
+	writer.writerow(['Name', 'Matr', 'AgeBand', 'Year', 'Category'])
+
+	matr = db.Affiliations.Matr.min()
+	matrrows = db(db.Affiliations.Matr!=None).select(db.Affiliations.Member, matr, groupby = db.Affiliations.Member)
+
+	query = (db.Members.Paiddate >= datetime.date(2007,1,1))|((db.Members.Paiddate==None)&(db.Members.Membership!=None))
+	left = db.Dues.on(db.Dues.Member==db.Members.id)
+	"""
+	grid = Grid(path, query, left=left,
+	     	columns=[db.Members.id, db.Members.Firstname, db.Members.Lastname, db.Members.Paiddate,
+					db.Members.Created, db.Dues.Date, db.Dues.Amount,
+					db.Dues.Nowpaid, db.Dues.Prevpaid, db.Dues.Status],
+			orderby=db.Members.Lastname|db.Members.Firstname|db.Dues.Date,
+			details=False, editable=False, create=False, deletable=False,
+			grid_class_style=GridClassStyle, formstyle=form_style, show_id=True,
+			)
+	return locals()
+	"""
+
+	rows = db(query).select(db.Members.id, db.Members.Firstname, db.Members.Lastname,
+			 		db.Members.Paiddate, db.Members.Created, db.Dues.Date, 
+					db.Dues.Amount, db.Dues.Nowpaid, db.Dues.Prevpaid, db.Dues.Status,
+					orderby=db.Members.Lastname|db.Members.Firstname|db.Dues.Date,
+					left = left)
+	
+	l = None
+	thisyear = datetime.datetime.now().year
+	for r in rows:
+		if r.Members.Lastname == 'Allen':
+			pass
+		if not l or r.Members.id != l.Members.id:
+			endyear = 0
+			name = r.Members.Lastname + ', ' + r.Members.Firstname
+			m = matrrows.find(lambda m: m.Affiliations.Member == r.Members.id).first()
+			matric = m[matr] if m else None
+			if r.Dues.Date and r.Dues.Prevpaid and not r.Dues.Nowpaid:
+				#assume has been a member since 2007 until Prevaid
+				startyear = max(r.Members.Created.date().year, 2007)
+				endyear = r.Dues.Prevpaid.year - 1
+				while startyear <= endyear:
+					writer.writerow([name, str(matric) if matric else '',
+									ageband(startyear, matric),
+									str(startyear), r.Dues.Status if r.Dues.Status else 'Full'])
+					startyear += 1
+		l = r
+		if not r.Members.Paiddate:	#life members
+			startyear = max(r.Members.Created.date().year, 2007)
+			endyear = thisyear
+		elif not r.Dues.Date:	#no dues payment recorded
+			endyear = r.Members.Paiddate.year - 1
+			startyear = endyear
+			# assume a one year membership from attending an event.
+		elif not r.Dues.Nowpaid:
+			startyear = max(r.Dues.Date.year, endyear+1)
+			endyear = startyear + r.Dues.Amount/(5 if r.Dues.Status=='Student' else 20) - 1
+		else:				#dues payments recorded
+			startyear = max(r.Dues.Date.year, endyear+1)
+			endyear = r.Dues.Nowpaid.year-1
+			if r.Dues.Nowpaid>=datetime.datetime.now().date() and endyear==thisyear-1:
+				endyear = thisyear	#assume renewal later this year
+	
+		while startyear <= endyear:
+			writer.writerow([name, str(matric) if matric else '',
+							ageband(startyear, matric),
+							str(startyear), r.Dues.Status if r.Dues.Status else 'Full'])
+			startyear += 1
+
+	return locals()
 
 @action('member_reservations/<member_id:int>', method=['POST', 'GET'])
 @action('member_reservations/<member_id:int>/<path:path>', method=['POST', 'GET'])
@@ -513,7 +610,8 @@ def events(path=None):
 	if not path:
 		session['back'] = None
 	elif path=='select':
-		footer = A("Export all Events as CSV file", _href=URL('events_export')) 
+		footer = CAT(A("Export all Events as CSV file", _href=URL('events_export')), XML('<br>'),
+			A("Export event analytics as CSV file", _href=URL('event_analytics')))
 		db.Events.Paid.readable = db.Events.Unpaid.readable = True
 		db.Events.Prvsnl.readable = db.Events.Wait.readable = db.Events.Attend.readable = True
 	elif path=='new':
@@ -541,15 +639,58 @@ def events(path=None):
 					Column('event', lambda row: A(row.Description[0:23], _href=URL(f"event_reservations/{row['id']}"))),
 	   				db.Events.Venue, db.Events.Speaker, db.Events.Paid,
 	    			db.Events.Unpaid, db.Events.Attend, db.Events.Wait],
-			search_queries=[["Event", lambda value: db.Events.Description.like(f'%{value}%')],
-		    				["Venue", lambda value: db.Events.Venue.like(f'%{value}%')],
-						    ["Speaker", lambda value: db.Events.Speaker.like(f'%{value}%')]],
+			search_queries=[["Event", lambda value: db.Events.Description.ilike(f'%{value}%')],
+		    				["Venue", lambda value: db.Events.Venue.ilike(f'%{value}%')],
+						    ["Speaker", lambda value: db.Events.Speaker.ilike(f'%{value}%')]],
 			details=not write, editable=write, create=write,
 			deletable=lambda r: write and db(db.Reservations.Event == r['id']).count() == 0 and db(db.AccTrans.Event == r['id']).count() == 0,
 			validation=checktickets,
 			grid_class_style=grid_style,
 			formstyle=form_style,
 			)
+	return locals()
+
+@action('event_analytics', method=['GET'])
+@action('event_analytics/<path:path>', method=['GET'])
+@action.uses("download.html", db, session, flash, Inject(response=response))
+@checkaccess('write')
+def event_analytics():
+	stream=io.StringIO()
+	content_type = "text/csv"
+	filename = 'event_analytics.csv'
+
+	writer=csv.writer(stream)
+	writer.writerow(['Name', 'College', 'Oxbridge', 'Matr', 'AgeBand', 'PartySize', 'Event', 'EventYear'])
+
+	rows = db((db.Reservations.Host==True) & (db.Reservations.Waitlist==False) & (db.Reservations.Provisional==False)& \
+					(db.Reservations.Event == db.Events.id)).select(db.Reservations.Member, db.Reservations.Lastname,
+				db.Reservations.Firstname, db.Reservations.Affiliation, db.Events.Description, db.Events.DateTime, db.Events.id,
+					orderby = db.Reservations.Lastname|db.Reservations.Firstname|db.Events.DateTime)
+
+	membid = 0
+
+	for r in rows:
+		if r.Reservations.Member != membid:
+			membid = r.Reservations.Member
+			name = r.Reservations.Lastname + ', ' + r.Reservations.Firstname
+			matric = None
+			affs = db((db.Affiliations.Member==membid) & (db.Affiliations.Matr!=None)).select(db.Affiliations.Matr)
+			for m in affs:
+				if m.Matr<(matric or 10000):
+					matric =m.Matr
+			college = ''
+			oxbridge = True
+			if r.Reservations.Affiliation:
+				c = db.Colleges[r.Reservations.Affiliation]
+				college = c.Name
+				oxbridge = c.Oxbridge
+		
+		partysize = db((db.Reservations.Event==r.Events.id) & (db.Reservations.Member==r.Reservations.Member)).count()
+
+		writer.writerow([name, college, oxbridge,
+							str(matric) if matric else '', ageband(r.Events.DateTime.year, matric),
+							str(partysize), r.Events.Description,
+							r.Events.DateTime.year if r.Events.DateTime.month <= 9 else r.Events.DateTime.year + 1])
 	return locals()
 		
 @action('event_reservations/<event_id:int>', method=['POST', 'GET'])
@@ -1359,9 +1500,9 @@ def transactions(path=None):
 			db.AccTrans[form.vars.get('id')].update_record(Fee=fee)
 			
 	search_queries = [
-		["Account", lambda value: db.AccTrans.Account.belongs([r.id for r in db(db.CoA.Name.like(f'%{value}%')).select(db.CoA.id)])],
-		["Event", lambda value: db.AccTrans.Event.belongs([r.id for r in db(db.Events.Description.like(f'%{value}%')).select(db.Events.id)])],
-		["Notes", lambda value: db.AccTrans.Notes.like(f'%{value}%')],
+		["Account", lambda value: db.AccTrans.Account.belongs([r.id for r in db(db.CoA.Name.ilike(f'%{value}%')).select(db.CoA.id)])],
+		["Event", lambda value: db.AccTrans.Event.belongs([r.id for r in db(db.Events.Description.ilike(f'%{value}%')).select(db.Events.id)])],
+		["Notes", lambda value: db.AccTrans.Notes.ilike(f'%{value}%')],
 	]
 	
 	grid = Grid(path, eval(query), left=eval(left) if left else None,
@@ -1460,6 +1601,11 @@ def msgformat(b):
 		return msgformat(m.group(1)) + m.group(2) + msgformat(m.group(3))
 	return markmin.markmin2html(b)
 
+def society_emails(member_id):
+	return [row['Email'] for row in db((db.Emails.Member == member_id) & \
+	   (db.Emails.Email.contains(SOCIETY_DOMAIN.lower()))).select(
+			db.Emails.Email, orderby=~db.Emails.Modified)]
+
 @action('composemail', method=['POST', 'GET'])
 @action.uses("form.html", db, session, flash)
 @checkaccess('write')
@@ -1469,9 +1615,8 @@ def composemail():
 	left = request.query.get('left')
 
 	header = CAT(A('back', _href=request.query.get('back')), H5("Send Email"))
-	source = [row['Email'] for row in db((db.Emails.Member == session['member_id']) & \
-	   (db.Emails.Email.contains(SOCIETY_DOMAIN.lower()))).select(
-			db.Emails.Email, orderby=~db.Emails.Modified)]
+	source = society_emails(session['member_id'])
+
 	if len(source) == 0:
 		flash.set('Sorry, you cannot send email without a Society email address')
 		redirect(URL('accessdenied'))
@@ -1602,6 +1747,129 @@ def bcc_export():
 		flash.set(e)
 	return locals()
 
+#embedded in Society Past Events Page
+@action('history', method=['GET'])
+@action.uses("message_embed.html", db)
+def history():
+	message = H4('Past Event Highlights:')
+	since = datetime.datetime(2019, 3, 31)
+	events = db((db.Events.DateTime < datetime.datetime.now()) & (db.Events.DateTime >= since) & (db.Events.Page != None)).select(orderby = ~db.Events.DateTime)
+
+	table_rows = []
+	for event in events:
+		table_rows.append(TR(
+							TD(event.DateTime.strftime('%A, %B %d, %Y')),
+							TD(A(event.Description, _href=event.Page.lower(), _target='booking'))))
+	message = CAT(message, TABLE(*table_rows))
+	return locals()
+
+#embedded in Society About page
+@action('about', method=['GET'])
+@action.uses("message_embed.html", db)
+def about():
+	def oxcamaddr(r):
+		return XML(str(markmin.markmin2html(', '.join(society_emails(r.id))))[3:-4])	#remove <p>...,</p>
+			
+	rows = db(db.Members.Committees.ilike('%advisory%')).select(orderby=db.Members.Lastname|db.Members.Firstname)
+				
+	board = rows.find(lambda r: (r.Committees or '').lower().find('board') >= 0)
+	message = H5(f'Current Board Members ({len(board)}):')
+	table_rows = []
+	for r in board:
+		table_rows.append(TR(
+			TD((r.Title or '')+' '+r.Firstname+' '+r.Lastname+' '+(r.Suffix or '')),
+			TD(primary_affiliation(r.id)),
+			TD(oxcamaddr(r))
+			))
+	adv = rows.find(lambda r: (r.Committees or '').lower().find('board') < 0)
+	message = CAT(message, TABLE(*table_rows),
+	       			H5(f'Additional Members of the Advisory Committee ({len(adv)}):'))
+
+	table_rows = []
+	for r in adv:
+		table_rows.append(TR(
+			TD((r.Title or '')+' '+r.Firstname+' '+r.Lastname+' '+(r.Suffix or '')),
+			TD(primary_affiliation(r.id)),
+			TD(oxcamaddr(r))
+			))
+	pres = db(db.Members.President!=None).select(orderby=~db.Members.President)
+	message = CAT(message, TABLE(*table_rows),
+					H5(f'Past Presidents of the Society ({len(pres)}):'))
+
+	table_rows = []
+	for r in pres:
+		table_rows.append(TR(
+			TD(r.President),
+			TD((r.Title or '')+' '+r.Firstname+' '+r.Lastname+' '+(r.Suffix or '')),
+			TD(primary_affiliation(r.id)),
+			))
+	message = CAT(message, TABLE(*table_rows))
+	return locals()
+
+#check if member is in good standing at a particular date
+def member_good_standing(member, date=datetime.datetime.now().date()):
+	return member and member.Membership and ((not member.Paiddate or member.Paiddate>=date)\
+			or member.Charged or (member.Stripe_subscription and member.Stripe_subscription != 'Cancelled'))
+
+#######################Member Directory linked from Society web site#########################
+@action('directory', method=['GET'])
+@action('directory/<path:path>', method=['GET'])
+@action.uses("grid.html", db, session, flash)
+@checkaccess(None)
+def directory(path=None):
+	if not member_good_standing(db.Members[session['member_id']]):
+		session.flash = 'Sorry, Member Directory is only available to members in good standing.'
+		redirect(URL('index'))
+			
+	query = "(db.Members.Membership!=None)&(db.Members.Membership!='')"
+	header = CAT(H5('Member Directory'),
+	      XML(f"You can search by last name, town, state, using the boxes below; click on a name to view contact information"))
+	db.Members.Name.readable = True
+	db.Members.Affiliations.readable = True
+	session['back'] = session['url']
+
+	grid = Grid(path, eval(query),
+		columns=(Column('Name', lambda r: A(f"{member_name(r['id'])}", _href=URL(f"contact_details/{r['id']}"))),
+				db.Members.Affiliations, db.Members.City, db.Members.State),
+		orderby=db.Members.Lastname|db.Members.Firstname,
+		search_queries=[["Last Name", lambda value: db.Members.Lastname.ilike(f'%{value}%')],
+						["Town", lambda value: db.Members.City.ilike(f'%{value}%')],
+						["State ('xx')", lambda value: db.Members.State.ilike(f'%{value}%')],
+						["College/University", lambda value: db.Members.id.belongs([a.Member for a in db(db.Affiliations.College.belongs([c.id for c in db(db.Colleges.Name.ilike(f"%{value}%")).select()])).select()])]],
+		details=False, editable=False, create=False, deletable=False,
+		show_id=True,
+		grid_class_style=grid_style,
+		formstyle=form_style)
+	return locals()
+	
+@action('contact_details/<member_id:int>', method=['GET'])
+@action.uses("message.html", db, session, flash)
+@checkaccess(None)
+def contact_details(member_id):
+	member=db.Members[member_id]
+	if not member or not member.Membership:
+		raise Exception("hack attempt?")
+	
+	message = CAT(A('back', _href=session['back']),
+				H5("Member Directory - Contact Details"),
+	       member_name(member_id), XML('<br>'),
+		   member_affiliations(member_id), XML('<br>'))
+	email = primary_email(member_id)
+	if not member.Privacy and email:
+		message = CAT(message, A(email, _href=f"mailto:{email}",_target='email'), XML('<br>'))
+	if member.Homephone:
+		message = CAT(message, f"home phone: {member.Homephone}", XML('<br>'))
+	if member.Workphone:
+		message = CAT(message, f"work phone: {member.Workphone}", XML('<br>'))
+	message = CAT(message, XML('<br>'))
+
+	if member.Address1:
+		message = CAT(message, f"{member.Address1}", XML('<br>'))
+	if member.Address2:
+		message = CAT(message, f"{member.Address2}", XML('<br>'))
+	message = CAT(message, f"{member.City or ''}, {member.State or ''} {member.Zip or ''}")
+	return locals()
+
 @action('login', method=['POST', 'GET'])
 @action.uses("form.html", db, session, flash)
 def login():
@@ -1670,16 +1938,16 @@ def validate(id, token):
 			session['access'] = None
 		redirect(user.url)	#a new email
 
-	tbody=TBODY()
+	table_rows = [THEAD(TR('Please select member:')),
+	       		  THEAD(TR(TH('Name'),TH('Status'),TH('Paid Date')))]
 	for member in rows:
 		paid = str(member.Paiddate) if member.Paiddate else ''
 		status = member.Membership or ''
-		tbody.append(TR(
-			TD(A('%40.40s '%(member.Name), _href=user.url)),
+		table_rows.append(TR(
+			TD(A('%40.40s '%(member_name(member.id)), _href=user.url)),
 			TD('%9s '%(status)),
 			TD(paid)))
-	message = TABLE(THEAD(TR('Please select member:')),
-					THEAD(TR(TH('Name'),TH('Status'),TH('Paid Date'))), tbody)
+	message = TABLE(*table_rows)
 	return locals()
 
 @action('accessdenied')

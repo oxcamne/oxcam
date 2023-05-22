@@ -61,10 +61,10 @@ def checkaccess(requiredaccess):
 			#check access
 			if requiredaccess != None:
 				require = ACCESS_LEVELS.index(requiredaccess)
-				if not session['member_id'] or not session['access']:
+				if not session.get('member_id') or not session.get('access'):
 					if db(db.Members.id>0).count()==0:
 						return f(*args, **kwds)
-				have = ACCESS_LEVELS.index(session['access']) if session['access'] != None else -1
+				have = ACCESS_LEVELS.index(session['access']) if session.get('access') != None else -1
 				if have < require:
 					redirect(URL('accessdenied'))
 			return f(*args, **kwds)
@@ -75,7 +75,32 @@ def checkaccess(requiredaccess):
 @action.uses('message.html', db, session, flash)
 @checkaccess(None)
 def index():
-	message = "reached index"
+	message = CAT(H6("Please select one of the following:"),
+		   A("Update your email address and/or mailing l(ist options", _href=URL('member_emails')), XML('<br>'))
+	member = db.Members[session['member_id']] if session.get('member_id') else None
+	if not member or not member_good_standing(member):
+		message = CAT(message, A("Join or Renew your Membership", _href=URL('registration')), XML('<br>'))
+	else:
+		message = CAT(message, A("Update your member profile or contact information", _href=URL('registration')), XML('<br>'))
+	if member and member.Membership and member.Stripe_subscription!='Cancelled':
+		if member.Stripe_subscription:
+			message = CAT(message, A("View membership subscription/Update credit card", _href=URL('update_card')), XML('<br>'))
+			message = CAT(message, A("Cancel your membership", _href=URL('cancel_subscription')), XML('<br>'))
+
+	message = CAT(message, XML('<br>'),
+	       H6(XML(f"To register for events use links below or visit {A(f'www.{SOCIETY_DOMAIN}.org', _href=f'https://www.{SOCIETY_DOMAIN}.org')}:")),
+	       XML('<br>'))
+	events = db(db.Events.DateTime>=datetime.datetime.now()).select(orderby = db.Events.DateTime)
+	events = events.find(lambda e: e.Booking_Closed>=datetime.datetime.now() or event_attend(e.id))
+	for event in events:
+		waitlist = ''
+		if event.Booking_Closed < datetime.datetime.now():
+			waitlist = ' *Booking Closed, waitlisting*'
+		elif event_wait(event.id) or (event.Capacity and (event_attend(event.id) or 0) >= event.Capacity):
+			waitlist = ' *Sold Out, waitlisting*'
+		pass
+		message = CAT(message, event.DateTime.strftime('%A, %B %d '), 
+			A(f"{event.Description}", _href=URL(f'registration/{event.id}')), waitlist, XML('<br>'))
 	return locals()
 
 @action('members', method=['POST', 'GET'])
@@ -1285,7 +1310,7 @@ def bank_file(bank_id):
 	header = CAT(A('back', _href=URL('accounting')),
 				H5(f"{bank.Name} Transactions"),
 				XML(f"To download data since {markmin.markmin2html(f'``**{str(bkrecent.Timestamp.date()) if bkrecent else origin}**``:red')}:"), XML('<br>'),
-				A('Login to Society Account', _href={bank.Bankurl}, _target='blank'), XML('<br>'),
+				A('Login to Society Account', _href=bank.Bankurl, _target='blank'), XML('<br>'),
 				XML(f"{markmin.markmin2html(bank.HowTo)}"))
 	
 	footer = f"Current Balance = {'$%8.2f'%(bank.Balance)}"
@@ -1534,7 +1559,7 @@ def emailparse(body, subject, query):
 		else:	#metadata?
 			text = eval(m.group(2).upper()).replace('<subject>', subject)
 			if not text:
-				raise Exception(f"<{m.group(2)}>  is not in metadata")
+				raise Exception(f"<{m.group(2)}>  is not in settings_private.py")
 		return emailparse(m.group(1), subject, query)+[(text, func)]+emailparse(m.group(3), subject, query)
 	return [(body, None)]
 	
@@ -1907,57 +1932,50 @@ you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _h
 							body=message)
 		form = None
 
-		header = DIV(P('Please click the link sent to your email to continue.'),
+		header = DIV(P("Please click the link sent to your email to continue. If you don't see the validation message, please check your spam folder."),
 					P('This link is valid for 15 minutes. You may close this window.'))
 	return locals()
 
-@action('validate/<id:int>/<token:int>', method=['POST', 'GET'])
-@action.uses("message.html", db, session)
+@action('validate/<id:int>/<token:int>', method=['GET', 'POST'])
+@action.uses("form.html", db, session)
 def validate(id, token):
 	user = db(db.users.id == id).select().first()
 	if not user or not int(token) in user.tokens or \
 			datetime.datetime.now() > user.when_issued + datetime.timedelta(minutes = 15) or \
 			user.remote_addr != request.remote_addr:
 		redirect(URL('index'))
+	rows = db((db.Members.id == db.Emails.Member) & db.Emails.Email.ilike(user.email)).select(
+				db.Members.ALL, distinct=True)
+	header = H6("Please select which of you is signing in:")
+	ids = [(row.id, member_name(row.id)+(' '+row.Membership+' member until '+row.Paiddate.strftime('%m/%d/%Y')  if row.Membership else '')) for row in rows]
+	form = Form([Field('member', 'integer', requires=IS_IN_SET(ids))],
+	     formstyle=FormStyleBulma)
+	if len(rows)<=1:
+		member_id = rows.first().id if len(rows)==1 else None
+	elif form.vars.get('member'):
+		member_id = form.vars.get('member')
+	else:
+		return locals()	#display form
+	
 	session['logged_in'] = True
 	session['id'] = user.id
 	session['email'] = user.email
 	session['filter'] = None
+	session['access'] = None
+	session['member_id'] = 0
+	if member_id:
+		session['member_id'] = member_id
+		session['access'] = db.Members[member_id].Access
 	log = 'verified '+request.remote_addr+' '+user.email
 	logger.info(log)
 	user.update_record(tokens=[])
-	rows = db((db.Members.id == db.Emails.Member) & db.Emails.Email.ilike(user.email)).select(
-				db.Members.ALL, distinct=True)
-	if len(rows)<=1:
-		if len(rows) == 1:
-			member = rows.first()
-			session['member_id'] = member.id
-			session['access'] = member.Access
-		else:
-			session['member_id'] = 0
-			session['access'] = None
-		redirect(user.url)	#a new email
-
-	table_rows = [THEAD(TR('Please select member:')),
-	       		  THEAD(TR(TH('Name'),TH('Status'),TH('Paid Date')))]
-	for member in rows:
-		paid = str(member.Paiddate) if member.Paiddate else ''
-		status = member.Membership or ''
-		table_rows.append(TR(
-			TD(A('%40.40s '%(member_name(member.id)), _href=user.url)),
-			TD('%9s '%(status)),
-			TD(paid)))
-	message = TABLE(*table_rows)
-	return locals()
+	redirect(user.url)
 
 @action('accessdenied')
-@action.uses('message.html', session, flash)
+@action.uses(session, flash)
 def accessdenied():
-	message = TBODY(
-		DIV("You do not have permission for that, please contact ",
-      		A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL),
-			" if you think this is wrong."),
-		P(A('Go back', _href=session.get('urll_prev'))))
+	flash.set(f"You do not have permission for that, please contact {SUPPORT_EMAIL} if you think this is wrong")
+	redirect(session['url_prev'])
 	return locals()
 
 @action('logout')

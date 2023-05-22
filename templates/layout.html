@@ -3,33 +3,33 @@
   <head>
     <base href="[[=URL('static')]]/">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="shortcut icon" href="data:image/x-icon;base64,AAABAAEAAQEAAAEAIAAwAAAAFgAAACgAAAABAAAAAgAAAAEAIAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAPAAAAAA=="/>
+    <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="css/no.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.14.0/css/all.min.css" integrity="sha512-1PKOgIY59xJ8Co8+NE6FZ+LOAZKjy+KY8iq0G4B3CyeY6wYHN3yt9PW0XpSriVlkMXe40PTKnXrLnZ9+fkDaog==" crossorigin="anonymous" />
     <style>.py4web-validation-error{margin-top:-16px; font-size:0.8em;color:red}</style>
-    [[block page_head]]<!-- individual pages can customize header here -->[[end]]
+    [[block page_head]]<!-- individual pages can customize header here -->
+    <h4><span style="color: blue"><em>Oxford and Cambridge Society of New England</em> <img src="images/oxcamne_no_pad.png" alt="logo" style="float:left;width:100px" /></span></h4>[[end]]
   </head>
   <body>
     <header>
       <!-- Navigation bar -->
-      <nav class="black">
+      <nav class="default">
         <!-- Logo -->
-        <a href="[[=URL('index')]]">
-          <u><b><script>document.write(window.location.href.split('/')[3]);</script></b></u></a>
-        </a>
+        <a href="https://www.oxcamne.org"; target="_blank"><b> Home</b></a>
         <!-- Do not touch this -->
         <label for="hamburger">☰</label>
         <input type="checkbox" id="hamburger">
         <!-- Left menu ul/li -->
         [[block page_left_menu]]
-        <u><a href="[[=URL('members')]]"><b> members</b></a></u>
-        <u><a href="[[=URL('events')]]"><b> events</b></a></u>
-        <u><a href="[[=URL('accounting')]]"><b> accounts</b></a></u>
+        <a href="[[=URL('members')]]"><b> members</b></a>
+        <a href="[[=URL('events')]]"><b> events</b></a>
+        <a href="[[=URL('accounting')]]"><b> accounts</b></a>
         [[end]]
         <!-- Right menu ul/li -->
         <ul>
           <li>
-            <u><a href="[[=URL('logout')]]"><b> Logout</b></a></u>
+            <a href="[[=URL('index')]]"><b> MyAccount</b></a>
+            <a href="[[=URL('logout')]]"><b> Logout</b></a>
           </li>
         </ul>
       </nav>
@@ -41,12 +41,12 @@
         <flash-alerts class="padded" data-alert="[[=globals().get('flash','')]]"></flash-alerts>
       </div>
       <main class="padded">
-        <!-- contect injected by extending page -->
+        <!-- content injected by extending page -->
         [[include]]
       </main>
     </center>
     <!-- end of HTML inserted by extending template -->
-    <footer class="black padded">
+    <footer class="default padded">
       <p>
         Made with py4web
       </p>

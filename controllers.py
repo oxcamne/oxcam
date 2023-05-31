@@ -34,7 +34,7 @@ from py4web.utils.grid import Grid, GridClassStyleBulma, Column, GridClassStyleB
 from py4web.utils.form import Form, FormStyleBulma, FormStyleBootstrap4, FormStyleDefault
 from pydal.validators import *
 from py4web.utils.factories import Inject
-import datetime, random, re, markmin, stripe, csv, decimal, io
+import datetime, random, re, markmin, stripe, csv, decimal, io, time
 from io import StringIO
 
 grid_style = GridClassStyleBulma
@@ -71,17 +71,28 @@ def checkaccess(requiredaccess):
 		return wrapped_f
 	return wrap
 
+#check if member is in good standing at a particular date
+def member_good_standing(member, date=datetime.datetime.now().date()):
+	return member and member.Membership and ((not member.Paiddate or member.Paiddate>=date)\
+			or member.Charged or (member.Stripe_subscription and member.Stripe_subscription != 'Cancelled'))
+
 @action('index')
 @action.uses('message.html', db, session, flash)
 @checkaccess(None)
 def index():
-	message = CAT(H6("Please select one of the following:"),
-		   A("Update your email address and/or mailing l(ist options", _href=URL('member_emails')), XML('<br>'))
+	message = H6("Please select one of the following:")
 	member = db.Members[session['member_id']] if session.get('member_id') else None
+
 	if not member or not member_good_standing(member):
 		message = CAT(message, A("Join or Renew your Membership", _href=URL('registration')), XML('<br>'))
 	else:
 		message = CAT(message, A("Update your member profile or contact information", _href=URL('registration')), XML('<br>'))
+
+	if member:
+		message = CAT(message, A("Update your email address and/or mailing list subscriptions", _href=URL(f"emails/Y/{session.get('member_id')}")), XML('<br>'))
+	else:
+		message = CAT(message, A("Join our mailing list(s)", _href=URL("registration", vars=dict(mail_list='Y'))), XML('<br>'))
+
 	if member and member.Membership and member.Stripe_subscription!='Cancelled':
 		if member.Stripe_subscription:
 			message = CAT(message, A("View membership subscription/Update credit card", _href=URL('update_card')), XML('<br>'))
@@ -154,8 +165,8 @@ def members(path=None):
 		if path.startswith('edit'):
 			header= CAT(header, 
 	       			A('Member reservations', _href=URL('member_reservations', path[5:])), XML('<br>'),
-					A('OxCam affiliation(s)', _href=URL('affiliations', path[5:])), XML('<br>'),
-					A('Email addresses and subscriptions', _href=URL('emails', path[5:])), XML('<br>'),
+					A('OxCam affiliation(s)', _href=URL('affiliations/N', path[5:])), XML('<br>'),
+					A('Email addresses and subscriptions', _href=URL('emails/N', path[5:])), XML('<br>'),
 					A('Dues payments', _href=URL('dues', path[5:])), XML('<br>'),
 					A('Send Email to Member', _href=URL('composemail',
 					 	vars=dict(query=f"db.Members.id=={path[5:]}", left='',
@@ -268,7 +279,6 @@ using an optional operator (=, <, >, <=, >=) together with a value."))
 		if not form.vars.get('id'):
 			return	#adding record
 		
-		db.Members[form.vars.get('id')].update_record(Modified = datetime.datetime.now())
 		if form.vars.get('Paiddate'):
 			dues = db(db.Dues.Member == form.vars.get('id')).select(orderby=~db.Dues.Date).first()
 			if dues:
@@ -346,17 +356,6 @@ def member_analytics(path=None):
 
 	query = (db.Members.Paiddate >= datetime.date(2007,1,1))|((db.Members.Paiddate==None)&(db.Members.Membership!=None))
 	left = db.Dues.on(db.Dues.Member==db.Members.id)
-	"""
-	grid = Grid(path, query, left=left,
-	     	columns=[db.Members.id, db.Members.Firstname, db.Members.Lastname, db.Members.Paiddate,
-					db.Members.Created, db.Dues.Date, db.Dues.Amount,
-					db.Dues.Nowpaid, db.Dues.Prevpaid, db.Dues.Status],
-			orderby=db.Members.Lastname|db.Members.Firstname|db.Dues.Date,
-			details=False, editable=False, create=False, deletable=False,
-			grid_class_style=GridClassStyle, formstyle=form_style, show_id=True,
-			)
-	return locals()
-	"""
 
 	rows = db(query).select(db.Members.id, db.Members.Firstname, db.Members.Lastname,
 			 		db.Members.Paiddate, db.Members.Created, db.Dues.Date, 
@@ -424,7 +423,7 @@ def member_reservations(member_id, path=None):
 			left=db.Events.on(db.Events.id == db.Reservations.Event),
 			orderby=~db.Events.DateTime,
 			columns=[db.Events.DateTime,
-	    			Column('event', lambda row: A(row.Reservations.Event.Description[0:23], _href=URL(f"reservation/{member_id}/{row.Reservations.Event}"))),
+	    			Column('event', lambda row: A(row.Reservations.Event.Description[0:23], _href=URL(f"reservation/'N'/{member_id}/{row.Reservations.Event}"))),
 	    			db.Reservations.Wait, db.Reservations.Conf, db.Reservations.Cost,
 					db.Reservations.TBC],
 			grid_class_style=grid_style,
@@ -447,19 +446,26 @@ def add_member_reservation(member_id):
 		formstyle=FormStyleBulma)
 	
 	if form.accepted:
-		redirect(URL(f"reservation/{member_id}/{form.vars.get('event')}"))
+		redirect(URL(f"reservation/'N'/{member_id}/{form.vars.get('event')}"))
 	return locals()
 
-@action('affiliations/<member_id:int>', method=['POST', 'GET'])
-@action('affiliations/<member_id:int>/<path:path>', method=['POST', 'GET'])
+@action('affiliations/<ismember>/<member_id:int>', method=['POST', 'GET'])
+@action('affiliations/<ismember>/<member_id:int>/<path:path>', method=['POST', 'GET'])
 @action.uses("grid.html", db, session, flash)
-@checkaccess('read')
-def affiliations(member_id, path=None):
-# .../affiliations/member_id/...
-	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
+@checkaccess(None)
+def affiliations(ismember, member_id, path=None):
+	session['url'] = session['url_prev'] 
+	if ismember=='Y':
+		if member_id!=session['member_id']:
+			raise Exception(f"invalid call to affiliations from member {session['member_id']}")
+		write = True
+	else:
+		if not session.get('access'):
+			redirect(URL('accessdenied'))
+		write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 	db.Affiliations.Member.default=member_id
 
-	header = CAT(A('back', _href=URL(f'members/edit/{member_id}', scheme=True)),
+	header = CAT(A('back', _href=session['url']),
 	      		H5('Member Affiliations'),
 	      		H6(member_name(member_id)))
 	footer = "Multiple affiliations are listed in order modified. The topmost one \
@@ -469,8 +475,6 @@ is used on name badges etc."
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
-		if (form.vars.get('id')):
-			db.Affiliations[form.vars.get('id')].update_record(Modified = datetime.datetime.now())
 
 	grid = Grid(path, db.Affiliations.Member==member_id,
 	     	orderby=db.Affiliations.Modified,
@@ -493,13 +497,20 @@ def update_Stripe_email(member):
 		except Exception as e:
 			member.update_record(Stripe_id=None, Stripe_subscription=None, Stripe_next=None)
 	
-@action('emails/<member_id:int>', method=['POST', 'GET'])
-@action('emails/<member_id:int>/<path:path>', method=['POST', 'GET'])
+@action('emails/<ismember>/<member_id:int>', method=['POST', 'GET'])
+@action('emails/<ismember>/<member_id:int>/<path:path>', method=['POST', 'GET'])
 @action.uses("grid.html", db, session, flash)
-@checkaccess('read')
-def emails(member_id, path=None):
-# .../emails/member_id/...
-	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
+@checkaccess(None)
+def emails(ismember, member_id, path=None):
+	session['url'] = session['url_prev'] 
+	if ismember=='Y':
+		if member_id!=session['member_id']:
+			raise Exception(f"invalid call to emails from member {session['member_id']}")
+		write = True
+	else:
+		if not session.get('access'):
+			redirect(URL('accessdenied'))
+		write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 	db.Emails.Member.default=member_id
 
 	if path=='new':
@@ -507,7 +518,7 @@ def emails(member_id, path=None):
 	elif path=='select':
 		update_Stripe_email(db.Members[member_id])
 
-	header = CAT(A('back', _href=URL(f'members/edit/{member_id}', scheme=True)),
+	header = CAT(A('back', _href=session['url']),
 	      		H5('Member Emails'),
 	      		H6(member_name(member_id)))
 	footer = "Note, the most recently edited (topmost) email is used for messages \
@@ -518,8 +529,6 @@ are sent as specified in the Mailings Column."
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
-		if (form.vars.get('id')):
-			db.Emails[form.vars.get('id')].update_record(Modified = datetime.datetime.now())
 
 	grid = Grid(path, db.Emails.Member==member_id,
 	     	orderby=~db.Emails.Modified,
@@ -562,7 +571,7 @@ def dues(member_id, path=None):
 			flash.set("Error(s) in form, please check")
 			return
 		if (not form.vars.get('id')): 	#adding dues record
-			member.update_record(Membership=form.vars.get('Status'), Paiddate=form.vars.get('Nowpaid'), Modified=datetime.datetime.now(),
+			member.update_record(Membership=form.vars.get('Status'), Paiddate=form.vars.get('Nowpaid'),
 								Charged=None)
 
 	grid = Grid(path, db.Dues.Member==member_id,
@@ -654,8 +663,6 @@ def events(path=None):
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
-		if (form.vars.get('id')):
-			db.Events[form.vars.get('id')].update_record(Modified = datetime.datetime.now())
 
 	grid = Grid(path, db.Events.id>0,
 	     	orderby=~db.Events.DateTime,
@@ -767,7 +774,7 @@ select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 	grid = Grid(path, eval(query),
 			left=db.Members.on(db.Members.id == db.Reservations.Member),
 			orderby=db.Reservations.Created if request.query.get('waitlist') else db.Reservations.Lastname|db.Reservations.Firstname,
-			columns=[Column('member', lambda row: A(member_name(row.Reservations.Member)[0:20], _href=URL(f"reservation/{row.Reservations.Member}/{event_id}"))),
+			columns=[Column('member', lambda row: A(member_name(row.Reservations.Member)[0:20], _href=URL(f"reservation/'N'/{row.Reservations.Member}/{event_id}"))),
 	    				db.Members.Membership, db.Members.Paiddate, db.Reservations.Affiliation, db.Reservations.Notes, 
 						db.Reservations.Cost, db.Reservations.TBC,
 						db.Reservations.Wait if request.query.get('waitlist') else db.Reservations.Prov if request.query.get('provisional') else db.Reservations.Conf],
@@ -780,14 +787,26 @@ def collegelist(sponsors=[]):
 	colleges = db().select(db.Colleges.ALL, orderby=db.Colleges.Oxbridge|db.Colleges.Name).find(lambda c: c.Oxbridge==True or c.id in sponsors)
 	return [(c.id, c.Name) for c in colleges if c.Name != 'Cambridge University' and c.Name != 'Oxford University']
 	
-@action('reservation/<member_id:int>/<event_id:int>', method=['POST', 'GET'])
-@action('reservation/<member_id:int>/<event_id:int>/<path:path>', method=['POST', 'GET'])
+@action('reservation/<ismember>/<member_id:int>/<event_id:int>', method=['POST', 'GET'])
+@action('reservation/<ismember>/<member_id:int>/<event_id:int>/<path:path>', method=['POST', 'GET'])
 @action.uses("grid.html", db, session, flash)
-@checkaccess('read')
-def reservation(member_id, event_id, path=None):
+@checkaccess(None)
+def reservation(ismember, member_id, event_id, path=None):
 # ...reservation/member_id/event_id/...
 #this controller is for dealing with the addition/modification of an expanded reservation
-	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
+#used both by database users with access privilege, and by members themselves registering for events.
+# in the latter case, ismember=='Y'
+	if ismember=='Y':
+		if member_id!=session['member_id'] or event_id!=session.get('event_id'):
+			raise Exception(f"invalid call to reservation from member {session['member_id']}")
+		write = True
+		db.Reservations.Provisional.default = True
+		db.Reservations.Waitlist.writable = db.Reservations.Waitlist.readable = False
+	else:
+		if not session.get('access'):
+			session['url'] = session['url_prev'] 
+			redirect(URL('accessdenied'))
+		write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 	member = db.Members[member_id]
 	event = db.Events[event_id]
 	all_guests = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)).select(orderby=~db.Reservations.Host)
@@ -799,12 +818,13 @@ def reservation(member_id, event_id, path=None):
 	elif path=='select':
 		back = session.get('back')
 	else:
-		back = URL('reservation', f'{member_id}/{event_id}/select')
+		back = URL(f'reservation/{ismember}/{member_id}/{event_id}/select')
 
 	if path:
-		header = CAT(A('back', _href=back), H5('Member Reservation'),
-	      		H6(member_name(member_id)),
-	      		XML(markmin.markmin2html(event_confirm(event.id, member.id, event_only=path != 'select'))))
+		header = CAT(H5('Member Reservation'), H6(member_name(member_id)),
+	      		XML(markmin.markmin2html(event_confirm(event.id, member.id, event_only=True))))
+		if ismember!='Y':
+			header = CAT(A('back', _href=back), header)
 	if path and path=='select':
 		header = CAT(header, A('send email', _href=(URL('composemail', vars=dict(
 			query=f"(db.Members.id=={member_id})&(db.Members.id==db.Reservations.Member)&(db.Reservations.Event=={event_id})",
@@ -838,14 +858,18 @@ Moving member on/off waitlist will also affect all guests."))
 	else:
 		db.Reservations.Ticket.writable = db.Reservations.Ticket.readable = False
 	
-	db.Reservations.Unitcost.writable=db.Reservations.Unitcost.readable=False
 	db.Reservations.Event.writable=db.Reservations.Event.readable=False
-	db.Reservations.Provisional.writable = db.Reservations.Provisional.readable = True
+	if ismember!='Y':
+		db.Reservations.Provisional.writable = db.Reservations.Provisional.readable = True
 	db.Reservations.Member.readable = False
 
 	if path and path != 'select' and not path.startswith('delete'):	#editing or creating reservation
-		db.Reservations.Survey.readable = True
-		db.Reservations.Comment.readable = True
+		db.Reservations.Unitcost.writable=db.Reservations.Unitcost.readable=False
+		if ismember=='Y':
+			db.Reservations.Modified.readable = db.Reservations.Modified.writable = False
+		else:
+			db.Reservations.Survey.readable = True
+			db.Reservations.Comment.readable = True
 		if host_reservation and (path=='new' or host_reservation.id!=int(path[5:])):
 			#this is a new guest reservation, or we are revising a guest reservation
 			db.Reservations.Host.default=False
@@ -857,15 +881,18 @@ Moving member on/off waitlist will also affect all guests."))
 			db.Reservations.Firstname.default = member.Firstname
 			db.Reservations.Lastname.default = member.Lastname
 			db.Reservations.Suffix.default = member.Suffix
-			db.Reservations.Paid.writable=db.Reservations.Paid.readable=True
-			db.Reservations.Charged.writable=db.Reservations.Charged.readable=True
-			db.Reservations.Checkout.writable=db.Reservations.Checkout.readable=True
+			if ismember!='Y':
+				db.Reservations.Paid.writable=db.Reservations.Paid.readable=True
+				db.Reservations.Charged.writable=db.Reservations.Charged.readable=True
+				db.Reservations.Checkout.writable=db.Reservations.Checkout.readable=True
 			db.Reservations.Firstname.readable=db.Reservations.Lastname.readable=False
 			if event.Tickets:
 				for t in event.Tickets:
 					if t.startswith(member.Membership or '~'): db.Reservations.Ticket.default = t
-			aff = db(db.Colleges.Name == primary_affiliation(member_id)).select().first()
-			if aff: db.Reservations.Affiliation.default = aff.id
+			affinity = db(db.Affiliations.Member==member_id).select(orderby=db.Affiliations.Modified).first()
+			if affinity:
+				db.Reservations.Affiliation.default = affinity.College
+				db.Reservations.Affiliation.writable = False
 
 	for row in all_guests:
 		if row.Ticket:
@@ -886,11 +913,11 @@ Moving member on/off waitlist will also affect all guests."))
 	grid = Grid(path, (db.Reservations.Member==member.id)&(db.Reservations.Event==event.id),
 			orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname,
 			columns=[db.Reservations.Lastname, db.Reservations.Firstname, 
-					db.Reservations.Notes, db.Reservations.Status],
-			headings=['Last', 'First', 'Notes', 'Status'],
-			deletable=lambda r: write and (len(all_guests)==1 or r.id != host_reservation.id),
+					db.Reservations.Notes, db.Reservations.Unitcost, db.Reservations.Status],
+			headings=['Last', 'First', 'Notes', 'Price', 'Status'],
+			deletable=lambda row: write and (len(all_guests)==1 or row['id'] != host_reservation.id),
 			details=not write, editable=write, grid_class_style=grid_style,
-			formstyle=form_style, create=write, validation=validate,show_id=True)
+			formstyle=form_style, create=write, validation=validate,show_id=ismember!='Y')
 	return locals()
 
 @action('doorlist_export/<event_id:int>', method=['GET'])
@@ -1582,6 +1609,27 @@ def member_profile(member):
 	body += '**Email:**|' + (primary_email(member.id) or '') + (' (not in directory)\n' if member.Privacy==True else '\n')
 	body += '------------------------\n\n'
 	return body
+
+#Create the header for a member message, such as a confirmation
+def msg_header(member, subject):
+	body = LETTERHEAD.replace('<subject>', subject)
+	body += f"\n\n-------------\n{datetime.datetime.now().strftime('%m/%d/%y')}||\n"
+	body += f"{(member.Title or '')+' '}{member.Firstname} {member.Lastname} {member.Suffix or ''}||\n"
+	if member.Address1:
+		body += f"{member.Address1}||\n"
+	if member.Address2:
+		body += f"{member.Address2}||\n"
+	body += f"{member.City or ''} {member.State or ''} {member.Zip or ''}||\n"
+	body += '-------------\n\n' 
+	return body
+	
+#send invoice or confirm
+def msg_send(member,subject, message):
+	email = primary_email(member.id)
+	if not email:
+		return
+	message = HTML(XML(markmin.markmin2html(message)))
+	auth.sender.send(to=email, sender=SUPPORT_EMAIL, bcc=SUPPORT_EMAIL, subject=subject, body=message)
 	
 #create confirmation of event
 def event_confirm(event_id, member_id, justpaid=0, event_only=False):
@@ -1689,7 +1737,7 @@ def composemail():
 				redirect(request.query.get('back'))
 			if form2.vars['save']:
 				proto.update_record(Subject=form2.vars['subject'],
-					Body=form2.vars['body'], Modified=datetime.datetime.now())
+					Body=form2.vars['body'])
 				flash.set("Template updatelend: "+ form2.vars['subject'])
 		else:
 			if form2.vars['save']:
@@ -1831,11 +1879,6 @@ def about():
 	message = CAT(message, TABLE(*table_rows))
 	return locals()
 
-#check if member is in good standing at a particular date
-def member_good_standing(member, date=datetime.datetime.now().date()):
-	return member and member.Membership and ((not member.Paiddate or member.Paiddate>=date)\
-			or member.Charged or (member.Stripe_subscription and member.Stripe_subscription != 'Cancelled'))
-
 #######################Member Directory linked from Society web site#########################
 @action('directory', method=['GET'])
 @action('directory/<path:path>', method=['GET'])
@@ -1895,6 +1938,347 @@ def contact_details(member_id):
 	message = CAT(message, f"{member.City or ''}, {member.State or ''} {member.Zip or ''}")
 	return locals()
 
+################################# New Event/Membership Registration Process  ################################
+@action('registration', method=['GET', 'POST'])
+@action('registration/<event_id:int>', method=['GET', 'POST'])
+@action.uses("form.html", db, session, flash)
+@checkaccess(None)
+def registration(event_id=None):	#deal with eligibility, set up member record and affiliation record as necessary
+#used for both event booking and join/renewal
+	if event_id:
+		event = db(db.Events.id==event_id).select().first()
+		if not event or datetime.datetime.now() > event.DateTime or (datetime.datetime.now() > event.Booking_Closed and not event_attend(event_id)):
+			flash.set('Event is not open for booking.')
+			redirect(URL('index'))
+		if datetime.datetime.now() > event.Booking_Closed:
+			flash.set('Booking is closed, but you may join the wait list.')
+		session['event_id'] = event_id
+		session['membership'] = None	#gets set if membership dues to be collected
+		session['dues'] = None
+	else:
+		event = None
+		if not request.query.get('join_or_renew'):
+			session['event_id'] = None
+			session['membership'] = None
+			session['dues'] = None
+			
+	affinity = None
+	clist = collegelist(event.Sponsors if event_id and event.Sponsors else [])
+	member_id = session.get('member_id')
+	
+	if member_id:
+		member = db.Members[member_id]
+		affinity = db((db.Affiliations.Member==member_id)&db.Affiliations.College.belongs([c[0] for c in clist])).select(
+							orderby=db.Affiliations.Modified).first()
+		if affinity:
+			clist = [(affinity.College, affinity.College.Name)]	#primary affiliation is only choice
+		if event_id:	#event reservation
+			member_reservation = db((db.Reservations.Event == event_id) & (db.Reservations.Member==member_id)\
+										& (db.Reservations.Host==True)).select().first()
+			sponsor = not affinity.College.Oxbridge if affinity else False
+			if member_reservation:
+				if member_reservation.Checkout:	#checked out but didn't complete payment
+					checkout = eval(member_reservation.Checkout)
+					if not member_good_standing(member, event.DateTime.date()):
+						#still need dues, so signal
+						session['membership'] = checkout.get('membership')
+						session['dues'] = str(checkout.get('dues'))
+				redirect(URL(f'reservation/Y/{member_id}/{event_id}/'))	#go add guests and/or checkout
+			if member_good_standing(member, event.DateTime.date()) or sponsor \
+					or ((affinity or member.Membership)and not event.Members_only):
+				#members in good standing at time of event, or, members of sponsor organizations, or
+				#membership-eligible and event open to all alums then no need to gather member information
+				redirect(URL(f'reservation/Y/{member_id}/{event_id}/new'))	#go create this member's reservation
+
+		elif request.query.get('mail_list'):
+			session['url'] = URL('index')
+			redirect(URL(f"emails/Y/{member_id}"))
+		else:		#dues payment or profile update
+			if not session.get('membership') and \
+					member_good_standing(member, (datetime.datetime.now()+datetime.timedelta(days=GRACE_PERIOD)).date()):
+				redirect(URL('profile')) #edit profile if good standing for at least grace period
+			if member.Stripe_subscription == 'Cancelled':
+				member.update_record(Stripe_subscription = None, Stripe_next = None)
+	else:
+		member = None
+		
+	header = H5('Event Registration: Your Information' if event 
+				else 'Mailing List Registration' if request.query.get('mail_list')
+				else 'Membership Application/Renewal: Your Information')
+	if event:
+		header = CAT(header, XML(f"Event: {event.Description}<br>When: {event.DateTime.strftime('%A %B %d, %Y %I:%M%p')}<br>Where: {event.Venue}<br><br>\
+	This event is open to {'all alumni of Oxford & Cambridge' if not event.Members_only else 'members of '+SOCIETY_DOMAIN}\
+	{' and members of sponsoring organizations (list at the top of the Affiliations dropdown)' if event.Sponsors else ''}\
+	{' and their guests.' if not event.Online else ''}.<br>"))
+	elif not request.query.get('mail_list'):
+		header = CAT(header, XML(MEMBERSHIP))
+		
+	#gather the person's information as necessary (may have only email)
+	fields=[]
+	fields.append(Field('firstname', 'string', requires = IS_NOT_EMPTY(),
+					default=member.Firstname if member else ''))
+	fields.append(Field('lastname', 'string', requires = IS_NOT_EMPTY(),
+					default=member.Lastname if member else ''))
+	fields.append(Field('affiliation', 'reference Colleges',
+			default=affinity.College if affinity else None, 
+			requires=IS_IN_SET(clist, zero=None) if affinity else IS_EMPTY_OR(IS_IN_SET(clist,
+						zero = 'Please select your sponsoring organization or College/University' if event and event.Sponsors else \
+								'Please select your College' if not member or not member.Membership else ''))))
+	fields.append(Field('matr', 'integer', default = affinity.Matr if affinity else None,
+			requires=IS_EMPTY_OR(IS_INT_IN_RANGE(datetime.datetime.now().year-100,datetime.datetime.now().year+1)),
+			comment='Please enter your matriculation year, not graduation year'))
+
+	if event:
+		mustjoin = event.Members_only and not event.Sponsors
+		if event.Members_only or event.Allow_join:
+			fields.append(Field('join_or_renew', 'boolean', default=mustjoin,
+				comment=' this event is restricted to OxCamNE members' if mustjoin else \
+					' tick if you are an Oxbridge alum and also wish to join OxCamNE or renew your membership'))
+	elif not request.query.get('mail_list'):
+		fields.append(Field('membership', 'string',
+						default=member.Membership if member and member.Membership else '',
+						requires=IS_IN_SET(MEMBER_CATEGORIES, zero='please select your membership category')))
+		fields.append(Field('notes', 'string'))
+						
+	def validate(form):
+		if form.vars.get('affiliation') and not db.Colleges[form.vars.get('affiliation')].Oxbridge: #sponsor member
+			if form.vars.get('join_or_renew'):
+				form.errors['join_or_renew']="You're not eligible to join "+SOCIETY_DOMAIN+'!'
+			return	#go ahead with sponsor registration
+		if not form.vars.get('affiliation') and not (member and member.Membership): #not alum, not approved friend member
+			form.errors['affiliation']='please select your affiliation from the dropdown, or contact '+SUPPORT_EMAIL
+			return
+		if form.vars.get('affiliation') and not form.vars.get('matr'):
+			form.errors['matr'] = 'please enter your matriculation year'
+		if event and event.Members_only and not form.vars.get('join_or_renew'):
+			form.errors['join_or_renew'] = 'This event is for members only, please join/renew to attend'
+		if not event and not request.query.get('mail_list') and form.vars.get('membership')!=MEMBER_CATEGORIES[0]:
+			if not form.vars.get('notes'):
+				form.errors['notes'] = 'Please note how you qualify for '+form.vars.get('membership')+' status'
+		if form.vars.get('affiliation') and not form.vars.get('matr'):
+			form.errors['matr'] = 'Please provide your matriculation year'
+	
+	form = Form(fields, validation=validate, formstyle=FormStyleBulma, keep_values=True)
+		
+	if form.accepted:
+		if member:
+			notes = f"{datetime.datetime.now().strftime('%m/%d/%y')} {form.vars.get('notes')}"
+			if member.Notes:
+				notes = member.Notes+'\n'+notes
+				
+			member.update_record(Firstname = form.vars['firstname'], Notes=notes,
+							Lastname = form.vars['lastname'])
+		else:
+			member_id = db.Members.insert(Firstname = form.vars['firstname'], 
+										Lastname = form.vars['lastname'])
+			member = db.Members[member_id]
+			session['member_id'] = member_id
+			if request.query.get('mail_list'):
+				db.Emails.Mailings.default = [list.id for list in db(db.Email_Lists.Member==True).select()]
+			email_id = db.Emails.insert(Member=member_id, Email=session.get('email'))
+
+		if form.vars.get('affiliation'):
+			if affinity:
+				db.Affiliations.Modified.update = None
+				affinity.update_record(Matr=form.vars.get('matr'))	#note, don't update Modified, keep as primary affiliation
+			else:
+				db(db.Affiliations.Member==member_id).delete()	#delete any stray sponsor affiliation.
+				db.Affiliations.insert(Member = member_id, College = form.vars['affiliation'],
+										Matr = form.vars.get('matr'))
+
+		if event and form.vars.get('join_or_renew'):
+			flash.set("Please complete your membership application, then you'll return to event registration")
+			redirect(URL('registration', vars=dict(join_or_renew='Y')))	#go deal with membership
+			
+		if (request.query.get('mail_list')):
+			session['url'] = URL('index')
+			redirect(URL(f"emails/Y/{member_id}/edit/{email_id}"))
+				
+		if request.query.get('join_or_renew') or not event:	#collecting dues with event registration, or joining/renewing
+			#membership dues payment
+			#get the subscription plan id (Full membership) or 1-year price (Student) from Stripe Products
+			stripe.api_key = STRIPE_SKEY
+			price_id = eval(f"STRIPE_{form.vars.get('membership')}".upper())
+			price = stripe.Price.retrieve(price_id)
+			session['membership'] = form.vars.get('membership')
+			session['dues'] = str(decimal.Decimal(price.unit_amount)/100)
+			session['subscription'] = True if price.recurring else False
+			#ensure the default mailing list subscriptions are in place in the primary email
+			email = db(db.Emails.Member==member.id).select(orderby=~db.Emails.Modified).first()
+			mailings = email.Mailings or []
+			for list in db(db.Email_Lists.Member==True).select():
+				if list.id not in mailings:
+					mailings.append(list.id)
+			email.update_record(Mailings=mailings)
+		
+		if event:
+			redirect(URL(f'reservation/Y/{member_id}/{event_id}/new'))	#go create this member's reservation
+		else:	#joining or renewing
+			if not member.Paiddate or member.Paiddate < datetime.datetime.now()-datetime.timedelta(GRACE_PERIOD):
+				#new/reinstated member, gather additional profile information
+				flash.set("Next, please review/complete your directory profile")
+				redirect(URL('profile')) #gather profile info
+			if session.vars.get('event_id'):
+				redirect(URL(f'reservation/Y/{member_id}/{event_id}/new'))	#go create this member's reservation
+			redirect(URL('checkout'))
+	return locals()
+	
+######################################## Join/Renew/Profile Update ######################################
+@action('profile', method=['GET', 'POST'])
+@action.uses("form.html", db, session, flash)
+@checkaccess(None)
+def profile():
+	if not session.get('member_id'):
+		redirect(URL('index'))
+	
+	member = db.Members[session.get('member_id')]
+
+	header = H5('Profile Information')
+	if member.Paiddate:
+		header = CAT(header,
+	       XML(f"Your membership {'expired' if member.Paiddate < datetime.datetime.now().date() else 'expires'} on {member.Paiddate.strftime('%m/%d/%Y')}"))
+	if member.Stripe_next:
+		header = CAT(header, XML(f" Renewal payment will be charged on {member.Stripe_next.strftime('%m/%d/%Y')}."))
+	header = CAT(header,
+	      XML(f"{'<br><br>' if member.Paiddate else ''}The information on this form, except as noted, is included \
+in our online Member Directory which is available through our home page to \
+all members in good standing. Fields marked * are required.<br><br>\
+You can use this screen at any time to update your information (it can be \
+reached by using the join/renew link on our home page).<br>\
+{A('Review or Edit your college affiliation(s)', _href=URL(f'affiliations/Y/{member.id}'))}<br>\
+{A('Manage your email address(es) and mailing list subscriptions', _href=URL(f'emails/Y/{member.id}'))}<br>"))
+	
+	db.Members.Membership.readable = db.Members.Paiddate.readable = db.Members.Stripe_id.readable = False
+	db.Members.Stripe_subscription.readable = db.Members.Stripe_next.readable = db.Members.Charged.readable = False
+	db.Members.Access.readable = db.Members.Committees.readable = db.Members.President.readable = False
+	db.Members.Notes.readable = db.Members.Created.readable = db.Members.Modified.readable = False
+	db.Members.Membership.writable = db.Members.Paiddate.writable = db.Members.Stripe_id.writable = False
+	db.Members.Stripe_subscription.writable = db.Members.Stripe_next.writable = db.Members.Charged.writable = False
+	db.Members.Access.writable = db.Members.Committees.writable = db.Members.President.writable = False
+	db.Members.Notes.writable = db.Members.Created.writable = db.Members.Modified.writable = False
+
+	def validate(form):
+		if len(form.errors)>0:
+			flash.set("Error(s) in form, please check")
+			return
+
+	form = Form(db.Members, record=member, show_id=False, deletable=False,
+	     			validation=validate, formstyle=FormStyleBulma, keep_values=True)
+					
+	if form.accepted:
+		#ready to checkout
+		if session.get('dues'):
+			if session.get('event_id'):
+				redirect(URL(f"reservation/Y/{member.id}/{session['event_id']}/new"))	#go create this member's reservation
+			redirect(URL('checkout'))
+		flash.set('Thank you for updating your profile information.')
+	
+	return locals()
+
+@action('checkout', method=['GET'])
+@action.uses("checkout.html", db, session, flash, Inject(session=session))
+@checkaccess(None)
+def checkout():
+	if (not session.get('membership') and not session.get('event_id')) or not session.get('member_id'):
+		redirect(URL('index'))	#protect against regurgitated old requests
+		
+	pk = STRIPE_PKEY	#use the public key on the client side	
+	stripe.api_key = STRIPE_SKEY
+
+	member = db.Members[session.get('member_id')]
+	if member.Stripe_id:	#check customer still exists on Stripe
+		try:
+			customer = stripe.Customer.retrieve(member.Stripe_id)
+		except Exception as e:
+			member.update_record(Stripe_id=None, Stripe_subscription=None)
+	
+	mode = 'payment'
+	items = []
+	params = {}	#for checkout_success
+	event = None
+	
+	if member.Stripe_id:
+		stripe.Customer.modify(member.Stripe_id, email=primary_email(member.id))	#in case has changed
+	else:
+		customer = stripe.Customer.create(email=primary_email(member.id))
+		member.update_record(Stripe_id=customer.id)
+	
+	if session.get('membership'):	#this includes a membership subscription
+		#get the subscription plan id (Full membership) or 1-year price (Student) from Stripe Products
+		price_id = eval(f"STRIPE_{session.get('membership')}".upper())
+		price = stripe.Price.retrieve(price_id)
+		params['dues'] = session.get('dues')
+		params['membership'] = session.get('membership')
+		if price.recurring:
+			mode = 'subscription'
+		items.append(dict(price = price_id, quantity = 1))
+		
+	if session.get('event_id'):			#event registration
+		event = db.Events[session.get('event_id')]
+		tickets_tbc = res_tbc(member.id, event.id)
+		if tickets_tbc:
+			params['event_id'] = event.id
+			params['tickets_tbc'] = tickets_tbc
+			items.append(dict(price_data = dict(currency='usd', unit_amount=int(tickets_tbc*100),
+						product=STRIPE_EVENT), description = event.Description, quantity=1))
+		 
+	stripe_session = stripe.checkout.Session.create(
+	  customer=member.Stripe_id,
+	  payment_method_types=['card'], line_items=items, mode=mode,
+	  success_url=URL('checkout_success', vars=params, scheme=True),
+	  cancel_url=session.get('url_prev')
+	)
+	session['stripe_id'] = stripe_session.stripe_id		#for use in template
+	session['stripe_pkey'] = pk
+	return locals()
+
+@action('checkout_success', method=['GET'])
+@action.uses("message.html", db, session, flash)
+@checkaccess(None)
+def checkout_success():
+	member = db.Members[session.get('member_id')]
+	dues = decimal.Decimal(request.query.get('dues') or 0)
+	tickets_tbc = decimal.Decimal(request.query.get('tickets_tbc') or 0)
+	stripe.api_key = STRIPE_SKEY
+	stripe_session = stripe.checkout.Session.retrieve(session.get('stripe_id'))
+
+	if not stripe_session or decimal.Decimal(stripe_session.amount_total)/100 != tickets_tbc + dues:
+		raise Exception(f"Unexpected checkout_success callback received from Stripe, member {member.id}, event {session.get('event_id')}")
+		redirect(URL('index'))
+
+	subject = 'Registration Confirmation' if tickets_tbc>0 else 'Thank you for your membership payment'
+	message = f"{msg_header(member, subject)}####Received: ${dues+tickets_tbc}\n\n"
+	
+	if dues:
+		next = None
+		if stripe_session.subscription:
+			subscription = stripe.Subscription.retrieve(stripe_session.subscription)
+			next = datetime.datetime.fromtimestamp(subscription.current_period_end).date()
+		member.update_record(Membership=request.query.get('membership'),
+			Stripe_subscription=stripe_session.subscription, Stripe_next=next, Charged=dues)
+		message += '**Thank you, your membership is now current.**\n\n'
+		
+	if tickets_tbc:
+		host_reservation = db((db.Reservations.Event==request.query.get('event_id'))&(db.Reservations.Member == member.id)\
+					&(db.Reservations.Host == True)).select().first()
+		message += '**Your reservation is now confirmed:**\n\n'
+		message +=event_confirm(request.query.get('event_id'), member.id, dues+tickets_tbc)
+		host_reservation.update_record(Charged = (host_reservation.Charged or 0) + tickets_tbc, Checkout = None)
+
+	msg_send(member,subject, message)
+	
+	flash.set('Thank you for your payment. Confirmation has been sent by email!')
+	session['membership'] = None
+	session['dues'] = None
+	session['event_id'] = None
+	session['stripe_pkey'] = None
+	session['stripe_id'] = None
+	if dues:
+		flash.set('Confirmation has been sent by email. Please review your mailing list subscriptions.')
+		session['url'] = URL('index')
+		redirect(URL(f"emails/Y/{member.id}"))
+	redirect(URL('index'))
+
 @action('login', method=['POST', 'GET'])
 @action.uses("form.html", db, session, flash)
 def login():
@@ -1947,8 +2331,7 @@ def validate(id, token):
 	rows = db((db.Members.id == db.Emails.Member) & db.Emails.Email.ilike(user.email)).select(
 				db.Members.ALL, distinct=True)
 	header = H6("Please select which of you is signing in:")
-	ids = [(row.id, member_name(row.id)+(' '+row.Membership+' member until '+row.Paiddate.strftime('%m/%d/%Y')  if row.Membership else '')) for row in rows]
-	form = Form([Field('member', 'integer', requires=IS_IN_SET(ids))],
+	form = Form([Field('member', 'integer', requires=IS_IN_SET([(row.id, member_name(row.id)+(' '+row.Membership+' member until '+row.Paiddate.strftime('%m/%d/%Y')  if row.Membership else '')) for row in rows]))],
 	     formstyle=FormStyleBulma)
 	if len(rows)<=1:
 		member_id = rows.first().id if len(rows)==1 else None
@@ -1964,7 +2347,7 @@ def validate(id, token):
 	session['access'] = None
 	session['member_id'] = 0
 	if member_id:
-		session['member_id'] = member_id
+		session['member_id'] = int(member_id)
 		session['access'] = db.Members[member_id].Access
 	log = 'verified '+request.remote_addr+' '+user.email
 	logger.info(log)
@@ -1989,7 +2372,7 @@ def logout():
 @action.uses("form.html", db, session, flash)
 @checkaccess('accounting')
 def stripe_tool():
-	form = Form([Field('object_type', comment="e.g. 'Customer', 'Subscription"),
+	form = Form([Field('object_type', comment="e.g. 'Customer', 'Subscription'"),
 	      		Field('object_id')],
 				keep_values=True, formstyle=form_style)
 	pk = STRIPE_PKEY	#use the public key on the client side	
@@ -2000,7 +2383,7 @@ def stripe_tool():
 
 	if form.accepted:
 		try:
-			object = eval(f"stripe.{form.vars.get('object_type')}.retrieve({form.vars.get('object_id')})")
+			object = eval(f"stripe.{form.vars.get('object_type')}.retrieve(\'{form.vars.get('object_id')}\')")
 			footer = BEAUTIFY(object)
 		except Exception as e:
 			flash.set(str(e))

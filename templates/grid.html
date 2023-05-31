@@ -1,11 +1,5 @@
 [[extend 'layout.html']]
 
-[[try:
-    =form
-except:
-    pass
-pass]]
-
 <div class="header">
 [[try:
     =header
@@ -13,6 +7,12 @@ pass]]
     pass
   pass]]
 </div>
+
+[[try:
+    =form
+except:
+    pass
+pass]]
 
 [[try:
     =grid.render()

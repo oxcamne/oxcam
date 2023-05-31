@@ -6,7 +6,7 @@ from .common import db, Field
 from .settings_private import MEMBER_CATEGORIES, ACCESS_LEVELS
 from pydal.validators import *
 from yatl.helpers import CAT, A
-from py4web.utils.form import Form, CheckboxWidget
+#from py4web.utils.form import Form, CheckboxWidget, ListWidget
 import datetime
 
 ### Define your table below
@@ -104,9 +104,9 @@ db.define_table('Members',
 	Field('Zip', 'string', requires = IS_NOT_EMPTY(),comment='* zip or postcode'),
 	Field('Homephone', 'string'),
 	Field('Workphone', 'string'),
-	Field('Cellphone', 'string', comment='for Society use only, will not be published in Directory'),
+	Field('Cellphone', 'string', comment='Cellphone for Society use only, will not be published in Directory'),
 	Field('Created', 'datetime', default=datetime.datetime.now(), writable=False),
-	Field('Modified', 'datetime', default=datetime.datetime.now(), writable=False),
+	Field('Modified', 'datetime', default=datetime.datetime.now(), update=datetime.datetime.now(), writable=False),
 	plural="Members", singular="Member",
 	format=lambda r: f"{r['Lastname']}, {r['Title'] or ''} {r['Firstname']} {r['Suffix'] or ''}")
 	
@@ -116,7 +116,7 @@ db.define_table('Emails',
 	Field('Mailings', 'list:reference Email_Lists', #widget=CheckboxWidget,
 			comment='Ctrl-click on list name in list above to toggle selection'),
 	Field('Created', 'datetime', default=datetime.datetime.now(), writable=False),
-	Field('Modified', 'datetime', default=datetime.datetime.now(), writable=False),
+	Field('Modified', 'datetime', default=datetime.datetime.now(), update=datetime.datetime.now(), writable=False),
 	singular="Email", plural="Emails", format='%(Email)s')
 
 def dues_type(date, prevpaid):
@@ -177,18 +177,19 @@ db.define_table('Events',
 	Field('Capacity', 'integer'),
 	Field('Speaker', 'string'),
 	Field('Tickets', 'list:string',
-			comment="empty for free events, or list ticket types (full member price first). Example ticket types are: 	'$45.00', 'Student $35.00', 'Fresher $0.00', 'Non-Member $55', ..."),
+       comment="empty for free events, or list ticket types (full member price first). Example ticket types are: 	'$45.00', 'Student $35.00', 'Fresher $0.00', 'Non-Member $55', ..."),
 	Field.Virtual('Attend', lambda r: event_attend(r['id']) or '', readable=False),
 	Field.Virtual('Wait', lambda r: event_wait(r['id']) or '', readable=False),
 	Field.Virtual('Prvsnl', lambda r: event_prvsnl(r['id']) or '', readable=False),
 	Field.Virtual('Paid', lambda r: event_revenue(r['id']) or '', readable=False),
 	Field.Virtual('Unpaid', lambda r: event_unpaid(r['id']) or '', readable=False),
-	Field('Selections', 'list:string', comment="if selection required, list one choice per line"), #e.g. Menuchoices
+	Field('Selections', 'list:string',
+       comment="if selection required, list one choice per line"), #e.g. Menuchoices
 	Field('Notes', 'text', comment="included on registration confirmation"),
 	Field('Survey', 'list:string',
 		comment="multiple choice question at Checkout. First row is the question, the rest are possible selections"),
 	Field('Comment', 'string', comment="open ended question at Checkout."),
-	Field('Modified', 'datetime', default=datetime.datetime.now(), writable=False),
+	Field('Modified', 'datetime', default=datetime.datetime.now(), update=datetime.datetime.now(), writable=False),
 	singular="Event", plural="Events", format='%(Description)s')
 
 db.define_table('Affiliations',
@@ -242,7 +243,7 @@ db.define_table('Reservations',
 			requires=IS_EMPTY_OR(IS_IN_DB(db, db.Colleges.id, '%(Name)s', orderby=db.Colleges.Name))),
 	Field('Ticket', 'string'),
 	Field('Selection', 'string'), #field was previously Menuchoice
-	Field('Notes', 'text'),	#host name specified, or justifying ticket selection
+	Field('Notes', 'string'),	#host name specified, or justifying ticket selection
 	Field('Survey', 'string', readable=False, writable=False),	#answer to multiple choice question
 	Field('Comment', 'string', readable=False, writable=False),	#answer to open ended question
 	Field('Unitcost', 'decimal(5,2)', requires=IS_EMPTY_OR(IS_DECIMAL_IN_RANGE(0, 1000))),
@@ -266,7 +267,7 @@ db.define_table('Reservations',
 	Field.Virtual('Prov', lambda r: db((db.Reservations.Member==r['Member'])& \
 								(db.Reservations.Event==r['Event'])&(db.Reservations.Provisional==True)).count(), readable=False),
 	Field('Created', 'datetime', default=datetime.datetime.now(), readable=False, writable=False),
-	Field('Modified', 'datetime', default=datetime.datetime.now(), writable=False),
+	Field('Modified', 'datetime', default=datetime.datetime.now(), update=datetime.datetime.now(), writable=False),
 	singular="Reservation", plural="Reservations")
 db.Reservations.Event.requires=IS_IN_DB(db, 'Events.id', '%(Event)s', zero=None, orderby=~db.Events.DateTime)
 
@@ -274,7 +275,7 @@ db.define_table('EMProtos',
 	Field('Subject', 'string', requires=IS_NOT_EMPTY()),
 	Field('Body', 'text', requires=IS_NOT_EMPTY()),
 	Field('Created', 'datetime', default=datetime.datetime.now(), writable=False),
-	Field('Modified', 'datetime', default=datetime.datetime.now(), writable=False))
+	Field('Modified', 'datetime', default=datetime.datetime.now(), update=datetime.datetime.now(), writable=False))
 	
 db.define_table('CoA',
 	Field('Name', 'string'),

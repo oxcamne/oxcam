@@ -1,12 +1,10 @@
 [[extend 'layout.html']]
 
-<div class="header">
 [[try:
     =header
   except:
     pass
   pass]]
-</div>
 
 [[try:
     =form
@@ -20,10 +18,14 @@ except:
     pass
 pass]]
 
-<div class="header">
+[[try:
+    =form2
+except:
+    pass
+pass]]
+
   [[try:
     =footer
   except:
     pass
   pass]]
-</div>

@@ -114,7 +114,7 @@ db.define_table('Emails',
 	Field('Member', 'reference Members', writable=False),
 	Field('Email', 'string', requires=IS_EMAIL(), writable=False),
 	Field('Mailings', 'list:reference Email_Lists', #widget=CheckboxWidget,
-			comment='Ctrl-click on list name in list above to toggle selection'),
+			comment='On desktop Ctrl-click on list name in list above to toggle selection'),
 	Field('Created', 'datetime', default=datetime.datetime.now(), writable=False),
 	Field('Modified', 'datetime', default=datetime.datetime.now(), update=datetime.datetime.now(), writable=False),
 	singular="Email", plural="Emails", format='%(Email)s')
@@ -150,10 +150,6 @@ def event_unpaid(event_id):	#unpaid from confirmed reservations
 		paid += (r.Paid or 0) + (r.Charged or 0)
 	return cost - paid if cost-paid != 0 else None
 
-def event_prvsnl(event_id):
-	prvsnl = db((db.Reservations.Event==event_id)&(db.Reservations.Provisional==True)).count()
-	return prvsnl if prvsnl != 0 else None
-
 def event_wait(event_id):
 	wait = db((db.Reservations.Event==event_id)&(db.Reservations.Waitlist==True)).count()
 	return wait if wait != 0 else None
@@ -169,7 +165,7 @@ db.define_table('Events',
 	Field('Booking_Closed', 'datetime'),
 	Field('Members_only', 'boolean', default=True, comment=" members and their guests only"),
 	Field('Allow_join', 'boolean', default=True, comment=" offer join option in registration"),
-	Field('Online', 'boolean', default=False, comment=" disables addition of guests within member's registration"),
+	Field('Guests', 'integer', comment=" limit total guests (including member) allowed"),
 	Field('Sponsors', 'list:reference Colleges',
 			requires=IS_EMPTY_OR(IS_IN_DB(db(db.Colleges.Oxbridge!=True), db.Colleges.id, '%(Name)s', multiple=True)),
 			comment=' Select co-sponsors to allow members to register.Members. Use ctrl-click to select multiple, e.g. for AUABN'),
@@ -180,7 +176,6 @@ db.define_table('Events',
        comment="empty for free events, or list ticket types (full member price first). Example ticket types are: 	'$45.00', 'Student $35.00', 'Fresher $0.00', 'Non-Member $55', ..."),
 	Field.Virtual('Attend', lambda r: event_attend(r['id']) or '', readable=False),
 	Field.Virtual('Wait', lambda r: event_wait(r['id']) or '', readable=False),
-	Field.Virtual('Prvsnl', lambda r: event_prvsnl(r['id']) or '', readable=False),
 	Field.Virtual('Paid', lambda r: event_revenue(r['id']) or '', readable=False),
 	Field.Virtual('Unpaid', lambda r: event_unpaid(r['id']) or '', readable=False),
 	Field('Selections', 'list:string',

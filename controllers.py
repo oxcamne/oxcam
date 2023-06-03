@@ -53,6 +53,8 @@ def checkaccess(requiredaccess):
 		def wrapped_f(*args, **kwds):
 			session['url_prev'] = session.get('url')
 			session['url']=request.url
+			if session['back'] and len(session['back'])>0 and request.url==session['back'][-1]:
+				session['back'].pop()
 			if not session.get('logged_in') == True:    #logged in
 				if db(db.Members.id>0).count()==0:
 					session['url']=URL('db_restore')
@@ -158,24 +160,26 @@ def members(path=None):
 			if search_form.vars.get('good_standing'):
 				filter['good_standing'] = 'On'
 			session['filter'] = filter
-		header = CAT(header, A("Send Email to Specific Address(es)", _href=URL('composemail', vars=dict(back=back))), XML('<br>'))
+		header = CAT(header, A("Send Email to Specific Address(es)", _href=URL('composemail')), XML('<br>'))
 	elif path:
-		back = session.get('back') or back
+		caller = re.match('.*/oxcam/([a-z]*).*', session['url_prev']).group(1)
+		if caller!='members' and caller not in ['composemail', 'affiliations', 'emails', 'dues']:
+			session['back'].append(session['url_prev'])
+		if len(session['back'])>0 and re.match('.*/oxcam/([a-z]*).*', session['back'][-1]).group(1)!='members':
+			back = session['back'][-1]
 		header = CAT(A('back', _href=back), H5('Member Record'))
 		if path.startswith('edit'):
 			header= CAT(header, 
 	       			A('Member reservations', _href=URL('member_reservations', path[5:])), XML('<br>'),
-					A('OxCam affiliation(s)', _href=URL('affiliations/N', path[5:])), XML('<br>'),
+					A('OxCam affiliation(s)', _href=URL(f'affiliations/N/{path[5:]}/select')), XML('<br>'),
 					A('Email addresses and subscriptions', _href=URL('emails/N', path[5:])), XML('<br>'),
-					A('Dues payments', _href=URL('dues', path[5:])), XML('<br>'),
+					A('Dues payments', _href=URL(f'dues/{path[5:]}')), XML('<br>'),
 					A('Send Email to Member', _href=URL('composemail',
 					 	vars=dict(query=f"db.Members.id=={path[5:]}", left='',
-		 					qdesc=member_name(path[5:]),
-		   					back=URL(f'members/edit/{path[5:]}', scheme=True)))))
+		 					qdesc=member_name(path[5:])))))
 	else:
-		session['back'] = None
 		session['filter'] = None
-		redirect(URL('members/select'))
+		session['back'] = []
 
 	if search_form.vars.get('mailing_list'):
 		query.append(f"(db.Emails.Member==db.Members.id)&db.Emails.Mailings.contains({search_form.vars.get('mailing_list')})")
@@ -251,7 +255,7 @@ def members(path=None):
 		if qdesc:
 			header = CAT(header,
 				A(f"Send Notice to {qdesc}", _href=URL('composemail',
-					vars=dict(query=query, left=left or '', qdesc=qdesc, back=back))), XML('<br>'))
+					vars=dict(query=query, left=left or '', qdesc=qdesc))), XML('<br>'))
 		header = CAT(header,
 	       XML("Use filter to select a mailing list or apply other filters.<br>Selecting an event selects \
 (or excludes from a mailing list) attendees.<br>You can filter on a member record field \
@@ -454,7 +458,7 @@ def add_member_reservation(member_id):
 @action.uses("grid.html", db, session, flash)
 @checkaccess(None)
 def affiliations(ismember, member_id, path=None):
-	session['url'] = session['url_prev'] 
+	session['url']=session['url_prev']	#preserve back link
 	if ismember=='Y':
 		if member_id!=session['member_id']:
 			raise Exception(f"invalid call to affiliations from member {session['member_id']}")
@@ -465,7 +469,7 @@ def affiliations(ismember, member_id, path=None):
 		write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 	db.Affiliations.Member.default=member_id
 
-	header = CAT(A('back', _href=session['url']),
+	header = CAT(A('back', _href=session['url_prev']),
 	      		H5('Member Affiliations'),
 	      		H6(member_name(member_id)))
 	footer = "Multiple affiliations are listed in order modified. The topmost one \
@@ -502,7 +506,7 @@ def update_Stripe_email(member):
 @action.uses("grid.html", db, session, flash)
 @checkaccess(None)
 def emails(ismember, member_id, path=None):
-	session['url'] = session['url_prev'] 
+	session['url']=session['url_prev']	#preserve back link
 	if ismember=='Y':
 		if member_id!=session['member_id']:
 			raise Exception(f"invalid call to emails from member {session['member_id']}")
@@ -518,7 +522,7 @@ def emails(ismember, member_id, path=None):
 	elif path=='select':
 		update_Stripe_email(db.Members[member_id])
 
-	header = CAT(A('back', _href=session['url']),
+	header = CAT(A('back', _href=session['url_prev']),
 	      		H5('Member Emails'),
 	      		H6(member_name(member_id)))
 	footer = "Note, the most recently edited (topmost) email is used for messages \
@@ -553,6 +557,7 @@ def newpaiddate(paiddate, timestamp=datetime.datetime.now(), graceperiod=GRACE_P
 @checkaccess('read')
 def dues(member_id, path=None):
 # .../dues/member_id/...
+	session['url']=session['url_prev']	#preserve back link
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 	db.Dues.Member.default=member_id
 
@@ -562,7 +567,7 @@ def dues(member_id, path=None):
 	db.Dues.Prevpaid.default = member.Paiddate
 	db.Dues.Nowpaid.default = newpaiddate(member.Paiddate)
 
-	header = CAT(A('back', _href=URL(f'members/edit/{member_id}', scheme=True)),
+	header = CAT(A('back', _href=session['url_prev']),
 	      		H5('Member Dues'),
 	      		H6(member_name(member_id)))
 
@@ -591,7 +596,6 @@ def dues(member_id, path=None):
 def dues_payments(path=None):
 	if not path:
 		session['query2'] = f"(db.Dues.Date >= \'{request.query.get('start')}\') & (db.Dues.Date <= \'{request.query.get('end')}\')"
-		session['back'] = session.get('url')
 	
 	header =H5('Dues Payments')
 	footer = A("Export as CSV file", _href=URL('dues_export'))
@@ -628,7 +632,7 @@ def dues_export():
 			writer.writerow(data)
 	except Exception as e:
 		flash.set(e)
-		redirect(session['back'])
+		redirect(session['url_prev'])
 	return locals()	
 	
 @action('events', method=['POST', 'GET'])
@@ -642,12 +646,12 @@ def events(path=None):
 	header = H5('Events')
 
 	if not path:
-		session['back'] = None
+		session['back'] = []
 	elif path=='select':
 		footer = CAT(A("Export all Events as CSV file", _href=URL('events_export')), XML('<br>'),
 			A("Export event analytics as CSV file", _href=URL('event_analytics')))
 		db.Events.Paid.readable = db.Events.Unpaid.readable = True
-		db.Events.Prvsnl.readable = db.Events.Wait.readable = db.Events.Attend.readable = True
+		db.Events.Wait.readable = db.Events.Attend.readable = True
 	elif path=='new':
 		header = CAT(A('back', _href=back), H5('New Event'))
 	else:
@@ -755,14 +759,14 @@ select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 	else:
 		query += '&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)'
 		header = CAT(header, A('Export Doorlist as CSV file',
-			 _href=(URL(f'doorlist_export/{event_id}', vars=dict(back=back), scheme=True))), XML('<br>'))
+			 _href=(URL(f'doorlist_export/{event_id}', scheme=True))), XML('<br>'))
 	query += '&(db.Reservations.Host==True)'
 
 	if not request.query.get('provisional'):
 		header = CAT(header, A('Send Email Notice', _href=URL('composemail', vars=dict(query=query,
 			left  = "[db.Emails.on(db.Emails.Member==db.Reservations.Member),db.Members.on(db.Members.id==db.Reservations.Member)]",	
 			qdesc=f"{event.Description} {'Waitlist' if request.query.get('waitlist') else 'Attendees'}",
-			back=back))), XML('<br>'))
+			))), XML('<br>'))
 	header = CAT(header, XML('Display: '))
 	if request.query.get('waitlist') or request.query.get('provisional'):
 		header = CAT(header, A('reservations', _href=URL(f'event_reservations/{event_id}')), ' or ')
@@ -792,7 +796,6 @@ def collegelist(sponsors=[]):
 @action.uses("grid.html", db, session, flash)
 @checkaccess(None)
 def reservation(ismember, member_id, event_id, path=None):
-# ...reservation/member_id/event_id/...
 #this controller is for dealing with the addition/modification of an expanded reservation
 #used both by database users with access privilege, and by members themselves registering for events.
 # in the latter case, ismember=='Y'
@@ -804,34 +807,80 @@ def reservation(ismember, member_id, event_id, path=None):
 		db.Reservations.Waitlist.writable = db.Reservations.Waitlist.readable = False
 	else:
 		if not session.get('access'):
-			session['url'] = session['url_prev'] 
+			session['url'] = session['url_prev']
 			redirect(URL('accessdenied'))
 		write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
+
 	member = db.Members[member_id]
 	event = db.Events[event_id]
-	all_guests = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)).select(orderby=~db.Reservations.Host)
-	host_reservation =all_guests.first()
-	
-	if not path:
-		back = session.get('url_prev')
-		session['back'] = back
-	elif path=='select':
-		back = session.get('back')
-	else:
-		back = URL(f'reservation/{ismember}/{member_id}/{event_id}/select')
+	is_good_standing = member_good_standing(member, event.DateTime.date())
+	if is_good_standing:
+		membership = member.Membership
+	elif ismember=='Y':
+		membership = session.get('membership')
+		if membership:		#joining as part of event registration
+			is_good_standing = True
 
-	if path:
-		header = CAT(H5('Member Reservation'), H6(member_name(member_id)),
-	      		XML(markmin.markmin2html(event_confirm(event.id, member.id, event_only=True))))
-		if ismember!='Y':
-			header = CAT(A('back', _href=back), header)
-	if path and path=='select':
-		header = CAT(header, A('send email', _href=(URL('composemail', vars=dict(
-			query=f"(db.Members.id=={member_id})&(db.Members.id==db.Reservations.Member)&(db.Reservations.Event=={event_id})",
-			qdesc=member_name(member_id), left="db.Emails.on(db.Emails.Member==db.Members.id)", back=session['url'])))),
-			XML(" (use "), "<reservation>", XML(" to include confirmation and payment link)<br>"),
-			A('view member record', _href=URL(f'members/edit/{member_id}')),
-			XML("<br>Top row is the member's own reservation, additional rows are guests.<br>\
+	all_guests = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)).select(orderby=~db.Reservations.Host)
+	host_reservation = all_guests.first()
+	payment_due = (session.get('dues') or 0)
+	adding = 0
+	for row in all_guests:
+		if row.Provisional:
+			adding += 1
+			payment_due += row.Unitcost or 0
+		if row.Ticket:
+			row.update_record(Unitcost=decimal.Decimal(re.match('.*[^0-9.]([0-9]+\.?[0-9]{0,2})$', row.Ticket).group(1)))
+	
+	back = URL(f'reservation/{ismember}/{member_id}/{event_id}/select')
+	caller = re.match('.*/oxcam/([a-z]*).*', session['url_prev']).group(1)
+	if caller!='reservation' and caller!='composemail':
+		session['back'].append(session['url_prev'])
+	if path=='select':
+			back = session['back'][-1]
+
+	header = CAT(H5('Member Reservation'), H6(member_name(member_id)),
+			XML(markmin.markmin2html(event_confirm(event.id, member.id, event_only=True))))
+	if ismember!='Y':
+		header = CAT(A('back', _href=back), header)
+
+	if path=='select':
+		if ismember=='Y':
+			dues_tbc = f", including ${session['dues']} membership dues." if session.get('dues') else '.'
+			header = CAT(header,  XML(f"Use <b>Checkout</b> button (below) to complete your registration, or <b>+New</b> button to add guests.<br>"))
+			attend = event_attend(event_id) or 0
+			wait = event_wait(event_id) or 0
+			waitlist = False
+			if datetime.datetime.now() > event.Booking_Closed:
+				waitlist = True
+				flash.set("Registration is closed, new registrations will be waitlisted.")
+			elif wait > 0 or (event.Capacity and attend+adding>event.Capacity):
+				waitlist = True
+				flash.set("Event is full: please Checkout to add all unconfirmed guests to the waitlist.")
+			elif event.Capacity and attend+adding>=event.Capacity-2:
+				flash.set(f"Event is nearly full, registration for more than {event.Capacity-attend} places will be wait listed.")
+			if waitlist:
+				payment_due = session.get('dues') or 0
+			if payment_due>0:
+				header = CAT(header, XML(f"You will be charged ${payment_due} at Checkout{dues_tbc}"))
+
+			fields = []
+			if event.Survey:
+				fields.append(Field('survey', requires=IS_IN_SET(event.Survey[1:], zero=event.Survey[0],
+									error_message='Please make a selection'),
+									default = host_reservation.Survey if host_reservation else None))
+			if event.Comment:
+				fields.append(Field('comment', 'string', comment=event.Comment,
+									default = host_reservation.Comment if host_reservation else None))
+			if host_reservation:
+				form2 = Form(fields, formstyle=FormStyleBulma, keep_values=True, submit_value='Checkout')
+		else:
+			header = CAT(header, A('send email', _href=(URL('composemail', vars=dict(
+				query=f"(db.Members.id=={member_id})&(db.Members.id==db.Reservations.Member)&(db.Reservations.Event=={event_id})",
+				qdesc=member_name(member_id), left="db.Emails.on(db.Emails.Member==db.Members.id)")))),
+				XML(" (use "), "<reservation>", XML(" to include confirmation and payment link)<br>"),
+				A('view member record', _href=URL(f'members/edit/{member_id}')),
+				XML("<br>Top row is the member's own reservation, additional rows are guests.<br>\
 Use Add Record to add the member, initially, then to add additional guests.<br>\
 Edit rows to move on/off waitlist or first row to record a check payment.<br>\
 Moving member on/off waitlist will also affect all guests."))
@@ -848,13 +897,12 @@ Moving member on/off waitlist will also affect all guests."))
 					Lastname=member.Lastname, Suffix=member.Suffix) 
 			
 	if len(event.Selections)>0:
-		db.Reservations.Selection.requires=IS_IN_SET(event.Selections, zero='please select from dropdown list')
+		db.Reservations.Selection.requires=IS_IN_SET(event.Selections, error_message='please make a selection')
 	else:
 		db.Reservations.Selection.writable = db.Reservations.Selection.readable = False
 		
 	if len(event.Tickets)>0:
-		db.Reservations.Ticket.requires=IS_EMPTY_OR(IS_IN_SET(event.Tickets))
-		db.Reservations.Ticket.default = event.Tickets[0]
+		db.Reservations.Ticket.requires=IS_EMPTY_OR(IS_IN_SET(event.Tickets, error_message='please select the appropriate ticket'))
 	else:
 		db.Reservations.Ticket.writable = db.Reservations.Ticket.readable = False
 	
@@ -875,6 +923,7 @@ Moving member on/off waitlist will also affect all guests."))
 			db.Reservations.Host.default=False
 			db.Reservations.Firstname.writable=True
 			db.Reservations.Lastname.writable=True
+			db.Reservations.Ticket.default = host_reservation.Ticket
 		else:
 			#creating or revising the host reservation
 			db.Reservations.Title.default = member.Title
@@ -887,16 +936,20 @@ Moving member on/off waitlist will also affect all guests."))
 				db.Reservations.Checkout.writable=db.Reservations.Checkout.readable=True
 			db.Reservations.Firstname.readable=db.Reservations.Lastname.readable=False
 			if event.Tickets:
+				db.Reservations.Ticket.default = event.Tickets[0]
 				for t in event.Tickets:
-					if t.startswith(member.Membership or '~'): db.Reservations.Ticket.default = t
+					if is_good_standing:
+						if t.lower().startswith(membership.lower()):
+							db.Reservations.Ticket.default = t
+							db.Reservations.Ticket.writable = False
+					elif t.lower().startswith('non-member'):
+						db.Reservations.Ticket.default = t
+						db.Reservations.Ticket.writable = False
+
 			affinity = db(db.Affiliations.Member==member_id).select(orderby=db.Affiliations.Modified).first()
 			if affinity:
 				db.Reservations.Affiliation.default = affinity.College
 				db.Reservations.Affiliation.writable = False
-
-	for row in all_guests:
-		if row.Ticket:
-			row.update_record(Unitcost=decimal.Decimal(re.match('.*[^0-9.]([0-9]+\.?[0-9]{0,2})$', row.Ticket).group(1)))
 	
 	def validate(form):
 		if form.vars.get('Waitlist') and form.vars.get('Provisional'):
@@ -909,6 +962,8 @@ Moving member on/off waitlist will also affect all guests."))
 				for row in all_guests:
 					if row.id != host_reservation.id and not row.Provisional:
 						row.update_record(Waitlist = form.vars.get('Waitlist'))
+		if ismember=='Y' and form.vars.get('Ticket') != None and form.vars.get('Ticket') != db.Reservations.Ticket.default and not form.vars.get('Notes'):
+			form.errors['Ticket']='Please note below how you qualify for this ticket price.'
 
 	grid = Grid(path, (db.Reservations.Member==member.id)&(db.Reservations.Event==event.id),
 			orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname,
@@ -916,8 +971,13 @@ Moving member on/off waitlist will also affect all guests."))
 					db.Reservations.Notes, db.Reservations.Unitcost, db.Reservations.Status],
 			headings=['Last', 'First', 'Notes', 'Price', 'Status'],
 			deletable=lambda row: write and (len(all_guests)==1 or row['id'] != host_reservation.id),
-			details=not write, editable=write, grid_class_style=grid_style,
-			formstyle=form_style, create=write, validation=validate,show_id=ismember!='Y')
+			details=not write, 
+			editable=lambda row: write and (ismember!='Y' or row['Provisional'] or row['Waitlist']), 
+			create=lambda row: write and (ismember!='Y' or not event.guests or (len(all_guests)<event.guests)),
+			grid_class_style=grid_style, formstyle=form_style, validation=validate, show_id=ismember!='Y')
+	
+	if path=='select' and ismember=='Y' and form2.accepted:
+		pass
 	return locals()
 
 @action('doorlist_export/<event_id:int>', method=['GET'])
@@ -948,6 +1008,7 @@ def doorlist_export(event_id):
 									guest.Survey or '', guest.Comment or ''])
 	except Exception as e:
 		flash.set(e)
+		redirect(session['url_prev'])
 	return locals()
 	
 @action('event_copy/<event_id:int>', method=['GET'])
@@ -1032,10 +1093,8 @@ def tdnum(value, query=None, left=None, th=False):
 	numsq = A(nums, _href=URL('transactions', vars=dict(query=query,left=left))) if query else nums
 	return TH(numsq, _style=f'text-align:right{"; color:Red" if value <0 else ""}') if th==True else TD(numsq, _style=f'text-align:right{"; color:Red" if value <0 else ""}')
 
-def financial_content(event):
+def financial_content(event, query, left):
 #shared by financial_statement and tax_statement
-	query = session.get('query')
-	left = session.get('left')
 	if event:
 		event_record = db.Events[event]
 
@@ -1077,14 +1136,12 @@ def financial_content(event):
 @action.uses("message.html", db, session, flash)
 @checkaccess('accounting')
 def financial_detail(event, title=''):
-	source = session.get('url_prev')
-	if 'transactions' not in source:
-		back = session.get('url_prev')
-		session['back'] = back
 	title = request.query.get('title')
+	
+	session['back'].append(session['url_prev'])
 
-	message = CAT(A('back', _href=session.get('back')), H5(f'{title}'),
-			financial_content(event if event!=0 else None))
+	message = CAT(A('back', _href=session['back'][-1]), H5(f'{title}'),
+			financial_content(event if event!=0 else None, request.query.get('query'), request.query.get('left')))
 	return locals()
 	
 @action('financial_statement', method=['GET'])
@@ -1170,13 +1227,13 @@ def financial_statement():
 	message = CAT(message, H6('\nLiabilities'), TABLE(*rows))
 	
 	transfer = db(db.CoA.Name=='Transfer').select().first().id	#ignore transfer transactions
-	session['query'] = f"(((db.AccTrans.Event != None) & (db.Events.DateTime >= '{startdatetime}') & (db.Events.DateTime < '{enddatetime}')) | \
+	query = f"(((db.AccTrans.Event != None) & (db.Events.DateTime >= '{startdatetime}') & (db.Events.DateTime < '{enddatetime}')) | \
 ((db.AccTrans.Event == None) & (db.AccTrans.Account != {transfer}) & \
 (db.AccTrans.Timestamp >= '{startdatetime}') & (db.AccTrans.Timestamp < '{enddatetime}')))"
-	session['left'] = 'db.Events.on(db.Events.id == db.AccTrans.Event)'
+	left = 'db.Events.on(db.Events.id == db.AccTrans.Event)'
 
-	events = db(eval(session.get('query'))).select(db.AccTrans.Event, db.Events.Description, db.Events.DateTime,
-					left = eval(session.get('left')), orderby = db.Events.DateTime, groupby = db.Events.DateTime)
+	events = db(eval(query)).select(db.AccTrans.Event, db.Events.Description, db.Events.DateTime,
+					left = eval(left), orderby = db.Events.DateTime, groupby = db.Events.DateTime)
 
 	rows = [THEAD(TR(TH('Event'), TH('Date'), TH('Revenue'), TH('Expense'), TH('Net Revenue')))]
 	totrev = totexp = 0
@@ -1184,15 +1241,15 @@ def financial_statement():
 		name = 'Admin' if e.AccTrans.Event == None else e.Events.Description
 		date = '' if e.AccTrans.Event == None else e.Events.DateTime.date()
 		rev = exp = 0
-		accounts = db(eval(session.get('query')+'&(db.AccTrans.Event==e.AccTrans.Event)')).select(sumamt, sumfee,
-					left = eval(session.get('left')), orderby = db.AccTrans.Account, groupby = db.AccTrans.Account)
+		accounts = db(eval(query+'&(db.AccTrans.Event==e.AccTrans.Event)')).select(sumamt, sumfee,
+					left = eval(left), orderby = db.AccTrans.Account, groupby = db.AccTrans.Account)
 		for a in accounts:
 			if a[sumamt] >= 0:
 				rev += a[sumamt]
 			else:
 				exp += a[sumamt]
 			exp += a[sumfee] or 0
-		rows.append(TR(TD(A(name[0:25], _href=URL(f'financial_detail/{e.AccTrans.Event or 0}', vars=dict(title=title)))), 
+		rows.append(TR(TD(A(name[0:25], _href=URL(f'financial_detail/{e.AccTrans.Event or 0}', vars=dict(title=title, query=query, left=left)))), 
 		 				TD(date), tdnum(rev), tdnum(exp), tdnum(rev + exp)))
 		totrev += rev
 		totexp += exp
@@ -1224,8 +1281,8 @@ def tax_statement():
 	sponacct = db(db.CoA.Name=='Sponsorships').select().first().id
 	xferacct = db(db.CoA.Name=='Transfer').select().first().id	#ignore transfer transactions
 
-	session['query'] = f"((db.AccTrans.Timestamp>='{startdatetime}')&(db.AccTrans.Timestamp < '{enddatetime}') & (db.AccTrans.Accrual!=True))"
-	session['left'] = 'db.Events.on(db.Events.id == db.AccTrans.Event)'
+	query = f"((db.AccTrans.Timestamp>='{startdatetime}')&(db.AccTrans.Timestamp < '{enddatetime}') & (db.AccTrans.Accrual!=True))"
+	left = 'db.Events.on(db.Events.id == db.AccTrans.Event)'
 	
 	assets = get_banks(startdatetime, enddatetime)
 	totals = [0, 0]
@@ -1242,7 +1299,7 @@ def tax_statement():
 
 	tottkt = totspon = totrev = totexp = 0
 	allrev = allexp = 0
-	allrevexp = db(eval(f"{session.get('query')}&(db.AccTrans.Account!={xferacct})")).select(sumamt, sumfee,
+	allrevexp = db(eval(f"{query}&(db.AccTrans.Account!={xferacct})")).select(sumamt, sumfee,
 					orderby=db.AccTrans.Account, groupby=db.AccTrans.Account)
 	for t in allrevexp:
 		if t[sumamt] >= 0:
@@ -1251,12 +1308,13 @@ def tax_statement():
 			allexp += t[sumamt]
 		allexp += (t[sumfee] or 0)
 
-	events = db(eval(f"{session.get('query')}&(db.AccTrans.Event!=None)")).select(db.Events.DateTime, db.Events.Description,
-					db.Events.id, left = eval(session.get('left')), orderby = db.Events.DateTime, groupby = db.Events.DateTime)
+	events = db(eval(f"{query}&(db.AccTrans.Event!=None)")).select(db.Events.DateTime, db.Events.Description,
+					db.Events.id, left = eval(left
+			       ), orderby = db.Events.DateTime, groupby = db.Events.DateTime)
 	rows =[THEAD(TR(TH('Event'), TH('Ticket Sales'), TH('Sponsorships'), TH('Revenue'), TH('Expense'), TH('Notes')))]
 	for e in events:
-		trans = db(eval(f"{session.get('query')}&(db.AccTrans.Event=={e.id})")).select(db.AccTrans.Account, sumamt, sumfee,
-					left = eval(session.get('left')), orderby = db.AccTrans.Account, groupby = db.AccTrans.Account)
+		trans = db(eval(f"{query}&(db.AccTrans.Event=={e.id})")).select(db.AccTrans.Account, sumamt, sumfee,
+					left = eval(left), orderby = db.AccTrans.Account, groupby = db.AccTrans.Account)
 		tkt = trans.find(lambda t: t.AccTrans.Account == tktacct).first()
 		spon = trans.find(lambda t: t.AccTrans.Account == sponacct).first()
 		revenue = expense = 0
@@ -1267,12 +1325,12 @@ def tax_statement():
 				expense += (a[sumamt] or 0)
 			expense += (a[sumfee] or 0)
 
-		rows.append(TR(TD(A(e.Description[0:25], _href=URL(f'financial_detail/{e.id}', vars=dict(title=title)))),
+		rows.append(TR(TD(A(e.Description[0:25], _href=URL(f'financial_detail/{e.id}', vars=dict(title=title, query=query, left=left)))),
 					tdnum(tkt[sumamt] if tkt else 0), tdnum(spon[sumamt] if spon else 0),
 					tdnum(revenue), tdnum(expense), TD(e.DateTime.date())))
 		if spon:
-			spontr = db(eval(f"{session.get('query')}&(db.AccTrans.Event=={e.id})&(db.AccTrans.Account=={sponacct})")).select(
-					db.AccTrans.Amount, db.AccTrans.Notes, left = eval(session.get('left')))
+			spontr = db(eval(f"{query}&(db.AccTrans.Event=={e.id})&(db.AccTrans.Account=={sponacct})")).select(
+					db.AccTrans.Amount, db.AccTrans.Notes, left = eval(left))
 			for t in spontr:
 				rows.append(TR(TD(''), TD(''), tdnum(t.Amount), TD(''),TD(''), TD(t.Notes)))
 		tottkt += tkt[sumamt] if tkt else 0
@@ -1284,7 +1342,7 @@ def tax_statement():
 	rows.append(THEAD(TR(TH('Overall Net Revenue'), TH(''), TH(''), tdnum(allrev+allexp, th=True))))
 	message = CAT(message, H6('Events'), TABLE(*rows))
 
-	message = CAT(message, financial_content(None))
+	message = CAT(message, financial_content(None, query, left))
 	return locals()
 		
 @action('accounting', method=['POST', 'GET'])
@@ -1292,8 +1350,11 @@ def tax_statement():
 @action.uses("grid.html", db, session, flash)
 @checkaccess('accounting')
 def accounting(path=None):
-
-	if path and path=='select':
+	if not path:
+		session['back'] = []
+		session['query'] = None	#main query for financial or tax statement
+		session['left'] = None
+	elif path=='select':
 		header = CAT(H5('Banks'),
 	       		A('Financial Statement', _href=URL('get_date_range', vars=dict(
 					function='financial_statement', title='Financial Statement'))), XML('<br>'),
@@ -1302,11 +1363,6 @@ def accounting(path=None):
 				"Use Upload to load a file you've downloaded from bank/payment processor into accounting")
 	else:
 		header = CAT(A('back', _href=URL('accounting')) , H5('Banks'))
-		if not path:
-			session['query'] = None	#main query for financial or tax statement
-			session['left'] = None
-			session['query2'] = None	#supplementary query for transactions grid
-			session['left2'] = None
 
 	grid = Grid(path, db.Bank_Accounts.id>0,
 				orderby=db.Bank_Accounts.Name,
@@ -1501,12 +1557,11 @@ def transactions(path=None):
 
 	back = URL('transactions/select', scheme=True)
 	if not path:
-		session['query2'] = request.query.get('query')
-		session['left2'] = request.query.get('left')
-		back = session.get('url_prev')
-		session['bank_back'] = back
+		session['back'].append(session['url_prev'])
+		session['query'] = request.query.get('query')
+		session['left'] = request.query.get('left')
 	elif path=='select':
-		back = session.get('bank_back')
+		back = session['back'][-1]
 	elif path.startswith('edit'):	#editing AccTrans record
 		db.AccTrans.Amount.comment = 'to split transaction, enter amount of a split piece'
 		db.AccTrans.CheckNumber.writable = False
@@ -1523,9 +1578,9 @@ def transactions(path=None):
 		db.AccTrans.Amount.comment='enter full amount of check as a negative number; split using Edit if multiple accounts',
 		db.AccTrans.Timestamp.writable=True
 		db.AccTrans.Amount.requires=IS_DECIMAL_IN_RANGE(-100000, 0)
-
-	query = session.get('query2')
-	left = session.get('left2')
+		db.AccTrans.CheckNumber.requires=IS_NOT_EMPTY()
+	query = session['query']
+	left = session['left']
 
 	bank_id_match=re.match('db.AccTrans.Bank==([0-9]+)$', query)
 	bank_id = int(bank_id_match.group(1)) if bank_id_match else None
@@ -1683,11 +1738,12 @@ def society_emails(member_id):
 @action.uses("form.html", db, session, flash)
 @checkaccess('write')
 def composemail():
+	session['url']=session['url_prev']	#preserve back link
 	query = request.query.get('query')
 	qdesc = request.query.get('qdesc')
 	left = request.query.get('left')
 
-	header = CAT(A('back', _href=request.query.get('back')), H5("Send Email"))
+	header = CAT(A('back', _href=session['url_prev']), H5("Send Email"))
 	source = society_emails(session['member_id'])
 
 	if len(source) == 0:
@@ -1709,7 +1765,7 @@ def composemail():
 	if query:
 		header = CAT(header, XML(f'To: {qdesc}'))
 		footer = A("Export bcc list for use in email", _href=URL('bcc_export',
-						vars=dict(query=query, left=left or '', back=request.query.get('back'))))
+						vars=dict(query=query, left=left or '')))
 	else:
 		fields.append(Field('to', 'string',
 			comment='Include spaces between multiple recipients',
@@ -1818,6 +1874,7 @@ def bcc_export():
 			id = row.Members.id
 	except Exception as e:
 		flash.set(e)
+		redirect(session['url_prev'])
 	return locals()
 
 #embedded in Society Past Events Page
@@ -1894,7 +1951,6 @@ def directory(path=None):
 	      XML(f"You can search by last name, town, state, using the boxes below; click on a name to view contact information"))
 	db.Members.Name.readable = True
 	db.Members.Affiliations.readable = True
-	session['back'] = session['url']
 
 	grid = Grid(path, eval(query),
 		columns=(Column('Name', lambda r: A(f"{member_name(r['id'])}", _href=URL(f"contact_details/{r['id']}"))),
@@ -1918,7 +1974,7 @@ def contact_details(member_id):
 	if not member or not member.Membership:
 		raise Exception("hack attempt?")
 	
-	message = CAT(A('back', _href=session['back']),
+	message = CAT(A('back', _href=session['url_prev']),
 				H5("Member Directory - Contact Details"),
 	       member_name(member_id), XML('<br>'),
 		   member_affiliations(member_id), XML('<br>'))
@@ -2346,6 +2402,7 @@ def validate(id, token):
 	session['filter'] = None
 	session['access'] = None
 	session['member_id'] = 0
+	session['back'] = []
 	if member_id:
 		session['member_id'] = int(member_id)
 		session['access'] = db.Members[member_id].Access

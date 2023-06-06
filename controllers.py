@@ -53,7 +53,7 @@ def checkaccess(requiredaccess):
 		def wrapped_f(*args, **kwds):
 			session['url_prev'] = session.get('url')
 			session['url']=request.url
-			if session['back'] and len(session['back'])>0 and request.url==session['back'][-1]:
+			if session.get('back') and len(session['back'])>0 and request.url==session['back'][-1]:
 				session['back'].pop()
 			if not session.get('logged_in') == True:    #logged in
 				if db(db.Members.id>0).count()==0:
@@ -162,18 +162,18 @@ def members(path=None):
 			session['filter'] = filter
 		header = CAT(header, A("Send Email to Specific Address(es)", _href=URL('composemail')), XML('<br>'))
 	elif path:
-		caller = re.match('.*/oxcam/([a-z]*).*', session['url_prev']).group(1)
-		if caller!='members' and caller not in ['composemail', 'affiliations', 'emails', 'dues']:
+		caller = re.match('.*/oxcam/([a-z_]*).*', session['url_prev']).group(1)
+		if caller!='members' and caller not in ['composemail', 'affiliations', 'emails', 'dues', 'member_reservations']:
 			session['back'].append(session['url_prev'])
-		if len(session['back'])>0 and re.match('.*/oxcam/([a-z]*).*', session['back'][-1]).group(1)!='members':
+		if len(session['back'])>0 and re.match('.*/oxcam/([a-z_]*).*', session['back'][-1]).group(1)!='members':
 			back = session['back'][-1]
 		header = CAT(A('back', _href=back), H5('Member Record'))
 		if path.startswith('edit'):
 			header= CAT(header, 
-	       			A('Member reservations', _href=URL('member_reservations', path[5:])), XML('<br>'),
+	       			A('Member reservations', _href=URL(f'member_reservations/{path[5:]}/select')), XML('<br>'),
 					A('OxCam affiliation(s)', _href=URL(f'affiliations/N/{path[5:]}/select')), XML('<br>'),
-					A('Email addresses and subscriptions', _href=URL('emails/N', path[5:])), XML('<br>'),
-					A('Dues payments', _href=URL(f'dues/{path[5:]}')), XML('<br>'),
+					A('Email addresses and subscriptions', _href=URL(f'emails/N/{path[5:]}/select')), XML('<br>'),
+					A('Dues payments', _href=URL(f'dues/{path[5:]}/select')), XML('<br>'),
 					A('Send Email to Member', _href=URL('composemail',
 					 	vars=dict(query=f"db.Members.id=={path[5:]}", left='',
 		 					qdesc=member_name(path[5:])))))
@@ -427,7 +427,7 @@ def member_reservations(member_id, path=None):
 			left=db.Events.on(db.Events.id == db.Reservations.Event),
 			orderby=~db.Events.DateTime,
 			columns=[db.Events.DateTime,
-	    			Column('event', lambda row: A(row.Reservations.Event.Description[0:23], _href=URL(f"reservation/'N'/{member_id}/{row.Reservations.Event}"))),
+	    			Column('event', lambda row: A(row.Reservations.Event.Description[0:23], _href=URL(f"reservation/N/{member_id}/{row.Reservations.Event}"))),
 	    			db.Reservations.Wait, db.Reservations.Conf, db.Reservations.Cost,
 					db.Reservations.TBC],
 			grid_class_style=grid_style,
@@ -450,7 +450,7 @@ def add_member_reservation(member_id):
 		formstyle=FormStyleBulma)
 	
 	if form.accepted:
-		redirect(URL(f"reservation/'N'/{member_id}/{form.vars.get('event')}"))
+		redirect(URL(f"reservation/N/{member_id}/{form.vars.get('event')}"))
 	return locals()
 
 @action('affiliations/<ismember>/<member_id:int>', method=['POST', 'GET'])
@@ -778,7 +778,7 @@ select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 	grid = Grid(path, eval(query),
 			left=db.Members.on(db.Members.id == db.Reservations.Member),
 			orderby=db.Reservations.Created if request.query.get('waitlist') else db.Reservations.Lastname|db.Reservations.Firstname,
-			columns=[Column('member', lambda row: A(member_name(row.Reservations.Member)[0:20], _href=URL(f"reservation/'N'/{row.Reservations.Member}/{event_id}"))),
+			columns=[Column('member', lambda row: A(member_name(row.Reservations.Member)[0:20], _href=URL(f"reservation/N/{row.Reservations.Member}/{event_id}/select"))),
 	    				db.Members.Membership, db.Members.Paiddate, db.Reservations.Affiliation, db.Reservations.Notes, 
 						db.Reservations.Cost, db.Reservations.TBC,
 						db.Reservations.Wait if request.query.get('waitlist') else db.Reservations.Prov if request.query.get('provisional') else db.Reservations.Conf],
@@ -833,8 +833,8 @@ def reservation(ismember, member_id, event_id, path=None):
 			row.update_record(Unitcost=decimal.Decimal(re.match('.*[^0-9.]([0-9]+\.?[0-9]{0,2})$', row.Ticket).group(1)))
 	
 	back = URL(f'reservation/{ismember}/{member_id}/{event_id}/select')
-	caller = re.match('.*/oxcam/([a-z]*).*', session['url_prev']).group(1)
-	if caller!='reservation' and caller!='composemail':
+	caller = re.match('.*/oxcam/([a-z_]*).*', session['url_prev']).group(1)
+	if caller not in ['reservation', 'composemail', 'members']:
 		session['back'].append(session['url_prev'])
 	if path=='select':
 			back = session['back'][-1]
@@ -846,8 +846,10 @@ def reservation(ismember, member_id, event_id, path=None):
 
 	if path=='select':
 		if ismember=='Y':
+			if not host_reservation:
+				redirect(URL(f'reservation/Y/{member_id}/{event_id}/new'))
 			dues_tbc = f", including ${session['dues']} membership dues." if session.get('dues') else '.'
-			header = CAT(header,  XML(f"Use <b>Checkout</b> button (below) to complete your registration, or <b>+New</b> button to add guests.<br>"))
+			header = CAT(header,  XML(f"Use <b>Checkout</b> button (below) to complete your registration{', or <b>+New</b> button to add guests' if not event.Guests or len(all_guests)<event.Guests else ''}.<br>"))
 			attend = event_attend(event_id) or 0
 			wait = event_wait(event_id) or 0
 			waitlist = False
@@ -973,7 +975,7 @@ Moving member on/off waitlist will also affect all guests."))
 			deletable=lambda row: write and (len(all_guests)==1 or row['id'] != host_reservation.id),
 			details=not write, 
 			editable=lambda row: write and (ismember!='Y' or row['Provisional'] or row['Waitlist']), 
-			create=lambda row: write and (ismember!='Y' or not event.guests or (len(all_guests)<event.guests)),
+			create=write and (ismember!='Y' or not event.Guests or (len(all_guests)<event.Guests)),
 			grid_class_style=grid_style, formstyle=form_style, validation=validate, show_id=ismember!='Y')
 	
 	if path=='select' and ismember=='Y' and form2.accepted:
@@ -1018,7 +1020,7 @@ def event_copy(event_id):
 	event = db.Events[event_id]
 	db.Events.insert(Page=event.Page, Description='Copy of '+event.Description, DateTime=event.DateTime,
 				Booking_Closed=event.Booking_Closed, Members_only=event.Members_only, Allow_join=event.Allow_join,
-				Online=event.Online, Sponsors=event.Sponsors, Venue=event.Venue, Capacity=event.Capacity,
+				Guest=event.Guests, Sponsors=event.Sponsors, Venue=event.Venue, Capacity=event.Capacity,
 				Speaker=event.Speaker, Tickets=event.Tickets, Selections=event.Selections,
 				Notes=event.Notes, Survey=event.Survey, Comment=event.Comment)
 	redirect(URL('events/select'))
@@ -1138,7 +1140,10 @@ def financial_content(event, query, left):
 def financial_detail(event, title=''):
 	title = request.query.get('title')
 	
-	session['back'].append(session['url_prev'])
+	caller = re.match('.*/oxcam/([a-z_]*).*', session['url_prev']).group(1)
+	if caller!='transactions':
+		session['back'].append(session['url_prev'])
+	session['url_prev'] = None #no longer needed, save cookie space
 
 	message = CAT(A('back', _href=session['back'][-1]), H5(f'{title}'),
 			financial_content(event if event!=0 else None, request.query.get('query'), request.query.get('left')))
@@ -1226,11 +1231,11 @@ def financial_statement():
 	rows.append(THEAD(TR(TH('Total'), tdnum(totals[0], th=True), tdnum(totals[1], th=True), tdnum(totals[1]-totals[0], th=True))))
 	message = CAT(message, H6('\nLiabilities'), TABLE(*rows))
 	
-	transfer = db(db.CoA.Name=='Transfer').select().first().id	#ignore transfer transactions
-	query = f"(((db.AccTrans.Event != None) & (db.Events.DateTime >= '{startdatetime}') & (db.Events.DateTime < '{enddatetime}')) | \
-((db.AccTrans.Event == None) & (db.AccTrans.Account != {transfer}) & \
-(db.AccTrans.Timestamp >= '{startdatetime}') & (db.AccTrans.Timestamp < '{enddatetime}')))"
-	left = 'db.Events.on(db.Events.id == db.AccTrans.Event)'
+	transfer = db(db.CoA.Name=='Transfer').select().first().id	#ignoretransfertransactions
+	query = f"(((db.AccTrans.Event!=None)&(db.Events.DateTime>='{startdatetime}')&(db.Events.DateTime<'{enddatetime}'))|\
+((db.AccTrans.Event==None)&(db.AccTrans.Account!={transfer})&\
+(db.AccTrans.Timestamp>='{startdatetime}')&(db.AccTrans.Timestamp<'{enddatetime}')))"
+	left='db.Events.on(db.Events.id==db.AccTrans.Event)'
 
 	events = db(eval(query)).select(db.AccTrans.Event, db.Events.Description, db.Events.DateTime,
 					left = eval(left), orderby = db.Events.DateTime, groupby = db.Events.DateTime)
@@ -1351,9 +1356,9 @@ def tax_statement():
 @checkaccess('accounting')
 def accounting(path=None):
 	if not path:
-		session['back'] = []
-		session['query'] = None	#main query for financial or tax statement
-		session['left'] = None
+		session['back'] = []	#stack or return addresses for controllers with multiple routes to reach them
+		session['query'] = None	#query stored by transactions controller
+		session['left'] = None	#accompanies query
 	elif path=='select':
 		header = CAT(H5('Banks'),
 	       		A('Financial Statement', _href=URL('get_date_range', vars=dict(
@@ -1558,11 +1563,13 @@ def transactions(path=None):
 	back = URL('transactions/select', scheme=True)
 	if not path:
 		session['back'].append(session['url_prev'])
+		session['url_prev'] = None	#no longer needed, save cookie space
 		session['query'] = request.query.get('query')
 		session['left'] = request.query.get('left')
 	elif path=='select':
 		back = session['back'][-1]
 	elif path.startswith('edit'):	#editing AccTrans record
+		session['url'] = URL(f"transactions/{path}")	#strip off _referrer parameter to save cookie space
 		db.AccTrans.Amount.comment = 'to split transaction, enter amount of a split piece'
 		db.AccTrans.CheckNumber.writable = False
 		db.AccTrans.CheckNumber.requires = None
@@ -1579,6 +1586,7 @@ def transactions(path=None):
 		db.AccTrans.Timestamp.writable=True
 		db.AccTrans.Amount.requires=IS_DECIMAL_IN_RANGE(-100000, 0)
 		db.AccTrans.CheckNumber.requires=IS_NOT_EMPTY()
+	session['url_prev'] = None	#no longer needed, save cookie space
 	query = session['query']
 	left = session['left']
 
@@ -2065,7 +2073,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 		header = CAT(header, XML(f"Event: {event.Description}<br>When: {event.DateTime.strftime('%A %B %d, %Y %I:%M%p')}<br>Where: {event.Venue}<br><br>\
 	This event is open to {'all alumni of Oxford & Cambridge' if not event.Members_only else 'members of '+SOCIETY_DOMAIN}\
 	{' and members of sponsoring organizations (list at the top of the Affiliations dropdown)' if event.Sponsors else ''}\
-	{' and their guests.' if not event.Online else ''}.<br>"))
+	{' and their guests.' if not event.Guests or event.Guests>1 else ''}.<br>"))
 	elif not request.query.get('mail_list'):
 		header = CAT(header, XML(MEMBERSHIP))
 		

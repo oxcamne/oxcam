@@ -3,8 +3,8 @@
   </head>
   
   <script>
-  var pkey = "[[=session.get('stripe_pkey')]]";
-  var id = "[[=session.get('stripe_id')]]";
+  var pkey = "[[=stripe_pkey]]";
+  var id = "[[=stripe_session_id]]";
   var stripe = Stripe(pkey);
   
   stripe.redirectToCheckout({

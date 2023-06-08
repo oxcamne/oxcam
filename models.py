@@ -7,7 +7,7 @@ from .settings_private import MEMBER_CATEGORIES, ACCESS_LEVELS
 from pydal.validators import *
 from yatl.helpers import CAT, A
 #from py4web.utils.form import Form, CheckboxWidget, ListWidget
-import datetime
+import datetime, decimal
 
 ### Define your table below
 #
@@ -212,7 +212,7 @@ def res_tbc(member_id, event_id, dues=False):	#cost of confirmed still tbc
 	for r in resvtns: 
 		v+=(r.Unitcost or 0)-(r.Paid or 0)-(r.Charged or 0)
 		if dues==True and r.Checkout:
-			v += eval(r.Checkout).get('dues', 0)
+			v += decimal.Decimal(eval(r.Checkout).get('dues', '0'))
 	return v if v!=0 else None
 
 def res_wait(member_id, event_id):

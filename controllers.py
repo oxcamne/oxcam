@@ -95,10 +95,10 @@ def index():
 	else:
 		message = CAT(message, A("Join our mailing list(s)", _href=URL("registration", vars=dict(mail_list='Y'))), XML('<br>'))
 
-	if member and member.Membership and member.Stripe_subscription!='Cancelled':
+	if member and member.Stripe_subscription!='Cancelled' and member_good_standing(member, (datetime.datetime.now()-datetime.timedelta(days=45)).date()):
 		if member.Stripe_subscription:
 			message = CAT(message, A("View membership subscription/Update credit card", _href=URL('update_card')), XML('<br>'))
-			message = CAT(message, A("Cancel your membership", _href=URL('cancel_subscription')), XML('<br>'))
+		message = CAT(message, A("Cancel your membership", _href=URL('cancel_subscription')), XML('<br>'))
 
 	message = CAT(message, XML('<br>'),
 	       H6(XML(f"To register for events use links below or visit {A(f'www.{SOCIETY_DOMAIN}.org', _href=f'https://www.{SOCIETY_DOMAIN}.org')}:")),
@@ -500,7 +500,42 @@ def update_Stripe_email(member):
 			stripe.Customer.modify(member.Stripe_id, email=primary_email(member.id))
 		except Exception as e:
 			member.update_record(Stripe_id=None, Stripe_subscription=None, Stripe_next=None)
-	
+
+#send email confirmation message
+@action('send_email_confirmation', method=['GET'])
+@action.uses("form.html", session, db)
+def send_email_confirmation():
+	email = request.query.get('email').lower()
+	user = db(db.users.email==email).select().first()
+	if user:
+		user.update_record(remote_addr = request.remote_addr)
+	else:
+		user = db.users[db.users.insert(email=email, remote_addr = request.remote_addr)]
+	token = str(random.randint(10000,999999))
+	user.update_record(tokens= [token]+(user.tokens or []), url=session['url'],
+						email = email, when_issued = datetime.datetime.now())
+	message = HTML(CAT(XML(f"{markmin.markmin2html(LETTERHEAD.replace('<subject>', ' '))}<br><br>"),
+				A("Please click to continue to "+SOCIETY_DOMAIN, _href=URL('validate', user.id, token, scheme=True)),
+				XML("<br>Please ignore this message if you did not request it.<br>"),
+				XML(f"If you have questions, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}.")))
+	auth.sender.send(to=email, subject='Please Confirm Email', body=message)
+	header = DIV(P("Please click the link sent to your email to continue. If you don't see the validation message, please check your spam folder."),
+				P('This link is valid for 15 minutes. You may close this window.'))
+	return locals()
+
+#switch user's primary email to newly validated email
+@action('switch_email', method=['GET'])
+@action.uses("form.html", session, db, flash)
+def switch_email():
+	member_id = request.query.get('member_id')
+	member = db.Members[member_id]
+	session['member_id'] = int(member_id)
+	session['access'] = member.Access
+	email_id = db.Emails.insert(Member=member_id, Email=session['email'], Mailings=eval(request.query.get('mailings')))
+	flash.set("Please review your mailing list subscriptions")
+	session['url'] = URL('index')	#will be back link from emails page
+	redirect(f"emails/Y/{member_id}/select")
+
 @action('emails/<ismember>/<member_id:int>', method=['POST', 'GET'])
 @action('emails/<ismember>/<member_id:int>/<path:path>', method=['POST', 'GET'])
 @action.uses("grid.html", db, session, flash)
@@ -509,7 +544,7 @@ def emails(ismember, member_id, path=None):
 	session['url']=session['url_prev']	#preserve back link
 	if ismember=='Y':
 		if member_id!=session['member_id']:
-			raise Exception(f"invalid call to emails from member {session['member_id']}")
+			raise Exception(f"invalid call to emails controller from member {session['member_id']}")
 		write = True
 	else:
 		if not session.get('access'):
@@ -519,26 +554,36 @@ def emails(ismember, member_id, path=None):
 
 	if path=='new':
 		db.Emails.Email.writable = True
+		old_primary_email = db(db.Emails.Member == member_id).select(orderby=~db.Emails.Modified).first()
+		db.Emails.Mailings.default = old_primary_email.Mailings
+		db.Emails.Modified.update = None
+		old_primary_email.update_record(Mailings=None)
 	elif path=='select':
 		update_Stripe_email(db.Members[member_id])
 
 	header = CAT(A('back', _href=session['url_prev']),
 	      		H5('Member Emails'),
 	      		H6(member_name(member_id)))
-	footer = "Note, the most recently edited (topmost) email is used for messages \
+	if path=='select':
+		footer = XML("Note, the most recently edited (topmost) email is used for messages \
 directed to the individual member, and appears in the Members Directory. Notices \
-are sent as specified in the Mailings Column."
+are sent as specified in the Mailings Column. To switch to a new email address, use <b>+New</b>.")
 
-	def email_modified(form):
+	def validate(form):
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
+		if ismember=='Y' and not form.vars.get('id'): #member adding new address
+			session['url'] = URL('switch_email', vars=dict(mailings=form.vars['Mailings'],
+										member_id=session['member_id']))
+			redirect(URL('send_email_confirmation', vars=dict(email=form.vars['Email'])))
 
 	grid = Grid(path, db.Emails.Member==member_id,
 	     	orderby=~db.Emails.Modified,
 			columns=[db.Emails.Email, db.Emails.Mailings],
-			details=not write, editable=write, create=write, deletable=write,
-			validation=email_modified,
+			details=not write, editable=write, create=write,
+			deletable=lambda row: write and (ismember!='Y' or row['id']!=db(db.Emails.Member == member_id).select(orderby=~db.Emails.Modified).first().id),
+			validation=validate,
 			grid_class_style=grid_style,
 			formstyle=form_style,
 			)
@@ -823,14 +868,20 @@ def reservation(ismember, member_id, event_id, path=None):
 
 	all_guests = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)).select(orderby=~db.Reservations.Host)
 	host_reservation = all_guests.first()
-	payment_due = (session.get('dues') or 0)
+	confirmed_ticket_cost = 0
+	provisional_ticket_cost = 0
 	adding = 0
+	confirmed = 0
 	for row in all_guests:
-		if row.Provisional:
-			adding += 1
-			payment_due += row.Unitcost or 0
 		if row.Ticket:
 			row.update_record(Unitcost=decimal.Decimal(re.match('.*[^0-9.]([0-9]+\.?[0-9]{0,2})$', row.Ticket).group(1)))
+		if not row.Waitlist:
+			if row.Provisional:
+				adding += 1
+				provisional_ticket_cost += row.Unitcost
+			else:
+				confirmed += 1
+				confirmed_ticket_cost += row.Unitcost
 	
 	back = URL(f'reservation/{ismember}/{member_id}/{event_id}/select')
 	caller = re.match('.*/oxcam/([a-z_]*).*', session['url_prev']).group(1)
@@ -861,10 +912,11 @@ def reservation(ismember, member_id, event_id, path=None):
 				flash.set("Event is full: please Checkout to add all unconfirmed guests to the waitlist.")
 			elif event.Capacity and attend+adding>=event.Capacity-2:
 				flash.set(f"Event is nearly full, registration for more than {event.Capacity-attend} places will be wait listed.")
-			if waitlist:
-				payment_due = session.get('dues') or 0
-			if payment_due>0:
-				header = CAT(header, XML(f"You will be charged ${payment_due} at Checkout{dues_tbc}"))
+			payment = (int(session.get('dues')) or 0) + confirmed_ticket_cost - (host_reservation.Paid or 0) - (host_reservation.Charged or 0)
+			if not waitlist:
+				payment += (provisional_ticket_cost or 0)
+			if payment>0:
+				header = CAT(header, XML(f"You will be charged ${payment} at Checkout{dues_tbc}"))
 
 			fields = []
 			if event.Survey:
@@ -875,6 +927,7 @@ def reservation(ismember, member_id, event_id, path=None):
 				fields.append(Field('comment', 'string', comment=event.Comment,
 									default = host_reservation.Comment if host_reservation else None))
 			if host_reservation:
+				host_reservation.update_record(Checkout=str(dict(membership=session.get('membership'), dues=session.get('dues'))).replace('Decimal','decimal.Decimal'))
 				form2 = Form(fields, formstyle=FormStyleBulma, keep_values=True, submit_value='Checkout')
 		else:
 			header = CAT(header, A('send email', _href=(URL('composemail', vars=dict(
@@ -979,7 +1032,25 @@ Moving member on/off waitlist will also affect all guests."))
 			grid_class_style=grid_style, formstyle=form_style, validation=validate, show_id=ismember!='Y')
 	
 	if path=='select' and ismember=='Y' and form2.accepted:
-		pass
+		#Checkout logic
+		host_reservation.update_record(Survey=form2.vars.get('survey'), Comment=form2.vars.get('comment'))
+		for row in all_guests.find(lambda row: row.Provisional==True):
+			row.update_record(Provisional=False, Waitlist=waitlist)
+
+		if waitlist:
+			flash.set(f"{'You' if confirmed==0 else 'Your additional guest(s)'} have been added to the waitlist.")
+		
+		if payment==0:	#free event, confirm booking
+			if not waitlist:
+				host_reservation.update_record(Checkout=None)
+				subject = 'Registration Confirmation'
+				body = msg_header(member, subject)
+				body += '**Your registration is now confirmed:**\n\n'
+				body += event_confirm(event.id, member.id)
+				msg_send(member, subject, body)
+				session.flash='Thank you. Confirmation has been sent by email.'
+			redirect(URL('reservations'))
+		redirect(URL('checkout'))
 	return locals()
 
 @action('doorlist_export/<event_id:int>', method=['GET'])
@@ -1798,7 +1869,7 @@ def composemail():
 			if form2.vars['delete']:
 				db(db.EMProtos.id == proto.id).delete()
 				flash.set("Template deleted: "+ proto.Subject)
-				redirect(request.query.get('back'))
+				redirect(session['url_back'])
 			if form2.vars['save']:
 				proto.update_record(Subject=form2.vars['subject'],
 					Body=form2.vars['body'])
@@ -1858,7 +1929,7 @@ def composemail():
 				flash.set(f"Email sent to: {to}")
 				message = HTML(XML(msgformat(body)))
 				auth.sender.send(to=to, sender=sender, reply_to=sender, subject=form2.vars['subject'], bcc=bcc, body=message)
-			redirect(request.query.get('back'))
+			redirect(session['url_prev'])
 	return locals()
 
 @action('bcc_export', method=['GET'])
@@ -2238,9 +2309,103 @@ reached by using the join/renew link on our home page).<br>\
 		flash.set('Thank you for updating your profile information.')
 	
 	return locals()
+	
+@action('stripe_update_card', method=['GET'])
+@action.uses("checkout.html", session)
+@checkaccess(None)
+def stripe_update_card():
+	stripe_session_id = request.query.get('stripe_session_id')
+	stripe_pkey = STRIPE_PKEY
+	return locals()
+	
+@action('stripe_switched_card', method=['GET'])
+@action.uses("checkout.html", session, db, flash)
+@checkaccess(None)
+def stripe_switched_card():
+	stripe.api_key = STRIPE_SKEY
+	member = db.Members[session['member_id']]
+
+	stripe_session = stripe.checkout.Session.retrieve(session['stripe_session_id'], expand=['setup_intent'])
+	stripe.Customer.modify(member.Stripe_id,
+				invoice_settings={'default_payment_method': stripe_session.setup_intent.payment_method})
+	stripe.Subscription.modify(member.Stripe_subscription,
+				default_payment_method=stripe_session.setup_intent.payment_method)
+	flash.set('Thank you for updating your credit card information!')
+	redirect(URL('update_card'))
+
+@action('update_card', method=['GET', 'POST'])
+@action.uses("form.html", db, session, flash)
+@checkaccess(None)
+def update_card():
+	stripe.api_key = STRIPE_SKEY
+
+	if not session.get('member_id'):
+		redirect(URL('index'))
+
+	member = db.Members[session['member_id']]
+	
+	if member.Stripe_subscription and member.Stripe_subscription!='Cancelled':
+		try:	#check subscription still exists on Stripe
+			subscription = stripe.Subscription.retrieve(member.Stripe_subscription)
+		except Exception as e:
+			member.update_record(Stripe_subscription=None, Stripe_next=None)
+	if not (member.Stripe_subscription and member.Stripe_subscription!='Cancelled'):
+		redirect(URL('index'))	#Stripe subscription doesn't exist
+		
+	paymentmethod = stripe.PaymentMethod.retrieve(subscription.default_payment_method)
+	renewaldate = member.Stripe_next.strftime('%b %d, %Y')
+	duesamount = decimal.Decimal(subscription.plan.amount)/100
+	header = CAT(H5('Membership Subscription'),
+	      XML(f"Your next renewal payment of ${duesamount} will be charged to {paymentmethod.card.brand.capitalize()} \
+....{paymentmethod.card.last4} exp {paymentmethod.card.exp_month}/{paymentmethod.card.exp_year} on {renewaldate}.<br><br>"))
+	
+	form = Form([], submit_value='Update Card on File')
+
+	if form.accepted:
+		stripe_session = stripe.checkout.Session.create(
+		  payment_method_types=['card'],
+		  mode='setup',
+		  customer=member.Stripe_id,
+		  setup_intent_data={},
+		  success_url=URL('stripe_switched_card', scheme=True),
+		  cancel_url=URL('index', scheme=True)
+		)
+		session['stripe_session_id'] = stripe_session.stripe_id
+		redirect(URL('stripe_update_card', vars=dict(stripe_session_id=stripe_session.id)))
+	return locals()
+	
+@action('cancel_subscription', method=['GET', 'POST'])
+@action.uses("form.html", db, session, flash)
+@checkaccess(None)
+def cancel_subscription():
+	stripe.api_key = STRIPE_SKEY
+	
+	member = db.Members[session['member_id']]
+	if not (member and member_good_standing(member, (datetime.datetime.now()-datetime.timedelta(days=45)).date())):
+		raise Exception("perhaps Back button or mobile auto re-request?")
+	
+	header = CAT(H5('Membership Cancellation'),
+	      XML(f"We are very sorry to lose you as a member. If you must leave, please click the button to confirm!.<br><br>"))
+	
+	form = Form([], submit_value='Cancel Subscription')
+	
+	if form.accepted:
+		if member.Stripe_subscription:	#delete Stripe subscription if applicable
+			try:
+				stripe.Subscription.delete(member.Stripe_subscription)
+			except Exception as e:
+				pass
+		
+		member.update_record(Stripe_subscription = 'Cancelled', Stripe_next=None)
+		#if we simply cleared Stripe_subscription then the daily backup daemon might issue membership reminders!
+
+		effective = max(member.Paiddate or datetime.datetime.now().date(), datetime.datetime.now().date()).strftime('%m/%d/%Y')
+		flash.set(f'Your membership is cancelled effective {effective}.')
+		redirect(URL('index'))
+	return locals()
 
 @action('checkout', method=['GET'])
-@action.uses("checkout.html", db, session, flash, Inject(session=session))
+@action.uses("checkout.html", db, session, flash)
 @checkaccess(None)
 def checkout():
 	if (not session.get('membership') and not session.get('event_id')) or not session.get('member_id'):
@@ -2292,8 +2457,9 @@ def checkout():
 	  success_url=URL('checkout_success', vars=params, scheme=True),
 	  cancel_url=session.get('url_prev')
 	)
-	session['stripe_id'] = stripe_session.stripe_id		#for use in template
-	session['stripe_pkey'] = pk
+	stripe_session_id = stripe_session.stripe_id		#for use in template
+	session['stripe_session_id'] = stripe_session.stripe_id
+	stripe_pkey = STRIPE_PKEY
 	return locals()
 
 @action('checkout_success', method=['GET'])
@@ -2304,7 +2470,7 @@ def checkout_success():
 	dues = decimal.Decimal(request.query.get('dues') or 0)
 	tickets_tbc = decimal.Decimal(request.query.get('tickets_tbc') or 0)
 	stripe.api_key = STRIPE_SKEY
-	stripe_session = stripe.checkout.Session.retrieve(session.get('stripe_id'))
+	stripe_session = stripe.checkout.Session.retrieve(session.get('stripe_session_id'))
 
 	if not stripe_session or decimal.Decimal(stripe_session.amount_total)/100 != tickets_tbc + dues:
 		raise Exception(f"Unexpected checkout_success callback received from Stripe, member {member.id}, event {session.get('event_id')}")
@@ -2335,8 +2501,7 @@ def checkout_success():
 	session['membership'] = None
 	session['dues'] = None
 	session['event_id'] = None
-	session['stripe_pkey'] = None
-	session['stripe_id'] = None
+	session['stripe_session_id'] = None
 	if dues:
 		flash.set('Confirmation has been sent by email. Please review your mailing list subscriptions.')
 		session['url'] = URL('index')
@@ -2356,32 +2521,9 @@ same email as this identifies your record.<br />You can change your email after 
 you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}."))
  
 	if form.accepted:
-		user = db(db.users.email==form.vars['email'].lower()).select().first()
-		token = str(random.randint(10000,999999))
-		if user:
-			id = user.id
-			user.update_record(tokens= [token]+(user.tokens or []), url=session['url'],
-				remote_addr = request.remote_addr, when_issued = datetime.datetime.now())
-		else:
-			id = db.users.insert(email = form.vars['email'].lower(),
-				tokens= [token], remote_addr = request.remote_addr,
-				when_issued = datetime.datetime.now(),
-				url = session['url'])
 		log = 'login '+request.remote_addr+' '+form.vars['email']+' '+request.environ['HTTP_USER_AGENT']+' '+(session.get('url') or '')
 		logger.info(log)
-		message = HTML(DIV(
-					A("Please click to continue to "+SOCIETY_DOMAIN, _href=URL('validate', id, token, scheme=True)),
-					P("Please ignore this message if you did not request it."),
-					P(DIV("If you have questions, please contact ",
-	   						A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL),
-							".")),
-					))
-		auth.sender.send(to=form.vars['email'], subject='Please Confirm Email',
-							body=message)
-		form = None
-
-		header = DIV(P("Please click the link sent to your email to continue. If you don't see the validation message, please check your spam folder."),
-					P('This link is valid for 15 minutes. You may close this window.'))
+		redirect(URL('send_email_confirmation', vars=dict(email=form.vars['email'])))
 	return locals()
 
 @action('validate/<id:int>/<token:int>', method=['GET', 'POST'])
@@ -2395,7 +2537,7 @@ def validate(id, token):
 	rows = db((db.Members.id == db.Emails.Member) & db.Emails.Email.ilike(user.email)).select(
 				db.Members.ALL, distinct=True)
 	header = H6("Please select which of you is signing in:")
-	form = Form([Field('member', 'integer', requires=IS_IN_SET([(row.id, member_name(row.id)+(' '+row.Membership+' member until '+row.Paiddate.strftime('%m/%d/%Y')  if row.Membership else '')) for row in rows]))],
+	form = Form([Field('member', 'integer', requires=IS_IN_SET([(row.id, member_name(row.id)+(' '+row.Membership+' member until '+(row.Paiddate.strftime('%m/%d/%Y') if row.Paiddate else '')  if row.Membership else '')) for row in rows]))],
 	     formstyle=FormStyleBulma)
 	if len(rows)<=1:
 		member_id = rows.first().id if len(rows)==1 else None
@@ -2405,7 +2547,6 @@ def validate(id, token):
 		return locals()	#display form
 	
 	session['logged_in'] = True
-	session['id'] = user.id
 	session['email'] = user.email
 	session['filter'] = None
 	session['access'] = None

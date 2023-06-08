@@ -890,7 +890,7 @@ def reservation(ismember, member_id, event_id, path=None):
 	if path=='select':
 			back = session['back'][-1]
 
-	header = CAT(H5('Member Reservation'), H6(member_name(member_id)),
+	header = CAT(H5('Member Registration'), H6(member_name(member_id)),
 			XML(markmin.markmin2html(event_confirm(event.id, member.id, event_only=True))))
 	if ismember!='Y':
 		header = CAT(A('back', _href=back), header)
@@ -899,8 +899,6 @@ def reservation(ismember, member_id, event_id, path=None):
 		if ismember=='Y':
 			if not host_reservation:
 				redirect(URL(f'reservation/Y/{member_id}/{event_id}/new'))
-			dues_tbc = f", including ${session['dues']} membership dues." if session.get('dues') else '.'
-			header = CAT(header,  XML(f"Use <b>Checkout</b> button (below) to complete your registration{', or <b>+New</b> button to add guests' if not event.Guests or len(all_guests)<event.Guests else ''}.<br>"))
 			attend = event_attend(event_id) or 0
 			wait = event_wait(event_id) or 0
 			waitlist = False
@@ -912,11 +910,16 @@ def reservation(ismember, member_id, event_id, path=None):
 				flash.set("Event is full: please Checkout to add all unconfirmed guests to the waitlist.")
 			elif event.Capacity and attend+adding>=event.Capacity-2:
 				flash.set(f"Event is nearly full, registration for more than {event.Capacity-attend} places will be wait listed.")
-			payment = (int(session.get('dues')) or 0) + confirmed_ticket_cost - (host_reservation.Paid or 0) - (host_reservation.Charged or 0)
+			dues_tbc = f", including ${session['dues']} membership dues." if session.get('dues') else '.'
+			payment = (int(session.get('dues') or 0)) + confirmed_ticket_cost - (host_reservation.Paid or 0) - (host_reservation.Charged or 0)
 			if not waitlist:
 				payment += (provisional_ticket_cost or 0)
+			if adding!=0 or payment!=0:
+				header = CAT(header,  XML(f"Use <b>Checkout</b> button (below) to complete your registration.<br>"))
+			if not event.Guests or len(all_guests)<event.Guests:
+				header = CAT(header,  XML(f"Use <b>+New</b> button to add guests.<br>"))
 			if payment>0:
-				header = CAT(header, XML(f"You will be charged ${payment} at Checkout{dues_tbc}"))
+				header = CAT(header, XML(f"You will be charged ${payment} at Checkout{dues_tbc}.<br>"))
 
 			fields = []
 			if event.Survey:
@@ -1025,32 +1028,36 @@ Moving member on/off waitlist will also affect all guests."))
 			columns=[db.Reservations.Lastname, db.Reservations.Firstname, 
 					db.Reservations.Notes, db.Reservations.Unitcost, db.Reservations.Status],
 			headings=['Last', 'First', 'Notes', 'Price', 'Status'],
-			deletable=lambda row: write and (len(all_guests)==1 or row['id'] != host_reservation.id),
+			deletable=lambda row: write and (len(all_guests)==1 or row['id'] != host_reservation.id) \
+						and (ismember!='Y' or row.Provisional or row.Waitlist),
 			details=not write, 
 			editable=lambda row: write and (ismember!='Y' or row['Provisional'] or row['Waitlist']), 
 			create=write and (ismember!='Y' or not event.Guests or (len(all_guests)<event.Guests)),
 			grid_class_style=grid_style, formstyle=form_style, validation=validate, show_id=ismember!='Y')
 	
-	if path=='select' and ismember=='Y' and form2.accepted:
-		#Checkout logic
-		host_reservation.update_record(Survey=form2.vars.get('survey'), Comment=form2.vars.get('comment'))
-		for row in all_guests.find(lambda row: row.Provisional==True):
-			row.update_record(Provisional=False, Waitlist=waitlist)
+	if ismember=='Y' and path=='select':
+		if adding==0 and payment==0:
+			form2 = ''	#don't need the Checkout form
+		elif form2.accepted:
+			#Checkout logic
+			host_reservation.update_record(Survey=form2.vars.get('survey'), Comment=form2.vars.get('comment'))
+			for row in all_guests.find(lambda row: row.Provisional==True):
+				row.update_record(Provisional=False, Waitlist=waitlist)
 
-		if waitlist:
-			flash.set(f"{'You' if confirmed==0 else 'Your additional guest(s)'} have been added to the waitlist.")
-		
-		if payment==0:	#free event, confirm booking
-			if not waitlist:
-				host_reservation.update_record(Checkout=None)
-				subject = 'Registration Confirmation'
-				body = msg_header(member, subject)
-				body += '**Your registration is now confirmed:**\n\n'
-				body += event_confirm(event.id, member.id)
-				msg_send(member, subject, body)
-				session.flash='Thank you. Confirmation has been sent by email.'
-			redirect(URL('reservations'))
-		redirect(URL('checkout'))
+			if waitlist:
+				flash.set(f"{'You' if confirmed==0 else 'Your additional guest(s)'} have been added to the waitlist.")
+			
+			if payment==0:	#free event, confirm booking
+				if not waitlist:
+					host_reservation.update_record(Checkout=None)
+					subject = 'Registration Confirmation'
+					message = msg_header(member, subject)
+					message += '**Your registration is now confirmed:**\n\n'
+					message += event_confirm(event.id, member.id, 0)
+					msg_send(member, subject, message)
+					session.flash='Thank you. Confirmation has been sent by email.'
+				redirect(back)
+			redirect(URL('checkout'))
 	return locals()
 
 @action('doorlist_export/<event_id:int>', method=['GET'])

@@ -21,9 +21,15 @@
         <input type="checkbox" id="hamburger">
         <!-- Left menu ul/li -->
         [[block page_left_menu]]
+        [[try:
+        if access:]]
         <a href="[[=URL('members')]]"><b> members</b></a>
         <a href="[[=URL('events')]]"><b> events</b></a>
         <a href="[[=URL('accounting')]]"><b> accounts</b></a>
+        [[pass]]
+        [[except:
+          pass
+        pass]]
         [[end]]
         <!-- Right menu ul/li -->
         <ul>

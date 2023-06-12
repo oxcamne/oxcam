@@ -84,6 +84,7 @@ def member_good_standing(member, date=datetime.datetime.now().date()):
 def index():
 	message = H6("Please select one of the following:")
 	member = db.Members[session['member_id']] if session.get('member_id') else None
+	access = session['access']	#for layout.html
 
 	if not member or not member_good_standing(member):
 		message = CAT(message, A("Join or Renew your Membership", _href=URL('registration')), XML('<br>'))
@@ -118,9 +119,10 @@ def index():
 
 @action('members', method=['POST', 'GET'])
 @action('members/<path:path>', method=['POST', 'GET'])
-@action.uses("grid.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 @checkaccess('read')
 def members(path=None):
+	access = session['access']	#for layout.html
 	query = []
 	left = None #only used if mailing list with excluded event attendees
 	qdesc = ""
@@ -162,10 +164,10 @@ def members(path=None):
 			session['filter'] = filter
 		header = CAT(header, A("Send Email to Specific Address(es)", _href=URL('composemail')), XML('<br>'))
 	elif path:
-		caller = re.match('.*/oxcam/([a-z_]*).*', session['url_prev']).group(1)
+		caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev']).group(1)
 		if caller!='members' and caller not in ['composemail', 'affiliations', 'emails', 'dues', 'member_reservations']:
 			session['back'].append(session['url_prev'])
-		if len(session['back'])>0 and re.match('.*/oxcam/([a-z_]*).*', session['back'][-1]).group(1)!='members':
+		if len(session['back'])>0 and re.match(f'.*/{request.app_name}/([a-z_]*).*', session['back'][-1]).group(1)!='members':
 			back = session['back'][-1]
 		header = CAT(A('back', _href=back), H5('Member Record'))
 		if path.startswith('edit'):
@@ -413,10 +415,11 @@ def member_analytics(path=None):
 
 @action('member_reservations/<member_id:int>', method=['POST', 'GET'])
 @action('member_reservations/<member_id:int>/<path:path>', method=['POST', 'GET'])
-@action.uses("grid.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 @checkaccess('read')
 def member_reservations(member_id, path=None):
 # .../member_reservations/member_id/...
+	access = session['access']	#for layout.html
 	db.Reservations.Wait.readable = db.Reservations.Conf.readable = db.Reservations.Cost.readable = db.Reservations.TBC.readable = True
 	header = CAT(A('back', _href=URL(f'members/edit/{member_id}', scheme=True)),
 				H5('Member Reservations'),
@@ -436,9 +439,10 @@ def member_reservations(member_id, path=None):
 	return locals()
 	
 @action('add_member_reservation/<member_id:int>', method=['POST', 'GET'])
-@action.uses("form.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 @checkaccess('write')
 def add_member_reservation(member_id):
+	access = session['access']	#for layout.html
 	header = CAT(A('back', _href=URL(f'members/edit/{member_id}', scheme=True)),
 	      		H5('Add New Reservation'),
 	      		H6(member_name(member_id)),
@@ -455,9 +459,10 @@ def add_member_reservation(member_id):
 
 @action('affiliations/<ismember>/<member_id:int>', method=['POST', 'GET'])
 @action('affiliations/<ismember>/<member_id:int>/<path:path>', method=['POST', 'GET'])
-@action.uses("grid.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 @checkaccess(None)
 def affiliations(ismember, member_id, path=None):
+	access = session['access']	#for layout.html
 	session['url']=session['url_prev']	#preserve back link
 	if ismember=='Y':
 		if member_id!=session['member_id']:
@@ -500,11 +505,20 @@ def update_Stripe_email(member):
 			stripe.Customer.modify(member.Stripe_id, email=primary_email(member.id))
 		except Exception as e:
 			member.update_record(Stripe_id=None, Stripe_subscription=None, Stripe_next=None)
+	
+#notifications to Member & Support_Email of member actions
+def notification(member, subject, body):
+	# build and send email update member, and to SUPPORT_EMAIL if production environment
+	message = eval(LETTERHEAD.upper()).replace('&lt;subject&gt;', subject)
+	message += member_greeting(member)
+	message += body
+	msg_send(member, subject, message)
 
 #send email confirmation message
 @action('send_email_confirmation', method=['GET'])
-@action.uses("form.html", session, db)
+@action.uses("gridform.html", session, db)
 def send_email_confirmation():
+	access = None	#for layout.html
 	email = request.query.get('email').lower()
 	user = db(db.users.email==email).select().first()
 	if user:
@@ -514,7 +528,7 @@ def send_email_confirmation():
 	token = str(random.randint(10000,999999))
 	user.update_record(tokens= [token]+(user.tokens or []), url=session['url'],
 						email = email, when_issued = datetime.datetime.now())
-	message = HTML(CAT(XML(f"{markmin.markmin2html(LETTERHEAD.replace('<subject>', ' '))}<br><br>"),
+	message = HTML(CAT(XML(f"{LETTERHEAD.replace('&lt;subject&gt;', ' ')}<br><br>"),
 				A("Please click to continue to "+SOCIETY_DOMAIN, _href=URL('validate', user.id, token, scheme=True)),
 				XML("<br>Please ignore this message if you did not request it.<br>"),
 				XML(f"If you have questions, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}.")))
@@ -525,7 +539,7 @@ def send_email_confirmation():
 
 #switch user's primary email to newly validated email
 @action('switch_email', method=['GET'])
-@action.uses("form.html", session, db, flash)
+@action.uses("gridform.html", session, db, flash)
 def switch_email():
 	member_id = request.query.get('member_id')
 	member = db.Members[member_id]
@@ -538,9 +552,10 @@ def switch_email():
 
 @action('emails/<ismember>/<member_id:int>', method=['POST', 'GET'])
 @action('emails/<ismember>/<member_id:int>/<path:path>', method=['POST', 'GET'])
-@action.uses("grid.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 @checkaccess(None)
 def emails(ismember, member_id, path=None):
+	access = session['access']	#for layout.html
 	session['url']=session['url_prev']	#preserve back link
 	if ismember=='Y':
 		if member_id!=session['member_id']:
@@ -598,10 +613,11 @@ def newpaiddate(paiddate, timestamp=datetime.datetime.now(), graceperiod=GRACE_P
 	
 @action('dues/<member_id:int>', method=['POST', 'GET'])
 @action('dues/<member_id:int>/<path:path>', method=['POST', 'GET'])
-@action.uses("grid.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 @checkaccess('read')
 def dues(member_id, path=None):
 # .../dues/member_id/...
+	access = session['access']	#for layout.html
 	session['url']=session['url_prev']	#preserve back link
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 	db.Dues.Member.default=member_id
@@ -636,9 +652,10 @@ def dues(member_id, path=None):
 	
 @action('dues_payments', method=['GET'])
 @action('dues_payments/<path:path>', method=['GET'])
-@action.uses("grid.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 @checkaccess('read')
 def dues_payments(path=None):
+	access = session['access']	#for layout.html
 	if not path:
 		session['query2'] = f"(db.Dues.Date >= \'{request.query.get('start')}\') & (db.Dues.Date <= \'{request.query.get('end')}\')"
 	
@@ -682,9 +699,10 @@ def dues_export():
 	
 @action('events', method=['POST', 'GET'])
 @action('events/<path:path>', method=['POST', 'GET'])
-@action.uses("grid.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 @checkaccess('read')
 def events(path=None):
+	access = session['access']	#for layout.html
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 	back = URL('events/select', scheme=True)
 
@@ -776,11 +794,12 @@ def event_analytics():
 		
 @action('event_reservations/<event_id:int>', method=['POST', 'GET'])
 @action('event_reservations/<event_id:int>/<path:path>', method=['POST', 'GET'])
-@action.uses("grid.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 @checkaccess('read')
 def event_reservations(event_id, path=None):
 # ...event_reservatins/event_id/...
 # request.query: waitlist=True, provisional=True
+	access = session['access']	#for layout.html
 	db.Reservations.id.readable=db.Reservations.Event.readable=False
 	if path=='select':
 		db.Reservations.Cost.readable=True
@@ -838,12 +857,13 @@ def collegelist(sponsors=[]):
 	
 @action('reservation/<ismember>/<member_id:int>/<event_id:int>', method=['POST', 'GET'])
 @action('reservation/<ismember>/<member_id:int>/<event_id:int>/<path:path>', method=['POST', 'GET'])
-@action.uses("grid.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 @checkaccess(None)
 def reservation(ismember, member_id, event_id, path=None):
 #this controller is for dealing with the addition/modification of an expanded reservation
 #used both by database users with access privilege, and by members themselves registering for events.
 # in the latter case, ismember=='Y'
+	access = session['access']	#for layout.html
 	if ismember=='Y':
 		if member_id!=session['member_id'] or event_id!=session.get('event_id'):
 			raise Exception(f"invalid call to reservation from member {session['member_id']}")
@@ -878,13 +898,13 @@ def reservation(ismember, member_id, event_id, path=None):
 		if not row.Waitlist:
 			if row.Provisional:
 				adding += 1
-				provisional_ticket_cost += row.Unitcost
+				provisional_ticket_cost += row.Unitcost or 0
 			else:
 				confirmed += 1
-				confirmed_ticket_cost += row.Unitcost
+				confirmed_ticket_cost += row.Unitcost or 0
 	
 	back = URL(f'reservation/{ismember}/{member_id}/{event_id}/select')
-	caller = re.match('.*/oxcam/([a-z_]*).*', session['url_prev']).group(1)
+	caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev']).group(1)
 	if caller not in ['reservation', 'composemail', 'members']:
 		session['back'].append(session['url_prev'])
 	if path=='select':
@@ -1055,7 +1075,7 @@ Moving member on/off waitlist will also affect all guests."))
 					message += '**Your registration is now confirmed:**\n\n'
 					message += event_confirm(event.id, member.id, 0)
 					msg_send(member, subject, message)
-					session.flash='Thank you. Confirmation has been sent by email.'
+					flash.set('Thank you. Confirmation has been sent by email.')
 				redirect(back)
 			redirect(URL('checkout'))
 	return locals()
@@ -1125,7 +1145,7 @@ def events_export():
 	return locals()
 	
 @action('get_date_range', method=['POST', 'GET'])
-@action.uses("form.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 @checkaccess('read')
 def get_date_range():
 # vars:	function: controller to be given the date range
@@ -1133,6 +1153,7 @@ def get_date_range():
 #		range: ytd - year to date
 #				 taxyear - prior full calendar year
 #		otherwise one full year ending now
+	access = session['access']	#for layout.html
 	today = datetime.datetime.now().date()
 	year_ago = (datetime.datetime.now() - datetime.timedelta(days=365) + datetime.timedelta(days=1)).date()
 	year_begin = datetime.date(datetime.datetime.now().year, 1, 1)	#start of current calendar 
@@ -1216,9 +1237,10 @@ def financial_content(event, query, left):
 @action.uses("message.html", db, session, flash)
 @checkaccess('accounting')
 def financial_detail(event, title=''):
+	access = session['access']	#for layout.html
 	title = request.query.get('title')
 	
-	caller = re.match('.*/oxcam/([a-z_]*).*', session['url_prev']).group(1)
+	caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev']).group(1)
 	if caller!='transactions':
 		session['back'].append(session['url_prev'])
 	session['url_prev'] = None #no longer needed, save cookie space
@@ -1231,6 +1253,7 @@ def financial_detail(event, title=''):
 @action.uses("message.html", db, session, flash)
 @checkaccess('accounting')
 def financial_statement():
+	access = session['access']	#for layout.html
 	start = request.query.get('start')
 	end = request.query.get('end')
 	startdatetime = datetime.datetime.fromisoformat(start)
@@ -1345,6 +1368,7 @@ def financial_statement():
 @action.uses("message.html", db, session, flash)
 @checkaccess('accounting')
 def tax_statement():
+	access = session['access']	#for layout.html
 	start = request.query.get('start')
 	end = request.query.get('end')
 	startdatetime = datetime.datetime.fromisoformat(start)
@@ -1430,9 +1454,10 @@ def tax_statement():
 		
 @action('accounting', method=['POST', 'GET'])
 @action('accounting/<path:path>', method=['POST', 'GET'])
-@action.uses("grid.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 @checkaccess('accounting')
 def accounting(path=None):
+	access = session['access']	#for layout.html
 	if not path:
 		session['back'] = []	#stack or return addresses for controllers with multiple routes to reach them
 		session['query'] = None	#query stored by transactions controller
@@ -1461,11 +1486,12 @@ def accounting(path=None):
 	return locals()
 
 @action('bank_file/<bank_id:int>', method=['POST', 'GET'])
-@action.uses("form.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 @checkaccess('accounting')
 def bank_file(bank_id):
 #upload and process a csv file from a bank or payment processor
 #	.../bank_id		bank_id is reference to bank in Bank Accounts
+	access = session['access']	#for layout.html
 	bank = db.Bank_Accounts[bank_id]
 	bkrecent = db((db.AccTrans.Bank==bank.id)&(db.AccTrans.Accrual!=True)).select(orderby=~db.AccTrans.Timestamp, limitby=(0,1)).first()
 	unalloc = db(db.CoA.Name == 'Unallocated').select().first()
@@ -1633,9 +1659,10 @@ def bank_file(bank_id):
 
 @action('transactions', method=['POST', 'GET'])
 @action('transactions/<path:path>', method=['POST', 'GET'])
-@action.uses("grid.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 @checkaccess('accounting')
 def transactions(path=None):
+	access = session['access']	#for layout.html
 	db.AccTrans.Fee.writable = False
 
 	back = URL('transactions/select', scheme=True)
@@ -1709,10 +1736,14 @@ def transactions(path=None):
 			field_id=db.AccTrans.id, grid_class_style=grid_style, formstyle=form_style)
 	return locals()
 
-def emailparse(body, subject, query):
-#this function validates and expands boilerplate <...> elements except the ones left til the last minute	
-	m = re.match(r"^(.*)(\{\{.*\}\})(.*)$", body, flags=re.DOTALL)
-	if m:			#don't unpack included html content
+def emailparse(body, subject, query=None):
+#parse email body from composemail form into a list of tuples:
+#	(text, function)
+#	where function will build html format from the results of the query,
+#	text (or {{html_content}}) will be inserted directly into the output
+	body = body.replace('\n', '{{<br>}}')
+	m = re.match(r"^(.*)\{\{(.*)\}\}(.*)$", body, flags=re.DOTALL)
+	if m:			#{{html content}} is simply stored. it will be sanitized later with XML()
 		return emailparse(m.group(1), subject, query)+[(m.group(2), None)]+emailparse(m.group(3), subject, query)
 
 	m = re.match(r"^(.*)<(.*)>(.*)$", body, flags=re.DOTALL)
@@ -1723,11 +1754,9 @@ def emailparse(body, subject, query):
 		elif m.group(2)=='greeting' or m.group(2)=='email' or m.group(2)=='member' or m.group(2)=='reservation':
 			if not query or m.group(2)=='reservation' and not ('Reservations.Event' in query):
 				raise Exception(f"<{m.group(2)}> can't be used in this context")
-			func=m.group(2)
-		else:	#metadata?
-			text = eval(m.group(2).upper()).replace('<subject>', subject)
-			if not text:
-				raise Exception(f"<{m.group(2)}>  is not in settings_private.py")
+			func=m.group(2) #will be generated individually for each target later
+		else:	#should be <name> where name is defined in settings_private, for example <letterhead>
+			text = eval(m.group(2).upper()).replace('&lt;subject&gt;', subject)
 		return emailparse(m.group(1), subject, query)+[(text, func)]+emailparse(m.group(3), subject, query)
 	return [(body, None)]
 	
@@ -1748,28 +1777,27 @@ def member_profile(member):
 	body += '**Work phone:**|' + (member.Workphone or '') + '\n'
 	body += '**Mobile:**|' + (member.Cellphone or '') + ' (not in directory)\n'
 	body += '**Email:**|' + (primary_email(member.id) or '') + (' (not in directory)\n' if member.Privacy==True else '\n')
-	body += '------------------------\n\n'
-	return body
+	body += '------------------------\n'
+	return markmin.markmin2html(body)
 
 #Create the header for a member message, such as a confirmation
 def msg_header(member, subject):
-	body = LETTERHEAD.replace('<subject>', subject)
-	body += f"\n\n-------------\n{datetime.datetime.now().strftime('%m/%d/%y')}||\n"
+	body = f"\n\n-------------\n{datetime.datetime.now().strftime('%m/%d/%y')}||\n"
 	body += f"{(member.Title or '')+' '}{member.Firstname} {member.Lastname} {member.Suffix or ''}||\n"
 	if member.Address1:
 		body += f"{member.Address1}||\n"
 	if member.Address2:
 		body += f"{member.Address2}||\n"
 	body += f"{member.City or ''} {member.State or ''} {member.Zip or ''}||\n"
-	body += '-------------\n\n' 
-	return body
+	body += '-------------' 
+	return LETTERHEAD.replace('&lt;subject&gt;', subject)+markmin.markmin2html(body)
 	
-#send invoice or confirm
+#sanitize and send invoice or confirm
 def msg_send(member,subject, message):
 	email = primary_email(member.id)
 	if not email:
 		return
-	message = HTML(XML(markmin.markmin2html(message)))
+	message = HTML(XML(message))
 	auth.sender.send(to=email, sender=SUPPORT_EMAIL, bcc=SUPPORT_EMAIL, subject=subject, body=message)
 	
 #create confirmation of event
@@ -1806,24 +1834,26 @@ def event_confirm(event_id, member_id, justpaid=0, event_only=False):
 		body += 'To pay online please visit '+URL(f'register/{event_id}', scheme=True)
 	elif event.Notes and not resvtns[0].Waitlist and not resvtns[0].Provisional:
 		body += '\n\n%s\n'%event.Notes
-	return body
-
-#apply markmin format except in HTML sections
-def msgformat(b):
-	m = re.match(r"^(.*)\{\{(.*)\}\}(.*)$", b, flags=re.DOTALL)
-	if m:
-		return msgformat(m.group(1)) + m.group(2) + msgformat(m.group(3))
-	return markmin.markmin2html(b)
+	return markmin.markmin2html(body)
 
 def society_emails(member_id):
 	return [row['Email'] for row in db((db.Emails.Member == member_id) & \
 	   (db.Emails.Email.contains(SOCIETY_DOMAIN.lower()))).select(
 			db.Emails.Email, orderby=~db.Emails.Modified)]
 
+def member_greeting(member):
+	if member.Title:
+		title = member.Title[4:] if member.Title.startswith('The ') else member.Title
+		greeting = f"Dear {title} {member.Firstname if title.find('Sir')>=0 else member.Lastname},<br>"
+	else:
+		greeting = f"Dear {member.Firstname.partition(' ')[0]},<br>"
+	return greeting
+
 @action('composemail', method=['POST', 'GET'])
-@action.uses("form.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 @checkaccess('write')
 def composemail():
+	access = session['access']	#for layout.html
 	session['url']=session['url_prev']	#preserve back link
 	query = request.query.get('query')
 	qdesc = request.query.get('qdesc')
@@ -1860,7 +1890,7 @@ def composemail():
 	fields.append(Field('subject', 'string', requires=IS_NOT_EMPTY(), default=proto.Subject if proto else ''))
 	fields.append(Field('body', 'text', requires=IS_NOT_EMPTY(), default=proto.Body if proto else "<Letterhead>\n<greeting>\n\n" if query else "<Letterhead>\n\n",
 				comment=CAT("You can use <subject>, <greeting>, <member>, <reservation>, <email>, or <metadata> ",
-				"where metadata is 'Letterhead', 'Membership Secretary' or  'Reservations', etc.  ",
+				"where metadata is 'Letterhead', 'support_email' or  'society_domain', etc.  ",
 				"You can also include html content thus: {{content}}. Email is formatted using ",
 					A('Markmin', _href='http://www.web2py.com/examples/static/markmin.html', _target='Markmin'), '.')))
 	fields.append(Field('save', 'boolean', default=proto!=None, comment='store/update template'))
@@ -1899,9 +1929,9 @@ def composemail():
 					select_fields.append(db.Reservations.Event)
 				if 'Mailings.contains'in query:		#using a mailing list
 					select_fields.append(db.Emails.Email)
-					unsubscribe = URL('member',  'mail_lists', scheme=True)
-					bodyparts.append((f"\n\n''This message addressed to {qdesc} [[unsubscribe {unsubscribe}]]''", None))
-				bodyparts.append((f"\n\n''{VISIT_WEBSITE_INSTRUCTIONS}''", None))
+					select_fields.append(db.Emails.id)
+					bodyparts.append((f"\n\n{VISIT_WEBSITE_INSTRUCTIONS}", None))
+					bodyparts.append((None, 'unsubscribe'))
 				rows = db(eval(query)).select(*select_fields, left=eval(left) if left!='' else None, distinct=True)
 				for row in rows:
 					body = ''
@@ -1913,20 +1943,16 @@ def composemail():
 						if part[0]:
 							body += part[0]
 						elif part[1] == 'greeting':
-							if member.Title:
-								title = member.Title[4:] if member.Title.startswith('The ') else member.Title
-								name = member.Firstname if title.find("Sir") >= 0 else member.Lastname
-								body += 'Dear ' + title + ' ' + name + ',\n\n'
-							else:
-								body += 'Dear ' + member.Firstname.partition(' ')[0] + ',\n\n'
+							body += member_greeting(member)
 						elif part[1] == 'email':
 							body += to
 						elif part[1] == 'member':
 							body += member_profile(member)
 						elif part[1] == 'reservation':
 							body += event_confirm(row.get(db.Reservations.Event), member.id)
-					message = HTML(XML(msgformat(body)))
-					auth.sender.send(to=to, sender=sender, reply_to=sender, bcc=bcc, subject=form2.vars['subject'], body=message)
+						elif part[1] == 'unsubscribe':
+							body += markmin.markmin2html(f"\n\nThis message addressed to {qdesc} [[unsubscribe {URL(f'emails/Y/{member.id}/edit/{row.get(db.Emails.id)}', scheme=True)}]]")
+					auth.sender.send(to=to, sender=sender, reply_to=sender, bcc=bcc, subject=form2.vars['subject'], body=HTML(XML(body)))
 				flash.set(f"{len(rows)} emails sent to {qdesc}")
 			else:
 				to = re.compile('[^,;\s]+').findall(form2.vars['to'])
@@ -1934,8 +1960,7 @@ def composemail():
 				for part in bodyparts:
 					body += part[0]		
 				flash.set(f"Email sent to: {to}")
-				message = HTML(XML(msgformat(body)))
-				auth.sender.send(to=to, sender=sender, reply_to=sender, subject=form2.vars['subject'], bcc=bcc, body=message)
+				auth.sender.send(to=to, sender=sender, reply_to=sender, subject=form2.vars['subject'], bcc=bcc, body=HTML(XML(body)))
 			redirect(session['url_prev'])
 	return locals()
 
@@ -2025,10 +2050,11 @@ def about():
 #######################Member Directory linked from Society web site#########################
 @action('directory', method=['GET'])
 @action('directory/<path:path>', method=['GET'])
-@action.uses("grid.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 @checkaccess(None)
 def directory(path=None):
-	if not member_good_standing(db.Members[session['member_id']]):
+	access = session['access']	#for layout.html
+	if not session['member_id'] or not member_good_standing(db.Members[session['member_id']]):
 		session.flash = 'Sorry, Member Directory is only available to members in good standing.'
 		redirect(URL('index'))
 			
@@ -2056,7 +2082,8 @@ def directory(path=None):
 @action.uses("message.html", db, session, flash)
 @checkaccess(None)
 def contact_details(member_id):
-	member=db.Members[member_id]
+	access = session['access']	#for layout.html
+	member=db.Members[member_id] if session['member_id'] else None
 	if not member or not member.Membership:
 		raise Exception("hack attempt?")
 	
@@ -2083,10 +2110,11 @@ def contact_details(member_id):
 ################################# New Event/Membership Registration Process  ################################
 @action('registration', method=['GET', 'POST'])
 @action('registration/<event_id:int>', method=['GET', 'POST'])
-@action.uses("form.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 @checkaccess(None)
 def registration(event_id=None):	#deal with eligibility, set up member record and affiliation record as necessary
 #used for both event booking and join/renewal
+	access = session['access']	#for layout.html
 	if event_id:
 		event = db(db.Events.id==event_id).select().first()
 		if not event or datetime.datetime.now() > event.DateTime or (datetime.datetime.now() > event.Booking_Closed and not event_attend(event_id)):
@@ -2267,11 +2295,13 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 	
 ######################################## Join/Renew/Profile Update ######################################
 @action('profile', method=['GET', 'POST'])
-@action.uses("form.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 @checkaccess(None)
 def profile():
+	access = session['access']	#for layout.html
 	if not session.get('member_id'):
 		redirect(URL('index'))
+
 	
 	member = db.Members[session.get('member_id')]
 
@@ -2321,6 +2351,7 @@ reached by using the join/renew link on our home page).<br>\
 @action.uses("checkout.html", session)
 @checkaccess(None)
 def stripe_update_card():
+	access = session['access']	#for layout.html
 	stripe_session_id = request.query.get('stripe_session_id')
 	stripe_pkey = STRIPE_PKEY
 	return locals()
@@ -2329,7 +2360,10 @@ def stripe_update_card():
 @action.uses("checkout.html", session, db, flash)
 @checkaccess(None)
 def stripe_switched_card():
+	access = session['access']	#for layout.html
 	stripe.api_key = STRIPE_SKEY
+	if not session.get('member_id'):
+		redirect(URL('index'))
 	member = db.Members[session['member_id']]
 
 	stripe_session = stripe.checkout.Session.retrieve(session['stripe_session_id'], expand=['setup_intent'])
@@ -2341,14 +2375,14 @@ def stripe_switched_card():
 	redirect(URL('update_card'))
 
 @action('update_card', method=['GET', 'POST'])
-@action.uses("form.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 @checkaccess(None)
 def update_card():
+	access = session['access']	#for layout.html
 	stripe.api_key = STRIPE_SKEY
 
 	if not session.get('member_id'):
 		redirect(URL('index'))
-
 	member = db.Members[session['member_id']]
 	
 	if member.Stripe_subscription and member.Stripe_subscription!='Cancelled':
@@ -2382,11 +2416,14 @@ def update_card():
 	return locals()
 	
 @action('cancel_subscription', method=['GET', 'POST'])
-@action.uses("form.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 @checkaccess(None)
 def cancel_subscription():
+	access = session['access']	#for layout.html
 	stripe.api_key = STRIPE_SKEY
 	
+	if not session.get('member_id'):
+		redirect(URL('index'))
 	member = db.Members[session['member_id']]
 	if not (member and member_good_standing(member, (datetime.datetime.now()-datetime.timedelta(days=45)).date())):
 		raise Exception("perhaps Back button or mobile auto re-request?")
@@ -2415,6 +2452,7 @@ def cancel_subscription():
 @action.uses("checkout.html", db, session, flash)
 @checkaccess(None)
 def checkout():
+	access = session['access']	#for layout.html
 	if (not session.get('membership') and not session.get('event_id')) or not session.get('member_id'):
 		redirect(URL('index'))	#protect against regurgitated old requests
 		
@@ -2516,7 +2554,7 @@ def checkout_success():
 	redirect(URL('index'))
 
 @action('login', method=['POST', 'GET'])
-@action.uses("form.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 def login():
 	user = db(db.users.remote_addr==request.remote_addr).select().first()
 	form = Form([Field('email', 'string',
@@ -2534,7 +2572,7 @@ you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _h
 	return locals()
 
 @action('validate/<id:int>/<token:int>', method=['GET', 'POST'])
-@action.uses("form.html", db, session)
+@action.uses("gridform.html", db, session)
 def validate(id, token):
 	user = db(db.users.id == id).select().first()
 	if not user or not int(token) in user.tokens or \
@@ -2582,9 +2620,10 @@ def logout():
 
 # stripe_tool (diagnostic tool)
 @action('stripe_tool', method=['GET', 'POST'])
-@action.uses("form.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 @checkaccess('accounting')
 def stripe_tool():
+	access = session['access']	#for layout.html
 	form = Form([Field('object_type', comment="e.g. 'Customer', 'Subscription'"),
 	      		Field('object_id')],
 				keep_values=True, formstyle=form_style)
@@ -2604,9 +2643,10 @@ def stripe_tool():
 
 @action('db_tool', method=['POST', 'GET'])
 @action('db_tool/<path:path>', method=['POST', 'GET'])
-@action.uses("grid.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 @checkaccess('admin')
 def db_tool(path=None):
+	access = session['access']	#for layout.html
 	form = Form([Field('query'),
 	      		Field('do_update', 'boolean'),
 			    Field('field_update')],
@@ -2640,9 +2680,10 @@ Use (...)&(...) for AND, (...)|(...) for OR, and ~(...) for NOT to build more co
 	return locals()
 
 @action("db_restore", method=['POST', 'GET'])
-@action.uses("form.html", db, session, flash)
+@action.uses("gridform.html", db, session, flash)
 @checkaccess('admin')
 def db_restore():
+	access = session['access']	#for layout.html
 	header = f"Restore {SOCIETY_DOMAIN} database from backup file"
 	
 	form = Form([Field('backup_file', 'upload', uploadfield = False)],
@@ -2668,6 +2709,7 @@ def db_restore():
 @action.uses("download.html", db, session, Inject(response=response))
 @checkaccess('admin')
 def db_backup():
+	access = session['access']	#for layout.html
 	stream = StringIO()
 	content_type = "text/csv"
 	filename = f'{SOCIETY_DOMAIN}_db_backup.csv'

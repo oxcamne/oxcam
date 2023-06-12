@@ -5,8 +5,7 @@ This file defines the database models
 from .common import db, Field
 from .settings_private import MEMBER_CATEGORIES, ACCESS_LEVELS
 from pydal.validators import *
-from yatl.helpers import CAT, A
-#from py4web.utils.form import Form, CheckboxWidget, ListWidget
+from yatl.helpers import CAT, A, I
 import datetime, decimal
 
 ### Define your table below
@@ -112,8 +111,8 @@ db.define_table('Members',
 	
 db.define_table('Emails',
 	Field('Member', 'reference Members', writable=False),
-	Field('Email', 'string', requires=IS_EMAIL(), writable=False),
-	Field('Mailings', 'list:reference Email_Lists', #widget=CheckboxWidget,
+	Field('Email', 'string', remequires=IS_EMAIL(), writable=False),
+	Field('Mailings', 'list:reference Email_Lists', #widget=ListRefCheckboxWidget,
 			comment='On desktop Ctrl-click on list name in list above to toggle selection'),
 	Field('Created', 'datetime', default=datetime.datetime.now(), writable=False),
 	Field('Modified', 'datetime', default=datetime.datetime.now(), update=datetime.datetime.now(), writable=False),

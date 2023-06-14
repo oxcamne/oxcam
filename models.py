@@ -4,8 +4,9 @@ This file defines the database models
 
 from .common import db, Field
 from .settings_private import MEMBER_CATEGORIES, ACCESS_LEVELS
-from pydal.validators import *
-from yatl.helpers import CAT, A, I
+from pydal.validators import IS_IN_DB, IS_EMPTY_OR, IS_IN_SET, IS_NOT_EMPTY, IS_DATE,\
+	IS_NOT_IN_DB, IS_MATCH, IS_EMAIL, IS_DECIMAL_IN_RANGE, IS_DATETIME, IS_INT_IN_RANGE
+from yatl.helpers import CAT, A
 import datetime, decimal
 
 ### Define your table below
@@ -270,18 +271,22 @@ db.define_table('EMProtos',
 	Field('Body', 'text', requires=IS_NOT_EMPTY()),
 	Field('Created', 'datetime', default=datetime.datetime.now(), writable=False),
 	Field('Modified', 'datetime', default=datetime.datetime.now(), update=datetime.datetime.now(), writable=False))
+
+db.define_table('emailqueue',	#used for notices or messages targetted via membership database
+	Field('subject'),
+	Field('bodyparts', 'text'),	#str([(text, func), ...])
+	Field('sender'),
+	Field('bcc'),
+	Field('query', 'text'),	#query used to locate targets
+	Field('left'),	#goes with query
+	Field('qdesc'),	#description of target list
+	Field('Created', 'datetime', default=datetime.datetime.now(), writable=False))
 	
 db.define_table('CoA',
 	Field('Name', 'string'),
 	Field('Notes', 'string'),
 	format='%(Name)s')
 db.CoA.Name.requires = [IS_NOT_EMPTY(), IS_NOT_IN_DB(db, 'CoA.Name')]
-
-def bank_balance(bank_id, timestamp=datetime.datetime.now(), balance=0):
-	amt = db.AccTrans.Amount.sum()
-	fee = db.AccTrans.Fee.sum()
-	r = db((db.AccTrans.Bank==bank_id)&(db.AccTrans.Accrual==False)&(db.AccTrans.Timestamp>=timestamp)).select(amt, fee).first()
-	return balance-(r[amt] or 0)-(r[fee] or 0)
 
 def bank_accrual(bank_id):
 	amt = db.AccTrans.Amount.sum()
@@ -338,14 +343,5 @@ db.define_table('Metadata',
 	Field('Modified', 'datetime', writable=False),
 	format='%(Name)s')
 db.Metadata.Name.requires=[IS_NOT_EMPTY(), IS_NOT_IN_DB(db, 'Metadata.Name')]
-
-db.define_table('emailqueue',	#used for notices or messages targetted via membership database
-	Field('subject', 'string'),
-	Field('body', 'text'),	#already in HTML, but contains {{greeting}} to be substituted individually
-	Field('reply_to', 'string'),	#the sender's selected Society email address
-	Field('targets', 'list:reference Emails'),	#emails now in their own table
-	Field('event', 'reference Events'),		#if references reservations, else None
-	Field('Created', 'datetime', writable=False),
-	Field('Modified', 'datetime', writable=False))
 
 db.commit()

@@ -1,16 +1,29 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-#this is used in PythonAnywhere environment, where it is run as a Pythonanywhere task:
-#	python#.# /home/oxcamne/web2py/web2py.py -S init -M -R applications/init/modules/db_backup.py
-#which in turn is run by the PythonAnywhere scheduler.
+"""
+this is used in PythonAnywhere environment, where it is run as a Pythonanywhere scheduled task:
+	py4web/py4web.py call py4web/apps oxcam.daily_maintenance.daily_maintenance
+it can be run in vscode using a configuration:
+        {
+            "name": "Python: daily",
+            "type": "python",
+            "request": "launch",
+            "program": "C:/Users/David/SkyDrive/py4web/py4web.py",
+            "args": ["call", "apps", "oxcam.daily_maintenance.daily_maintenance"],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+        }
+
+"""
 import datetime
 import os
-from .common import db, session, T, cache, auth, logger, authenticated, unauthenticated, flash
-from .settings_private import *
-from .models import *
+from .common import db, auth, logger
+from .settings_private import SOCIETY_DOMAIN, STRIPE_SKEY, IS_PRODUCTION, SUPPORT_EMAIL,\
+	LETTERHEAD, SOCIETY_NAME
+from .models import primary_email
 from .controllers import member_greeting
 from py4web import URL
-from yatl.helpers import *
+from yatl.helpers import HTML, XML
 import stripe
 stripe.api_key = STRIPE_SKEY
 
@@ -43,11 +56,14 @@ def daily_maintenance():
 		if (m.Paiddate - datetime.date.today()).days % interval == 0:
 			text = f"{LETTERHEAD.replace('&lt;subject&gt;', 'Renewal Reminder')}{member_greeting(m)}"
 			text += f"<p>This is a friendly reminder that your {SOCIETY_NAME} membership expiration \
-	date is/was {m.Paiddate.strftime('%m/%d/%Y')}. Please renew by <a href={URL('index', scheme=True)}> logging in</a> \
-	and selecting join/renew from the menu of choices.</p><p>\
-	We are very grateful for your membership support!</p>\
-	If you have any questions, please contact {SUPPORT_EMAIL}"
-			auth.sender.send(to=to, bcc=bcc, sender=SUPPORT_EMAIL, subject='Renewal Reminder', body=HTML(XML(text)))
+date is/was {m.Paiddate.strftime('%m/%d/%Y')}. Please renew by <a href={URL('index', scheme=True)}> logging in</a> \
+and selecting join/renew from the menu of choices, \
+or cancel membership to receive no futher reminders.</p><p>\
+We are very grateful for your membership support and hope that you will renew!</p>\
+If you have any questions, please contact {SUPPORT_EMAIL}"
+			if IS_PRODUCTION:
+				auth.sender.send(to=primary_email(m.id), sender=SUPPORT_EMAIL, subject='Renewal Reminder', body=HTML(XML(text)))
+			logger.info(f"Renewal Reminder sent to {primary_email(m.id)}")
 
 	subs = db((db.Members.Stripe_subscription!=None)&(db.Members.Stripe_subscription!='Cancelled')&(db.Members.Stripe_next<datetime.date.today())).select()
 	for m in subs:
@@ -69,5 +85,6 @@ If you have any questions, please contact {SUPPORT_EMAIL}"
 		except Exception as e:	#assume payment has failed
 			pass
 				
+		logger.info(f"Membership Subscription Cancelled {primary_email(m.id)}")
 		m.update_record(Stripe_subscription = 'Cancelled', Stripe_next=None, Modified=datetime.datetime.now())
 	db.commit()

@@ -28,8 +28,8 @@ from py4web import action, request, response, redirect, URL, Field
 from yatl.helpers import H5, H6, XML, HTML, DIV, P, TABLE, TH, TD, THEAD, TR
 from .common import db, session, auth, logger, flash
 from .settings_private import SOCIETY_DOMAIN, STRIPE_PKEY, STRIPE_SKEY, LETTERHEAD,\
-	SUPPORT_EMAIL, GRACE_PERIOD, SOCIETY_NAME, VISIT_WEBSITE_INSTRUCTIONS,\
-	MEMBERSHIP, STRIPE_EVENT, MEMBER_CATEGORIES
+	SUPPORT_EMAIL, GRACE_PERIOD, SOCIETY_NAME, MEMBERSHIP, STRIPE_EVENT,\
+	MEMBER_CATEGORIES, MAIL_LISTS, STRIPE_FULL, STRIPE_STUDENT
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
 	primary_matriculation, dues_type, event_revenue, event_unpaid, res_tbc
@@ -37,7 +37,7 @@ from pydal.validators import IS_LIST_OF_EMAILS, IS_EMPTY_OR, IS_IN_DB, IS_IN_SET
 	IS_NOT_EMPTY, IS_DATE, IS_DECIMAL_IN_RANGE, IS_INT_IN_RANGE, IS_EMAIL
 from .utilities import member_good_standing, ageband, update_Stripe_email, newpaiddate,\
 	collegelist, tdnum, get_banks, financial_content, event_confirm, msg_header, msg_send,\
-	society_emails, emailparse, member_greeting, member_profile, checkaccess
+	society_emails, emailparse, checkaccess, notification, notify_support, member_profile
 from py4web.utils.grid import Grid, GridClassStyleBulma, Column
 from py4web.utils.form import Form, FormStyleBulma
 from py4web.utils.factories import Inject
@@ -478,8 +478,10 @@ def switch_email():
 	session['access'] = member.Access
 	email_id = db.Emails.insert(Member=member_id, Email=session['email'], Mailings=eval(request.query.get('mailings')))
 	flash.set("Please review your mailing list subscriptions")
+	notify_support(member, 'Email address change',
+		f"New primary email address {primary_email(member.id)}")
 	session['url'] = URL('index')	#will be back link from emails page
-	redirect(f"emails/Y/{member_id}/select")
+	redirect(f"emails/Y/{member_id}/edit/{email_id}")
 
 @action('emails/<ismember>/<member_id:int>', method=['POST', 'GET'])
 @action('emails/<ismember>/<member_id:int>/<path:path>', method=['POST', 'GET'])
@@ -493,7 +495,7 @@ def emails(ismember, member_id, path=None):
 			raise Exception(f"invalid call to emails controller from member {session['member_id']}")
 		write = True
 	else:
-		if not session.get('access'):
+		if not session['access']:
 			redirect(URL('accessdenied'))
 		write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 	db.Emails.Member.default=member_id
@@ -502,18 +504,19 @@ def emails(ismember, member_id, path=None):
 		db.Emails.Email.writable = True
 		old_primary_email = db(db.Emails.Member == member_id).select(orderby=~db.Emails.Modified).first()
 		db.Emails.Mailings.default = old_primary_email.Mailings
-		db.Emails.Modified.update = None
-		old_primary_email.update_record(Mailings=None)
+		if ismember=='Y':
+			db.Emails.Mailings.readable=db.Emails.Mailings.writable=False
 	elif path=='select':
 		update_Stripe_email(db.Members[member_id])
 
-	header = CAT(A('back', _href=session['url_prev']),
+	header = CAT(A('back', _href=session['url_prev']) if ismember!='Y' else '',
 	      		H5('Member Emails'),
 	      		H6(member_name(member_id)))
 	if path=='select':
-		footer = XML("Note, the most recently edited (topmost) email is used for messages \
+		header = CAT(header, XML("Note, the most recently edited (topmost) email is used for messages \
 directed to the individual member, and appears in the Members Directory. Notices \
-are sent as specified in the Mailings Column. To switch to a new email address, use <b>+New</b>.")
+are sent as specified in the Mailings Column.<br>To switch to a new email address, use <b>+New</b> button.<br>\
+To change your mailing list subscritions, use the <b>Edit</b> button."))
 
 	def validate(form):
 		if len(form.errors)>0:
@@ -533,6 +536,26 @@ are sent as specified in the Mailings Column. To switch to a new email address, 
 			grid_class_style=grid_style,
 			formstyle=form_style,
 			)
+
+	if ismember=='Y' and path.startswith('edit'):	#substitute user friendly form for grid form
+		grid = None
+		email = db.Emails[path[5:]]
+		header = CAT(header, email.Email)
+		fields = []
+		for list in db(db.Email_Lists.id>0).select():
+			fields.append(Field(list.Listname.replace(' ', '_'), 'boolean', default=list.id in email.Mailings))
+		form = Form(fields)
+		footer = XML(MAIL_LISTS)
+		if form.accepted:
+			mailings = []
+			for list in db(db.Email_Lists.id>0).select():
+				if form.vars.get(list.Listname.replace(' ', '_')):
+					mailings.append(list.id)
+			email.update_record(Mailings=mailings)
+			flash.set('Thank you for updating your mailing list subscriptions')
+			notify_support(db.Members[member_id],"Mail Subscriptions Updated",
+		  		f"{email.Email} {', '.join([list.Listname for list in db(db.Email_Lists.id.belongs(mailings)).select()])}")
+			redirect(URL(f"emails/Y/{member_id}/select"))
 	return locals()
 	
 @action('dues/<member_id:int>', method=['POST', 'GET'])
@@ -830,7 +853,7 @@ def reservation(ismember, member_id, event_id, path=None):
 	if path=='select':
 			back = session['back'][-1]
 
-	header = CAT(H5('Member Registration'), H6(member_name(member_id)),
+	header = CAT(H5('Event Registration'), H6(member_name(member_id)),
 			XML(markmin.markmin2html(event_confirm(event.id, member.id, event_only=True))))
 	if ismember!='Y':
 		header = CAT(A('back', _href=back), header)
@@ -855,11 +878,11 @@ def reservation(ismember, member_id, event_id, path=None):
 			if not waitlist:
 				payment += (provisional_ticket_cost or 0)
 			if adding!=0 or payment!=0:
-				header = CAT(header,  XML(f"Use <b>Checkout</b> button (below) to complete your registration.<br>"))
+				header = CAT(header,  XML(f"Use the blue <b>Checkout</b> button (below) to complete your registration.<br>"))
 			if not event.Guests or len(all_guests)<event.Guests:
-				header = CAT(header,  XML(f"Use <b>+New</b> button to add guests.<br>"))
+				header = CAT(header,  XML(f"Use the blue <b>+New</b> button to add guests.<br>"))
 			if payment>0:
-				header = CAT(header, XML(f"You will be charged ${payment} at Checkout{dues_tbc}.<br>"))
+				header = CAT(header, XML(f"You will be charged ${payment} at Checkout{dues_tbc}<br>"))
 
 			fields = []
 			if event.Survey:
@@ -921,7 +944,7 @@ Moving member on/off waitlist will also affect all guests."))
 			db.Reservations.Host.default=False
 			db.Reservations.Firstname.writable=True
 			db.Reservations.Lastname.writable=True
-			db.Reservations.Ticket.default = host_reservation.Ticket
+			db.Reservations.Ticket.default = event.Tickets[0]
 		else:
 			#creating or revising the host reservation
 			db.Reservations.Title.default = member.Title
@@ -948,10 +971,26 @@ Moving member on/off waitlist will also affect all guests."))
 			if affinity:
 				db.Reservations.Affiliation.default = affinity.College
 				db.Reservations.Affiliation.writable = False
+
+			if ismember=='Y' and path=='new' and not event.Selections and \
+				(not event.Tickets or len(event.Tickets)==1 or db.Reservations.Ticket.writable==False):
+				#no choices needed, create the Host reservation and display checkout screen
+				db.Reservations.insert(Member=member_id, Event=event_id, Host=True,
+			   		Firstname=member.Firstname, Lastname=member.Lastname, Affiliation=affinity.College,
+					Ticket=db.Reservations.Ticket.default)
+				redirect(URL(f"reservation/Y/{member_id}/{event_id}/select"))
 	
 	def validate(form):
 		if form.vars.get('Waitlist') and form.vars.get('Provisional'):
 			form.errors['Waitlist'] = "Waitlist and Provisional should not both be set"
+		if ismember=='Y' and form.vars.get('Ticket') != db.Reservations.Ticket.default and db.Reservations.Ticket.writable==True:
+			if form.vars.get('Ticket'):
+				if form.vars.get('Ticket').endswith('$0'):
+					form.errors['Ticket'] = "Freshers should please register themselves individually."
+				elif not form.vars.get('Notes'):
+					form.errors['Ticket']='Please note below how this guest qualifies for the ticket discount.'
+			else:
+				form.errors['Ticket'] = "Please select the appropriate ticket type."
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
@@ -960,15 +999,13 @@ Moving member on/off waitlist will also affect all guests."))
 				for row in all_guests:
 					if row.id != host_reservation.id and not row.Provisional:
 						row.update_record(Waitlist = form.vars.get('Waitlist'))
-		if ismember=='Y' and form.vars.get('Ticket') != None and form.vars.get('Ticket') != db.Reservations.Ticket.default and not form.vars.get('Notes'):
-			form.errors['Ticket']='Please note below how you qualify for this ticket price.'
 
 	grid = Grid(path, (db.Reservations.Member==member.id)&(db.Reservations.Event==event.id),
 			orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname,
 			columns=[db.Reservations.Lastname, db.Reservations.Firstname, 
 					db.Reservations.Notes, db.Reservations.Unitcost, db.Reservations.Status],
 			headings=['Last', 'First', 'Notes', 'Price', 'Status'],
-			deletable=lambda row: write and (len(all_guests)==1 or row['id'] != host_reservation.id) \
+			deletable=lambda row: write and (len(all_guests)==1 and ismember!='Y' or row['id'] != host_reservation.id) \
 						and (ismember!='Y' or row.Provisional or row.Waitlist),
 			details=not write, 
 			editable=lambda row: write and (ismember!='Y' or row['Provisional'] or row['Waitlist']), 
@@ -976,7 +1013,9 @@ Moving member on/off waitlist will also affect all guests."))
 			grid_class_style=grid_style, formstyle=form_style, validation=validate, show_id=ismember!='Y')
 	
 	if ismember=='Y' and path=='select':
-		if adding==0 and payment==0:
+		if len(form2.errors)>0:
+			flash.set("Error(s) in form, please check")
+		elif adding==0 and payment==0:
 			form2 = ''	#don't need the Checkout form
 		elif form2.accepted:
 			#Checkout logic
@@ -1818,7 +1857,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 					if not member_good_standing(member, event.DateTime.date()):
 						#still need dues, so signal
 						session['membership'] = checkout.get('membership')
-						session['dues'] = str(checkout.get('dues'))
+						session['dues'] = str(checkout.get('dues')) if checkout.get('dues') else None
 				redirect(URL(f'reservation/Y/{member_id}/{event_id}/'))	#go add guests and/or checkout
 			if member_good_standing(member, event.DateTime.date()) or sponsor \
 					or ((affinity or member.Membership)and not event.Members_only):
@@ -1928,6 +1967,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 			
 		if (request.query.get('mail_list')):
 			session['url'] = URL('index')
+			flash.set("Please review your subscription settings below.")
 			redirect(URL(f"emails/Y/{member_id}/edit/{email_id}"))
 				
 		if request.query.get('join_or_renew') or not event:	#collecting dues with event registration, or joining/renewing
@@ -2010,6 +2050,7 @@ reached by using the join/renew link on our home page).<br>\
 				redirect(URL(f"reservation/Y/{member.id}/{session['event_id']}/new"))	#go create this member's reservation
 			redirect(URL('checkout'))
 		flash.set('Thank you for updating your profile information.')
+		notify_support(member, 'Member Profile Updated', member_profile(member))
 	
 	return locals()
 	
@@ -2038,6 +2079,7 @@ def stripe_switched_card():
 	stripe.Subscription.modify(member.Stripe_subscription,
 				default_payment_method=stripe_session.setup_intent.payment_method)
 	flash.set('Thank you for updating your credit card information!')
+	notify_support(member, 'Credit Card Update', 'Credit card updated.')
 	redirect(URL('update_card'))
 
 @action('update_card', method=['GET', 'POST'])
@@ -2109,7 +2151,8 @@ def cancel_subscription():
 		member.update_record(Stripe_subscription = 'Cancelled', Stripe_next=None)
 		#if we simply cleared Stripe_subscription then the daily backup daemon might issue membership reminders!
 
-		effective = max(member.Paiddate or datetime.datetime.now().date(), datetime.datetime.now().date()).strftime('%m/%d/%Y')
+		effective = max(member.Paiddate or datetime.datetime.now().date(), datetime.datetme.now().date()).strftime('%m/%d/%Y')
+		notification(member, 'Memership Cancelled', f'Your membership is cancelled effective {effective}.')
 		flash.set(f'Your membership is cancelled effective {effective}.')
 		redirect(URL('index'))
 	return locals()
@@ -2188,7 +2231,7 @@ def checkout_success():
 		redirect(URL('index'))
 
 	subject = 'Registration Confirmation' if tickets_tbc>0 else 'Thank you for your membership payment'
-	message = f"{msg_header(member, subject)}####Received: ${dues+tickets_tbc}\n\n"
+	message = f"{msg_header(member, subject)}<br><b>Received: ${dues+tickets_tbc}</b><br>"
 	
 	if dues:
 		next = None
@@ -2197,7 +2240,7 @@ def checkout_success():
 			next = datetime.datetime.fromtimestamp(subscription.current_period_end).date()
 		member.update_record(Membership=request.query.get('membership'),
 			Stripe_subscription=stripe_session.subscription, Stripe_next=next, Charged=dues)
-		message += '<br><b>Thank you, your membership is now current.</b><br>'
+		message += 'Thank you, your membership is now current.</b><br>'
 		
 	if tickets_tbc:
 		host_reservation = db((db.Reservations.Event==request.query.get('event_id'))&(db.Reservations.Member == member.id)\
@@ -2216,7 +2259,7 @@ def checkout_success():
 	if dues:
 		flash.set('Confirmation has been sent by email. Please review your mailing list subscriptions.')
 		session['url'] = URL('index')
-		redirect(URL(f"emails/Y/{member.id}"))
+		redirect(URL(f"emails/Y/{member.id}/edit/{db(db.Emails.Member == member.id).select(orderby=~db.Emails.Modified).first().id}"))
 	redirect(URL('index'))
 
 @action('login', method=['POST', 'GET'])

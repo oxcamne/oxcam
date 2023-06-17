@@ -21,10 +21,9 @@ and in PythonAnywhere environment, where it is run as a Pythonanywhere 'run fore
 import time, markmin
 import os
 from .common import db, auth
-from .settings_private import LETTERHEAD, SOCIETY_NAME, VISIT_WEBSITE_INSTRUCTIONS
-from .utilities import member_profile, event_confirm
+from .settings_private import VISIT_WEBSITE_INSTRUCTIONS
+from .utilities import member_profile, event_confirm, member_greeting
 from .models import primary_email
-from .controllers import member_greeting
 from py4web import URL
 from yatl.helpers import HTML, XML
 

@@ -5,10 +5,10 @@ from py4web import URL, request, redirect
 from py4web.utils.factories import Inject
 from .common import db, auth, session
 from .settings_private import *	#include all for <name> in emailparse
-from .models import primary_email, res_tbc, res_totalcost, res_status
+from .models import primary_email, res_tbc, res_totalcost, res_status,\
+		ACCESS_LEVELS, member_name
 from yatl.helpers import A, TABLE, TH, THEAD, H6, TR, TD, CAT, HTML, XML
 import stripe, datetime, re, markmin
-from .models import ACCESS_LEVELS
 
 """
 decorator for validating login & access permission using a one-time code
@@ -77,7 +77,12 @@ def update_Stripe_email(member):
 			stripe.Customer.modify(member.Stripe_id, email=primary_email(member.id))
 		except Exception as e:
 			member.update_record(Stripe_id=None, Stripe_subscription=None, Stripe_next=None)
-	
+
+def notify_support(member, subject, body):
+	message = f"{member_name(member.id)} id {member.id}<br>{body}"
+	message = HTML(XML(message))
+	auth.sender.send(to=SUPPORT_EMAIL, sender=SUPPORT_EMAIL, subject=subject, body=message)
+
 #notifications to Member & Support_Email of member actions
 def notification(member, subject, body):
 	# build and send email update member, and to SUPPORT_EMAIL if production environment

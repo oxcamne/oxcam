@@ -20,6 +20,7 @@ import os
 from .common import db, auth, logger
 from .settings_private import SOCIETY_DOMAIN, STRIPE_SKEY, IS_PRODUCTION, SUPPORT_EMAIL,\
 	LETTERHEAD, SOCIETY_NAME
+from .utilities import notify_support
 from .models import primary_email
 from .controllers import member_greeting
 from py4web import URL
@@ -86,5 +87,6 @@ If you have any questions, please contact {SUPPORT_EMAIL}"
 			pass
 				
 		logger.info(f"Membership Subscription Cancelled {primary_email(m.id)}")
+		notify_support(m, 'Membership Cancelled', f"{primary_email(m.id)} Stripe auto-renew failed")
 		m.update_record(Stripe_subscription = 'Cancelled', Stripe_next=None, Modified=datetime.datetime.now())
 	db.commit()

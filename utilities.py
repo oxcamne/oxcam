@@ -86,7 +86,7 @@ def notify_support(member, subject, body):
 #notifications to Member & Support_Email of member actions
 def notification(member, subject, body):
 	# build and send email update member, and to SUPPORT_EMAIL if production environment
-	message = eval(LETTERHEAD.upper()).replace('&lt;subject&gt;', subject)
+	message = LETTERHEAD.replace('&lt;subject&gt;', subject)
 	message += member_greeting(member)
 	message += body
 	msg_send(member, subject, message)

@@ -105,6 +105,7 @@ def members(path=None):
 		db.Members.Access.writable = False
 	db.Members.City.requires=db.Members.State.requires=db.Members.Zip.requires=None
 	db.Members.Affiliations.readable = False
+	db.Members.Created.default = datetime.datetime.now()
 
 	search_form=Form([
 		Field('mailing_list', 'reference Email_Lists', 
@@ -517,14 +518,15 @@ def emails(ismember, member_id, path=None):
 directed to the individual member, and appears in the Members Directory. Notices \
 are sent as specified in the Mailings Column.<br>To switch to a new email address, use <b>+New</b> button.<br>\
 To change your mailing list subscritions, use the <b>Edit</b> button."))
+	footer = XML(MAIL_LISTS)
 
 	def validate(form):
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
 		if ismember=='Y' and not form.vars.get('id'): #member adding new address
-			session['url'] = URL('switch_email', vars=dict(mailings=form.vars['Mailings'],
-										member_id=session['member_id']))
+			session['url'] = URL('switch_email', vars=dict(mailings=db.Emails.Mailings.default,
+										member_id=member_id))
 			redirect(URL('send_email_confirmation', vars=dict(email=form.vars['Email'])))
 
 	grid = Grid(path, db.Emails.Member==member_id,
@@ -545,7 +547,6 @@ To change your mailing list subscritions, use the <b>Edit</b> button."))
 		for list in db(db.Email_Lists.id>0).select():
 			fields.append(Field(list.Listname.replace(' ', '_'), 'boolean', default=list.id in email.Mailings))
 		form = Form(fields)
-		footer = XML(MAIL_LISTS)
 		if form.accepted:
 			mailings = []
 			for list in db(db.Email_Lists.id>0).select():
@@ -819,6 +820,7 @@ def reservation(ismember, member_id, event_id, path=None):
 			redirect(URL('accessdenied'))
 		write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 
+	db.Reservations.Created.default = datetime.datetime.now()
 	member = db.Members[member_id]
 	event = db.Events[event_id]
 	is_good_standing = member_good_standing(member, event.DateTime.date())
@@ -1820,6 +1822,8 @@ def contact_details(member_id):
 def registration(event_id=None):	#deal with eligibility, set up member record and affiliation record as necessary
 #used for both event booking and join/renewal
 	access = session['access']	#for layout.html
+	db.Members.Created.default = datetime.datetime.now()
+	db.Reservations.Created.default = datetime.datetime.now()
 	if event_id:
 		event = db(db.Events.id==event_id).select().first()
 		if not event or datetime.datetime.now() > event.DateTime or (datetime.datetime.now() > event.Booking_Closed and not event_attend(event_id)):
@@ -2150,9 +2154,11 @@ def cancel_subscription():
 		
 		member.update_record(Stripe_subscription = 'Cancelled', Stripe_next=None)
 		#if we simply cleared Stripe_subscription then the daily backup daemon might issue membership reminders!
+		if not member.Paiddate:	#just joined but changed their mind?
+			member.update_record(Membership=None, Charged=None)
 
-		effective = max(member.Paiddate or datetime.datetime.now().date(), datetime.datetme.now().date()).strftime('%m/%d/%Y')
-		notification(member, 'Memership Cancelled', f'Your membership is cancelled effective {effective}.')
+		effective = max(member.Paiddate or datetime.datetime.now().date(), datetime.datetime.now().date()).strftime('%m/%d/%Y')
+		notification(member, 'Membership Cancelled', f'Your membership is cancelled effective {effective}.')
 		flash.set(f'Your membership is cancelled effective {effective}.')
 		redirect(URL('index'))
 	return locals()
@@ -2259,7 +2265,11 @@ def checkout_success():
 	if dues:
 		flash.set('Confirmation has been sent by email. Please review your mailing list subscriptions.')
 		session['url'] = URL('index')
-		redirect(URL(f"emails/Y/{member.id}/edit/{db(db.Emails.Member == member.id).select(orderby=~db.Emails.Modified).first().id}"))
+		redirect(URL(f"emails/Y/{member.id}/select"))
+		#it would be nice to go right to edit the subscription of the primary email,
+		#but a side effect of Stripe Checkout seems to be that the first 'submit' doesn't work
+		#I think this is CSRF protection at work.
+		#redirect(URL(f"emails/Y/{member.id}/edit/{db(db.Emails.Member == member.id).select(orderby=~db.Emails.Modified).first().id}"))
 	redirect(URL('index'))
 
 @action('login', method=['POST', 'GET'])
@@ -2291,11 +2301,16 @@ def validate(id, token):
 	rows = db((db.Members.id == db.Emails.Member) & db.Emails.Email.ilike(user.email)).select(
 				db.Members.ALL, distinct=True)
 	header = H6("Please select which of you is signing in:")
-	form = Form([Field('member', 'integer', requires=IS_IN_SET([(row.id, member_name(row.id)+(' '+row.Membership+' member until '+(row.Paiddate.strftime('%m/%d/%Y') if row.Paiddate else '')  if row.Membership else '')) for row in rows]))],
+	members = [(row.id, member_name(row.id)+(' '+row.Membership+' member until '+(row.Paiddate.strftime('%m/%d/%Y') if row.Paiddate else '')  if row.Membership else '')) for row in rows]
+	form = Form([Field('member', 'integer', requires=IS_IN_SET(members))],
 	     formstyle=FormStyleBulma)
 	if len(rows)<=1:
 		member_id = rows.first().id if len(rows)==1 else None
 	elif form.vars.get('member'):
+		#note, if we use form.accepted the user will have to click twice;
+		#apparently when validate is invoked from another site (e.g. gmail) a new form_key
+		#is put in the response cookie, but won't match the proper key, in other words we
+		#run into CSRF protection.
 		member_id = form.vars.get('member')
 	else:
 		return locals()	#display form

@@ -18,6 +18,9 @@ import datetime, decimal
 # db.commit()
 #
 
+def set_modified(fields):
+	return datetime.datetime.now()
+
 db.define_table('users', 
 	Field('email', 'string'),
 	Field('tokens', 'list:integer'),
@@ -106,7 +109,7 @@ db.define_table('Members',
 	Field('Workphone', 'string'),
 	Field('Cellphone', 'string', comment='Cellphone for Society use only, will not be published in Directory'),
 	Field('Created', 'datetime', default=datetime.datetime.now(), writable=False),
-	Field('Modified', 'datetime', default=datetime.datetime.now(), update=datetime.datetime.now(), writable=False),
+	Field('Modified', 'datetime', compute=set_modified, writable=False),
 	plural="Members", singular="Member",
 	format=lambda r: f"{r['Lastname']}, {r['Title'] or ''} {r['Firstname']} {r['Suffix'] or ''}")
 	
@@ -115,8 +118,7 @@ db.define_table('Emails',
 	Field('Email', 'string', remequires=IS_EMAIL(), writable=False),
 	Field('Mailings', 'list:reference Email_Lists', #widget=ListRefCheckboxWidget,
 			comment='On desktop Ctrl-click on list name in list above to toggle selection'),
-	Field('Created', 'datetime', default=datetime.datetime.now(), writable=False),
-	Field('Modified', 'datetime', default=datetime.datetime.now(), update=datetime.datetime.now(), writable=False),
+	Field('Modified', 'datetime', compute=set_modified, writable=False),
 	singular="Email", plural="Emails", format='%(Email)s')
 
 def dues_type(date, prevpaid):
@@ -184,7 +186,7 @@ db.define_table('Events',
 	Field('Survey', 'list:string',
 		comment="multiple choice question at Checkout. First row is the question, the rest are possible selections"),
 	Field('Comment', 'string', comment="open ended question at Checkout."),
-	Field('Modified', 'datetime', default=datetime.datetime.now(), update=datetime.datetime.now(), writable=False),
+	Field('Modified', 'datetime', compute=set_modified, writable=False),
 	singular="Event", plural="Events", format='%(Description)s')
 
 db.define_table('Affiliations',
@@ -193,8 +195,7 @@ db.define_table('Affiliations',
 	Field('Matr', 'integer', requires=IS_INT_IN_RANGE(1900,datetime.datetime.now().date().year+1),
 			comment='Please enter your matriculation year, not graduation year'),
 	Field('Notes', 'string', default=''),
-	Field('Created', 'datetime', default=datetime.datetime.now(), readable=False, writable=False),
-	Field('Modified', 'datetime', default=datetime.datetime.now(), writable=False),
+	Field('Modified', 'datetime', compute=set_modified, writable=False),
 	singular="Affiliation", plural="Affiliations")
 
 def res_totalcost(member_id, event_id):	#cost of confirmed places
@@ -262,15 +263,14 @@ db.define_table('Reservations',
 	Field.Virtual('Prov', lambda r: db((db.Reservations.Member==r['Member'])& \
 								(db.Reservations.Event==r['Event'])&(db.Reservations.Provisional==True)).count(), readable=False),
 	Field('Created', 'datetime', default=datetime.datetime.now(), readable=False, writable=False),
-	Field('Modified', 'datetime', default=datetime.datetime.now(), update=datetime.datetime.now(), writable=False),
+	Field('Modified', 'datetime', compute=set_modified, writable=False),
 	singular="Reservation", plural="Reservations")
 db.Reservations.Event.requires=IS_IN_DB(db, 'Events.id', '%(Event)s', zero=None, orderby=~db.Events.DateTime)
 
 db.define_table('EMProtos',
 	Field('Subject', 'string', requires=IS_NOT_EMPTY()),
 	Field('Body', 'text', requires=IS_NOT_EMPTY()),
-	Field('Created', 'datetime', default=datetime.datetime.now(), writable=False),
-	Field('Modified', 'datetime', default=datetime.datetime.now(), update=datetime.datetime.now(), writable=False))
+	Field('Modified', 'datetime', compute=set_modified, writable=False))
 
 db.define_table('emailqueue',	#used for notices or messages targetted via membership database
 	Field('subject'),
@@ -280,7 +280,7 @@ db.define_table('emailqueue',	#used for notices or messages targetted via member
 	Field('query', 'text'),	#query used to locate targets
 	Field('left'),	#goes with query
 	Field('qdesc'),	#description of target list
-	Field('Created', 'datetime', default=datetime.datetime.now(), writable=False))
+	Field('Modified', 'datetime', compute=set_modified, writable=False))
 	
 db.define_table('CoA',
 	Field('Name', 'string'),

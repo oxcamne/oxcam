@@ -33,7 +33,7 @@ def email_daemon():
 	print(path+' email_daemon running')
 
 	while True:
-		notice = db(db.emailqueue.id > 0).select(orderby=db.emailqueue.Created).first()
+		notice = db(db.emailqueue.id > 0).select().first()
 		if notice:
 			bodyparts = eval(notice.bodyparts)
 			select_fields = [db.Members.id]

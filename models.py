@@ -280,6 +280,7 @@ db.define_table('emailqueue',	#used for notices or messages targetted via member
 	Field('query', 'text'),	#query used to locate targets
 	Field('left'),	#goes with query
 	Field('qdesc'),	#description of target list
+	Field('scheme'),	#base url 
 	Field('Modified', 'datetime', compute=set_modified, writable=False))
 	
 db.define_table('CoA',

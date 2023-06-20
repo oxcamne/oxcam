@@ -1,47 +1,12 @@
 """
 This file contains functions shared by multiple controllers
 """
-from py4web import URL, request, redirect
-from py4web.utils.factories import Inject
-from .common import db, auth, session
+from py4web import URL
+from .common import db, auth
 from .settings_private import *	#include all for <name> in emailparse
-from .models import primary_email, res_tbc, res_totalcost, res_status,\
-		ACCESS_LEVELS, member_name
+from .models import primary_email, res_tbc, res_totalcost, res_status, member_name
 from yatl.helpers import A, TABLE, TH, THEAD, H6, TR, TD, CAT, HTML, XML
 import stripe, datetime, re, markmin
-
-"""
-decorator for validating login & access permission using a one-time code
-sent to email address.
-Allows for an access level parameter associated with a user
-for an explanation see the blog article from which I cribbed 
-	https://www.artima.com/weblogs/viewpost.jsp?thread=240845#decorator-functions-with-decorator-arguments
-
-"""
-def checkaccess(requiredaccess):
-	def wrap(f):
-		def wrapped_f(*args, **kwds):
-			session['url_prev'] = session.get('url')
-			session['url']=request.url
-			if session.get('back') and len(session['back'])>0 and request.url==session['back'][-1]:
-				session['back'].pop()
-			if not session.get('logged_in') == True:    #logged in
-				if db(db.Members.id>0).count()==0:
-					session['url']=URL('db_restore')
-				redirect(URL('login'))
-
-			#check access
-			if requiredaccess != None:
-				require = ACCESS_LEVELS.index(requiredaccess)
-				if not session.get('member_id') or not session.get('access'):
-					if db(db.Members.id>0).count()==0:
-						return f(*args, **kwds)
-				have = ACCESS_LEVELS.index(session['access']) if session.get('access') != None else -1
-				if have < require:
-					redirect(URL('accessdenied'))
-			return f(*args, **kwds)
-		return wrapped_f
-	return wrap
 
 #check if member is in good standing at a particular date
 def member_good_standing(member, date=datetime.datetime.now().date()):

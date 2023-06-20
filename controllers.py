@@ -26,7 +26,7 @@ Warning: Fixtures MUST be declared with @action.uses({fixtures}) else your app w
 """
 from py4web import action, request, response, redirect, URL, Field
 from yatl.helpers import H5, H6, XML, HTML, DIV, P, TABLE, TH, TD, THEAD, TR
-from .common import db, session, auth, logger, flash
+from .common import db, session, auth, flash
 from .settings_private import SOCIETY_DOMAIN, STRIPE_PKEY, STRIPE_SKEY, LETTERHEAD,\
 	SUPPORT_EMAIL, GRACE_PERIOD, SOCIETY_NAME, MEMBERSHIP, STRIPE_EVENT,\
 	MEMBER_CATEGORIES, MAIL_LISTS, STRIPE_FULL, STRIPE_STUDENT
@@ -34,10 +34,11 @@ from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
 	primary_matriculation, dues_type, event_revenue, event_unpaid, res_tbc
 from pydal.validators import IS_LIST_OF_EMAILS, IS_EMPTY_OR, IS_IN_DB, IS_IN_SET,\
-	IS_NOT_EMPTY, IS_DATE, IS_DECIMAL_IN_RANGE, IS_INT_IN_RANGE, IS_EMAIL
+	IS_NOT_EMPTY, IS_DATE, IS_DECIMAL_IN_RANGE, IS_INT_IN_RANGE
 from .utilities import member_good_standing, ageband, update_Stripe_email, newpaiddate,\
 	collegelist, tdnum, get_banks, financial_content, event_confirm, msg_header, msg_send,\
-	society_emails, emailparse, checkaccess, notification, notify_support, member_profile
+	society_emails, emailparse, notification, notify_support, member_profile
+from .session import checkaccess
 from py4web.utils.grid import Grid, GridClassStyleBulma, Column
 from py4web.utils.form import Form, FormStyleBulma
 from py4web.utils.factories import Inject
@@ -482,7 +483,7 @@ def switch_email():
 	notify_support(member, 'Email address change',
 		f"New primary email address {primary_email(member.id)}")
 	session['url'] = URL('index')	#will be back link from emails page
-	redirect(f"emails/Y/{member_id}/edit/{email_id}")
+	redirect(f"emails/Y/{member_id}/select")
 
 @action('emails/<ismember>/<member_id:int>', method=['POST', 'GET'])
 @action('emails/<ismember>/<member_id:int>/<path:path>', method=['POST', 'GET'])
@@ -1718,7 +1719,8 @@ def composemail():
 		if bodyparts:
 			if query:
 				db.emailqueue.insert(subject=form2.vars['subject'], bodyparts=str(bodyparts), sender=sender,
-			 		bcc=bcc, query=query, left=left, qdesc=qdesc)
+			 		bcc=bcc, query=query, left=left, qdesc=qdesc,
+					scheme=URL('index', scheme=True).replace('index', ''))
 				flash.set(f"email notice sent to '{qdesc}'")
 			else:
 				to = re.compile('[^,;\s]+').findall(form2.vars['to'])
@@ -2270,74 +2272,4 @@ def checkout_success():
 		#but a side effect of Stripe Checkout seems to be that the first 'submit' doesn't work
 		#I think this is CSRF protection at work.
 		#redirect(URL(f"emails/Y/{member.id}/edit/{db(db.Emails.Member == member.id).select(orderby=~db.Emails.Modified).first().id}"))
-	redirect(URL('index'))
-
-@action('login', method=['POST', 'GET'])
-@action.uses("gridform.html", db, session, flash)
-def login():
-	user = db(db.users.remote_addr==request.remote_addr).select().first()
-	form = Form([Field('email', 'string',
-				requires=[IS_NOT_EMPTY(), IS_EMAIL()],
-				default = user.email if user else session.get('email'))],
-				formstyle=FormStyleBulma)
-	header = P(XML(f"Please specify your email to login.<br />If you have signed in previously, please use the \
-same email as this identifies your record.<br />You can change your email after logging in via 'My account'.<br />If \
-you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}."))
- 
-	if form.accepted:
-		log = 'login '+request.remote_addr+' '+form.vars['email']+' '+request.environ['HTTP_USER_AGENT']+' '+(session.get('url') or '')
-		logger.info(log)
-		redirect(URL('send_email_confirmation', vars=dict(email=form.vars['email'])))
-	return locals()
-
-@action('validate/<id:int>/<token:int>', method=['GET', 'POST'])
-@action.uses("gridform.html", db, session)
-def validate(id, token):
-	user = db(db.users.id == id).select().first()
-	if not user or not int(token) in user.tokens or \
-			datetime.datetime.now() > user.when_issued + datetime.timedelta(minutes = 15) or \
-			user.remote_addr != request.remote_addr:
-		redirect(URL('index'))
-	rows = db((db.Members.id == db.Emails.Member) & db.Emails.Email.ilike(user.email)).select(
-				db.Members.ALL, distinct=True)
-	header = H6("Please select which of you is signing in:")
-	members = [(row.id, member_name(row.id)+(' '+row.Membership+' member until '+(row.Paiddate.strftime('%m/%d/%Y') if row.Paiddate else '')  if row.Membership else '')) for row in rows]
-	form = Form([Field('member', 'integer', requires=IS_IN_SET(members))],
-	     formstyle=FormStyleBulma)
-	if len(rows)<=1:
-		member_id = rows.first().id if len(rows)==1 else None
-	elif form.vars.get('member'):
-		#note, if we use form.accepted the user will have to click twice;
-		#apparently when validate is invoked from another site (e.g. gmail) a new form_key
-		#is put in the response cookie, but won't match the proper key, in other words we
-		#run into CSRF protection.
-		member_id = form.vars.get('member')
-	else:
-		return locals()	#display form
-	
-	session['logged_in'] = True
-	session['email'] = user.email
-	session['filter'] = None
-	session['access'] = None
-	session['member_id'] = 0
-	session['back'] = []
-	if member_id:
-		session['member_id'] = int(member_id)
-		session['access'] = db.Members[member_id].Access
-	log = 'verified '+request.remote_addr+' '+user.email
-	logger.info(log)
-	user.update_record(tokens=[])
-	redirect(user.url)
-
-@action('accessdenied')
-@action.uses(session, flash)
-def accessdenied():
-	flash.set(f"You do not have permission for that, please contact {SUPPORT_EMAIL} if you think this is wrong")
-	redirect(session['url_prev'])
-	return locals()
-
-@action('logout')
-@action.uses(session)
-def logout():
-	session['logged_in'] = False
 	redirect(URL('index'))

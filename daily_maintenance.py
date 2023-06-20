@@ -20,9 +20,8 @@ import os
 from .common import db, auth, logger
 from .settings_private import SOCIETY_DOMAIN, STRIPE_SKEY, IS_PRODUCTION, SUPPORT_EMAIL,\
 	LETTERHEAD, SOCIETY_NAME
-from .utilities import notify_support
+from .utilities import notify_support, member_greeting
 from .models import primary_email
-from .controllers import member_greeting
 from py4web import URL
 from yatl.helpers import HTML, XML
 import stripe

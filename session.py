@@ -1,7 +1,7 @@
 """
 This file contains controllers used to manage the user's session
 """
-from py4web import URL, request, redirect, action, Field
+from py4web import URL, request, redirect, action, Field, response
 from .common import db, session, flash, logger
 from .settings_private import SUPPORT_EMAIL
 from .models import ACCESS_LEVELS, member_name
@@ -56,7 +56,7 @@ same email as this identifies your record.<br />You can change your email after 
 you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}."))
  
 	if form.accepted:
-		log = 'login '+request.remote_addr+' '+form.vars['email']+' '+request.environ['HTTP_USER_AGENT']+' '+(session.get('url') or '')
+		log =f"login {request.remote_addr} {request.environ['HTTP_USER_AGENT']} {form.vars['email']} {session.get('url') or ''}"
 		logger.info(log)
 		redirect(URL('send_email_confirmation', vars=dict(email=form.vars['email'])))
 	return locals()

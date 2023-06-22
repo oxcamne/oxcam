@@ -64,7 +64,7 @@ def index():
 	if member:
 		message = CAT(message, A("Update your email address and/or mailing list subscriptions", _href=URL(f"emails/Y/{session.get('member_id')}")), XML('<br>'))
 	else:
-		message = CAT(message, A("Join our mailing list(s)", _href=URL("registration", vars=dict(mail_list='Y'))), XML('<br>'))
+		message = CAT(message, A("Join our mailing list(s)", _href=URL("registration", vars=dict(mail_lists='Y'))), XML('<br>'))
 
 	if member and member.Stripe_subscription!='Cancelled' and member_good_standing(member, (datetime.datetime.now()-datetime.timedelta(days=45)).date()):
 		if member.Stripe_subscription:
@@ -1746,11 +1746,10 @@ def bcc_export():
 			       orderby=db.Members.id|~db.Emails.Modified, distinct=True)
 	try:
 		writer=csv.writer(stream)
-		id = 0
 		for row in rows:
-			if mailing_list or row.Members.id != id:	#allow only primary email
-				writer.writerow([row.Emails.Email])
-			id = row.Members.id
+			email = row.get(db.Emails.Email) or primary_email(row.get(db.Members.id))
+			if email:
+				writer.writerow([email])
 	except Exception as e:
 		flash.set(e)
 		redirect(session['url_prev'])
@@ -1769,7 +1768,7 @@ def directory(path=None):
 			
 	query = "(db.Members.Membership!=None)&(db.Members.Membership!='')"
 	header = CAT(H5('Member Directory'),
-	      XML(f"You can search by last name, town, state, using the boxes below; click on a name to view contact information"))
+	      XML(f"You can search by last name, town, state, or college/university using the boxes below; click on a name to view contact information"))
 	db.Members.Name.readable = True
 	db.Members.Affiliations.readable = True
 
@@ -1871,7 +1870,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 				#membership-eligible and event open to all alums then no need to gather member information
 				redirect(URL(f'reservation/Y/{member_id}/{event_id}/new'))	#go create this member's reservation
 
-		elif request.query.get('mail_list'):
+		elif request.query.get('mail_lists'):
 			session['url'] = URL('index')
 			redirect(URL(f"emails/Y/{member_id}"))
 		else:		#dues payment or profile update
@@ -1884,14 +1883,14 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 		member = None
 		
 	header = H5('Event Registration: Your Information' if event 
-				else 'Mailing List Registration' if request.query.get('mail_list')
+				else 'Mailing List Registration' if request.query.get('mail_lists')
 				else 'Membership Application/Renewal: Your Information')
 	if event:
 		header = CAT(header, XML(f"Event: {event.Description}<br>When: {event.DateTime.strftime('%A %B %d, %Y %I:%M%p')}<br>Where: {event.Venue}<br><br>\
 	This event is open to {'all alumni of Oxford & Cambridge' if not event.Members_only else 'members of '+SOCIETY_DOMAIN}\
 	{' and members of sponsoring organizations (list at the top of the Affiliations dropdown)' if event.Sponsors else ''}\
 	{' and their guests.' if not event.Guests or event.Guests>1 else ''}.<br>"))
-	elif not request.query.get('mail_list'):
+	elif not request.query.get('mail_lists'):
 		header = CAT(header, XML(MEMBERSHIP))
 		
 	#gather the person's information as necessary (may have only email)
@@ -1915,7 +1914,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 			fields.append(Field('join_or_renew', 'boolean', default=mustjoin,
 				comment=' this event is restricted to OxCamNE members' if mustjoin else \
 					' tick if you are an Oxbridge alum and also wish to join OxCamNE or renew your membership'))
-	elif not request.query.get('mail_list'):
+	elif not request.query.get('mail_lists'):
 		fields.append(Field('membership', 'string',
 						default=member.Membership if member and member.Membership else '',
 						requires=IS_IN_SET(MEMBER_CATEGORIES, zero='please select your membership category')))
@@ -1933,7 +1932,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 			form.errors['matr'] = 'please enter your matriculation year'
 		if event and event.Members_only and not form.vars.get('join_or_renew'):
 			form.errors['join_or_renew'] = 'This event is for members only, please join/renew to attend'
-		if not event and not request.query.get('mail_list') and form.vars.get('membership')!=MEMBER_CATEGORIES[0]:
+		if not event and not request.query.get('mail_lists') and form.vars.get('membership')!=MEMBER_CATEGORIES[0]:
 			if not form.vars.get('notes'):
 				form.errors['notes'] = 'Please note how you qualify for '+form.vars.get('membership')+' status'
 		if form.vars.get('affiliation') and not form.vars.get('matr'):
@@ -1954,7 +1953,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 										Lastname = form.vars['lastname'])
 			member = db.Members[member_id]
 			session['member_id'] = member_id
-			if request.query.get('mail_list'):
+			if request.query.get('mail_lists'):
 				db.Emails.Mailings.default = [list.id for list in db(db.Email_Lists.Member==True).select()]
 			email_id = db.Emails.insert(Member=member_id, Email=session.get('email'))
 
@@ -1971,7 +1970,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 			flash.set("Please complete your membership application, then you'll return to event registration")
 			redirect(URL('registration', vars=dict(join_or_renew='Y')))	#go deal with membership
 			
-		if (request.query.get('mail_list')):
+		if (request.query.get('mail_lists')):
 			session['url'] = URL('index')
 			flash.set("Please review your subscription settings below.")
 			redirect(URL(f"emails/Y/{member_id}/edit/{email_id}"))

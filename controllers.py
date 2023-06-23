@@ -988,7 +988,7 @@ Moving member on/off waitlist will also affect all guests."))
 			form.errors['Waitlist'] = "Waitlist and Provisional should not both be set"
 		if ismember=='Y' and form.vars.get('Ticket') != db.Reservations.Ticket.default and db.Reservations.Ticket.writable==True:
 			if form.vars.get('Ticket'):
-				if not host_reservation and form.vars.get('Ticket').endswith('$0'):
+				if host_reservation and form.vars.get('Ticket').endswith('$0'):
 					form.errors['Ticket'] = "Freshers should please register themselves individually."
 				elif not form.vars.get('Notes'):
 					form.errors['Ticket']='Please note below how this guest qualifies for the ticket discount.'

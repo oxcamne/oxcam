@@ -85,7 +85,9 @@ def db_restore():
 	access = session['access']	#for layout.html
 	header = f"Restore {SOCIETY_DOMAIN} database from backup file"
 	
-	form = Form([Field('backup_file', 'upload', uploadfield = False)],
+	form = Form([Field('backup_file', 'upload', uploadfield = False),
+	      		Field('overwrite_existing_database', 'boolean',
+	       				default=True, comment='clear if new empty database')],
 				submit_button = 'Import')
 	
 	if not form.accepted:
@@ -94,9 +96,10 @@ def db_restore():
 	if form.accepted:
 		try:
 			with io.TextIOWrapper(form.vars.get('backup_file').file, encoding='utf-8') as backup_file:
-				for tablename in db.tables:	#clear out existing database
-					db(db[tablename]).delete()
-				db.import_from_csv_file(backup_file, id_map={})   #, restore=True won't work in MySQL)
+				if form.vars.get('overwrite_existing_database'):
+					for tablename in db.tables:	#clear out existing database
+						db(db[tablename]).delete()
+				db.import_from_csv_file(backup_file, id_map={} if form.vars.get('overwrite_existing_database') else None)   #, restore=True won't work in MySQL)
 				flash.set(f"{SOCIETY_DOMAIN} Database Restored from {form.vars.get('backup_file').raw_filename}")
 				redirect('login')
 		except Exception as e:

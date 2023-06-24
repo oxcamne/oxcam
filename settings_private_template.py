@@ -48,7 +48,7 @@ except <b>Pub Nights</b> and <b>Online</b> (only) Events. This includes formal d
 talk/receptions, and outdoor events. Some are for members only, others are open to all alumni.<br>\
 <b>Other Events</b> includes such things as concerts by College Choirs, visiting College or \
 University sports team events, and events organized by Cambridge in America or Oxford North America.<br>\
-<b>OxCam10</b> includes informal events organized by OxCam10 for alumni within 10 yearsof graduation."
+<b>OxCam10</b> includes informal events organized by OxCam10 for alumni within 10 years of graduation."
 TITLE_BLOCK = '<h4><span style="color: blue"><b>Oxford and Cambridge Society of New England</b> <img src="images/oxcamne_no_pad.png" alt="logo" style="float:left;width:100px" /></span></h4>'
 SOCIETY_NAME = 'Oxford & Cambridge Society of New England'
 SOCIETY_DOMAIN = 'OxCamNE'

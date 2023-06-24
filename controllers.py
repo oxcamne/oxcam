@@ -423,6 +423,8 @@ def affiliations(ismember, member_id, path=None):
 	else:
 		if not session.get('access'):
 			redirect(URL('accessdenied'))
+		db.Affiliations.Matr.requires=IS_EMPTY_OR(IS_INT_IN_RANGE(1900,datetime.datetime.now().date().year+1))
+		#allow matr to be omitted, may get it from member later.
 		write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 	db.Affiliations.Member.default=member_id
 
@@ -511,7 +513,7 @@ def emails(ismember, member_id, path=None):
 	elif path=='select':
 		update_Stripe_email(db.Members[member_id])
 
-	header = CAT(A('back', _href=session['url_prev']) if ismember!='Y' else '',
+	header = CAT(A('back', _href=session['url_prev']),
 	      		H5('Member Emails'),
 	      		H6(member_name(member_id)))
 	if path=='select':
@@ -880,10 +882,10 @@ def reservation(ismember, member_id, event_id, path=None):
 			payment = (int(session.get('dues') or 0)) + confirmed_ticket_cost - (host_reservation.Paid or 0) - (host_reservation.Charged or 0)
 			if not waitlist:
 				payment += (provisional_ticket_cost or 0)
-			if adding!=0 or payment!=0:
-				header = CAT(header,  XML(f"Use the blue <b>Checkout</b> button (below) to complete your registration.<br>"))
 			if not event.Guests or len(all_guests)<event.Guests:
 				header = CAT(header,  XML(f"Use the blue <b>+New</b> button to add guests.<br>"))
+			if adding!=0 or payment!=0:
+				header = CAT(header,  XML(f"Use the blue <b>Checkout</b> button (below) to complete your registration.<br>"))
 			if payment>0:
 				header = CAT(header, XML(f"You will be charged ${payment} at Checkout{dues_tbc}<br>"))
 
@@ -1904,9 +1906,10 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 			requires=IS_IN_SET(clist, zero=None) if affinity else IS_EMPTY_OR(IS_IN_SET(clist,
 						zero = 'Please select your sponsoring organization or College/University' if event and event.Sponsors else \
 								'Please select your College' if not member or not member.Membership else ''))))
-	fields.append(Field('matr', 'integer', default = affinity.Matr if affinity else None,
-			requires=IS_EMPTY_OR(IS_INT_IN_RANGE(datetime.datetime.now().year-100,datetime.datetime.now().year+1)),
-			comment='Please enter your matriculation year, not graduation year'))
+	if not affinity or not affinity.Matr:
+		fields.append(Field('matr', 'integer', default = affinity.Matr if affinity else None,
+				requires=IS_EMPTY_OR(IS_INT_IN_RANGE(datetime.datetime.now().year-100,datetime.datetime.now().year+1)),
+				comment='Please enter your matriculation year, not graduation year'))
 
 	if event:
 		mustjoin = event.Members_only and not event.Sponsors
@@ -1927,16 +1930,16 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 			return	#go ahead with sponsor registration
 		if not form.vars.get('affiliation') and not (member and member.Membership): #not alum, not approved friend member
 			form.errors['affiliation']='please select your affiliation from the dropdown, or contact '+SUPPORT_EMAIL
-			return
-		if form.vars.get('affiliation') and not form.vars.get('matr'):
+		if form.vars.get('affiliation') and (not affinity or not affinity.Matr) and not form.vars.get('matr'):
 			form.errors['matr'] = 'please enter your matriculation year'
 		if event and event.Members_only and not form.vars.get('join_or_renew'):
 			form.errors['join_or_renew'] = 'This event is for members only, please join/renew to attend'
 		if not event and not request.query.get('mail_lists') and form.vars.get('membership')!=MEMBER_CATEGORIES[0]:
 			if not form.vars.get('notes'):
 				form.errors['notes'] = 'Please note how you qualify for '+form.vars.get('membership')+' status'
-		if form.vars.get('affiliation') and not form.vars.get('matr'):
-			form.errors['matr'] = 'Please provide your matriculation year'
+		if len(form.errors)>0:
+			flash.set("Error(s) in form, please check")
+			return
 	
 	form = Form(fields, validation=validate, formstyle=FormStyleBulma, keep_values=True)
 		
@@ -1959,8 +1962,8 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 
 		if form.vars.get('affiliation'):
 			if affinity:
-				db.Affiliations.Modified.update = None
-				affinity.update_record(Matr=form.vars.get('matr'))	#note, don't update Modified, keep as primary affiliation
+				if form.vars.get('matr'):
+					affinity.update_record(Matr=form.vars.get('matr'), Modified=affinity.Modified)	#note, preserve Modified, keep as primary affiliation
 			else:
 				db(db.Affiliations.Member==member_id).delete()	#delete any stray sponsor affiliation.
 				db.Affiliations.insert(Member = member_id, College = form.vars['affiliation'],

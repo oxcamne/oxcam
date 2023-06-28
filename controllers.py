@@ -134,6 +134,7 @@ def members(path=None):
 				filter['good_standing'] = 'On'
 			session['filter'] = filter
 		header = CAT(header, A("Send Email to Specific Address(es)", _href=URL('composemail')), XML('<br>'))
+		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/member-search/members-page?authuser=1"
 	elif path:
 		caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev']).group(1)
 		if caller!='members' and caller not in ['composemail', 'affiliations', 'emails', 'dues', 'member_reservations']:
@@ -141,15 +142,17 @@ def members(path=None):
 		if len(session['back'])>0 and re.match(f'.*/{request.app_name}/([a-z_]*).*', session['back'][-1]).group(1)!='members':
 			back = session['back'][-1]
 		header = CAT(A('back', _href=back), H5('Member Record'))
-		if path.startswith('edit'):
+		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/member-search/member-record?authuser=1"
+		if path.startswith('edit') or path.startswith('details'):
+			member_id = path[path.find('/')+1:]
 			header= CAT(header, 
-	       			A('Member reservations', _href=URL(f'member_reservations/{path[5:]}/select')), XML('<br>'),
-					A('OxCam affiliation(s)', _href=URL(f'affiliations/N/{path[5:]}/select')), XML('<br>'),
-					A('Email addresses and subscriptions', _href=URL(f'emails/N/{path[5:]}/select')), XML('<br>'),
-					A('Dues payments', _href=URL(f'dues/{path[5:]}/select')), XML('<br>'),
+	       			A('Member reservations', _href=URL(f'member_reservations/{member_id}/select')), XML('<br>'),
+					A('OxCam affiliation(s)', _href=URL(f'affiliations/N/{member_id}/select')), XML('<br>'),
+					A('Email addresses and subscriptions', _href=URL(f'emails/N/{member_id}/select')), XML('<br>'),
+					A('Dues payments', _href=URL(f'dues/{member_id}/select')), XML('<br>'),
 					A('Send Email to Member', _href=URL('composemail',
-					 	vars=dict(query=f"db.Members.id=={path[5:]}", left='',
-		 					qdesc=member_name(path[5:])))))
+					 	vars=dict(query=f"db.Members.id=={member_id}", left='',
+		 					qdesc=member_name(member_id)))))
 	else:
 		session['filter'] = None
 		session['back'] = []
@@ -373,7 +376,7 @@ def member_reservations(member_id, path=None):
 # .../member_reservations/member_id/...
 	access = session['access']	#for layout.html
 	db.Reservations.Wait.readable = db.Reservations.Conf.readable = db.Reservations.Cost.readable = db.Reservations.TBC.readable = True
-	header = CAT(A('back', _href=URL(f'members/edit/{member_id}', scheme=True)),
+	header = CAT(A('back', _href=URL(f"members/{'details' if access=='read' else 'edit'}/{member_id}", scheme=True)),
 				H5('Member Reservations'),
 	      		H6(member_name(member_id)),
 				A('Add New Reservation', _href=URL(f'add_member_reservation/{member_id}', scheme=True)))
@@ -542,9 +545,9 @@ To change your mailing list subscritions, use the <b>Edit</b> button."))
 			formstyle=form_style,
 			)
 
-	if ismember=='Y' and path.startswith('edit'):	#substitute user friendly form for grid form
+	if ismember=='Y' and (path.startswith('edit') or path.startswith('details')):	#substitute user friendly form for grid form
 		grid = None
-		email = db.Emails[path[5:]]
+		email = db.Emails[path[path.find('/')+1:]]
 		header = CAT(header, email.Email)
 		fields = []
 		for list in db(db.Email_Lists.id>0).select():
@@ -669,10 +672,10 @@ def events(path=None):
 	elif path=='new':
 		header = CAT(A('back', _href=back), H5('New Event'))
 	else:
-		url = URL('register', path[5:], scheme=True)
+		url = URL('register', path[path.find('/')+1:], scheme=True)
 		header = CAT(A('back', _href=back), H5('Event Record'),
 	       			"Booking link is ", A(url, _href=url), XML('<br>'),
-	       			A('Make a Copy of This Event', _href=URL('event_copy', path[5:])))
+	       			A('Make a Copy of This Event', _href=URL('event_copy', path[path.find('/')+1:])))
 	       		
 	def checktickets(form):
 		for t in form.vars['Tickets']:
@@ -764,7 +767,7 @@ def event_reservations(event_id, path=None):
 	header = CAT(A('back', _href=URL('events/select')),
 	      		H5('Provisional Reservations' if request.query.get('provisional') else 'Waitlist' if request.query.get('waitlist') else 'Reservations'),
 				H6(f"{event.DateTime}, {event.Description}"),
-				XML("Use the 'Edit' buttons to drill down on a reservation and view detail or edit individual reservations."), XML('<br>'))
+				XML("Use the 'Edit/Details' button to drill down on a reservation and view detail or edit individual reservations."), XML('<br>'))
 	query = f'(db.Reservations.Event=={event_id})'
 	#for waitlist or provisional, have to include hosts with waitlisted or provisional guests
 	if request.query.get('waitlist') or request.query.get('provisional'):
@@ -944,7 +947,7 @@ Moving member on/off waitlist will also affect all guests."))
 		else:
 			db.Reservations.Survey.readable = True
 			db.Reservations.Comment.readable = True
-		if host_reservation and (path=='new' or host_reservation.id!=int(path[5:])):
+		if host_reservation and (path=='new' or host_reservation.id!=int(path[path.find('/')+1:])):
 			#this is a new guest reservation, or we are revising a guest reservation
 			db.Reservations.Host.default=False
 			db.Reservations.Firstname.writable=True
@@ -1582,12 +1585,12 @@ def transactions(path=None):
 		session['left'] = request.query.get('left')
 	elif path=='select':
 		back = session['back'][-1]
-	elif path.startswith('edit'):	#editing AccTrans record
+	elif path.startswith('edit') or path.startswith('details'):	#editing AccTrans record
 		session['url'] = URL(f"transactions/{path}")	#strip off _referrer parameter to save cookie space
 		db.AccTrans.Amount.comment = 'to split transaction, enter amount of a split piece'
 		db.AccTrans.CheckNumber.writable = False
 		db.AccTrans.CheckNumber.requires = None
-		transaction = db.AccTrans[path[5:]]
+		transaction = db.AccTrans[path[path.find('/')+1:]]
 		if transaction.Accrual:
 			db.AccTrans.Fee.readable = db.AccTrans.Fee.writable = False
 			db.AccTrans.Timestamp.writable=True

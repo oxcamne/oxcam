@@ -4,7 +4,10 @@ The first section contains sensitive settings, which may include sign-in codes
 for database (if using, e.g., MySql), the email server for sending out notices etc.,
 and account specific information for the Stripe payment processor
 """
+from py4web import URL
+
 DB_URI = "sqlite://storage.db"
+DB_POOL_SIZE = 10
 
 # email settings -development (uses Mailgun Sandbox, limited addressees)
 SMTP_SSL = False
@@ -26,6 +29,12 @@ STRIPE_EVENT = "product_code"
 #remaining items shared across all environments for OxCamNE,
 #would need to customized for other groups
 
+SOCIETY_NAME = 'Oxford & Cambridge Society of New England'
+SOCIETY_DOMAIN = 'OxCamNE'
+SERVER_URL = "https://oxcamne.pythonanywhere.com/oxcam" #use production server, gmail can't handle local server
+SUPPORT_EMAIL = 'dgmanns@gmail.com'
+HOME_URL = 'https://www.oxcamne.org'
+VISIT_WEBSITE_INSTRUCTIONS = "<br><br>Visit us at www.oxcamne.org or https://www.instagram.com/oxcamne/ or www.facebook.com/oxcamne"
 MEMBER_CATEGORIES = ['Full', 'Student']
 MEMBERSHIP = "Membership is open to all matriculated alumni and members of the \
 Universities of Oxford and Cambridge.<br><br>\
@@ -42,18 +51,12 @@ GRACE_PERIOD = 45 #Renewal within this number of days after expiration extends f
                     # days
 ACCESS_LEVELS = ['read', 'write', 'accounting', 'admin']
 
-LETTERHEAD = '<h2><span style="color: blue"><em>Oxford and Cambridge Society of New England</em></span> <img src="https://oxcamne.pythonanywhere.com/init/static/images/oxcamne_no_pad.png" alt="logo" style="float:left;width:100px" /></h2><h3><span style="color: blue"><em>&lt;subject&gt;</em></span></h3>'
+LETTERHEAD = f'<h2><span style="color: blue"><em>Oxford and Cambridge Society of New England</em></span> <img src="{SERVER_URL}/static/images/oxcamne_no_pad.png" alt="logo" style="float:left;width:100px" /></h2><h3><span style="color: blue"><em>&lt;subject&gt;</em></span></h3>'
 MAIL_LISTS = "The <b>Member Events</b> list is used for notices of all Society in-person events \
 except <b>Pub Nights</b> and <b>Online</b> (only) Events. This includes formal dinners, \
 talk/receptions, and outdoor events. Some are for members only, others are open to all alumni.<br>\
 <b>Other Events</b> includes such things as concerts by College Choirs, visiting College or \
 University sports team events, and events organized by Cambridge in America or Oxford North America.<br>\
 <b>OxCam10</b> includes informal events organized by OxCam10 for alumni within 10 years of graduation."
-TITLE_BLOCK = '<h4><span style="color: blue"><b>Oxford and Cambridge Society of New England</b> <img src="images/oxcamne_no_pad.png" alt="logo" style="float:left;width:100px" /></span></h4>'
-SOCIETY_NAME = 'Oxford & Cambridge Society of New England'
-SOCIETY_DOMAIN = 'OxCamNE'
-SOCIETY_SUBDOMAIN = "oxcamne.pythonanywhere.com"
-SUPPORT_EMAIL = 'dgmanns@gmail.com'
-HOME_URL = 'https://www.oxcamne.org'
-VISIT_WEBSITE_INSTRUCTIONS = "<br><br>Visit us at www.oxcamne.org or https://www.instagram.com/oxcamne/ or www.facebook.com/oxcamne"
 IS_PRODUCTION = False
+TIME_ZONE = 'America/New_York' #see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones

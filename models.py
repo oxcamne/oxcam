@@ -3,7 +3,7 @@ This file defines the database models
 """
 
 from .common import db, Field
-from .settings import MEMBER_CATEGORIES, ACCESS_LEVELS, LOCAL_NOW
+from .settings import MEMBER_CATEGORIES, ACCESS_LEVELS, TIME_ZONE
 from pydal.validators import IS_IN_DB, IS_EMPTY_OR, IS_IN_SET, IS_NOT_EMPTY, IS_DATE,\
 	IS_NOT_IN_DB, IS_MATCH, IS_EMAIL, IS_DECIMAL_IN_RANGE, IS_DATETIME, IS_INT_IN_RANGE
 from yatl.helpers import CAT, A
@@ -19,7 +19,7 @@ import datetime, decimal
 #
 
 def set_modified(fields):
-	return LOCAL_NOW
+	return datetime.datetime.now(TIME_ZONE)
 
 db.define_table('users', 
 	Field('email', 'string'),
@@ -102,7 +102,7 @@ db.define_table('Members',
 	Field('Homephone', 'string'),
 	Field('Workphone', 'string'),
 	Field('Cellphone', 'string', comment='Cellphone for Society use only, will not be published in Directory'),
-	Field('Created', 'datetime', default=LOCAL_NOW, writable=False),
+	Field('Created', 'datetime', default=datetime.datetime.now(TIME_ZONE), writable=False),
 	Field('Modified', 'datetime', compute=set_modified, writable=False),
 	plural="Members", singular="Member",
 	format=lambda r: f"{r['Lastname']}, {r['Title'] or ''} {r['Firstname']} {r['Suffix'] or ''}")
@@ -122,7 +122,7 @@ db.define_table('Dues',
 	Field('Member', 'reference Members', writable=False),
 	Field('Status', 'string', requires=IS_EMPTY_OR(IS_IN_SET(MEMBER_CATEGORIES)), writable=True, readable=True),
 	Field('Amount', 'decimal(6,2)', requires=[IS_NOT_EMPTY(), IS_DECIMAL_IN_RANGE(0, 500)]),
-	Field('Date', 'date', default=LOCAL_NOW.date(), writable=False),
+	Field('Date', 'date', default=datetime.datetime.now(TIME_ZONE).date(), writable=False),
 	Field('Notes', 'string', default=''),
 	Field('Prevpaid', 'date'), #used to track paid member history
 	Field('Nowpaid', 'date'), #paid date after this payment
@@ -181,7 +181,7 @@ db.define_table('Events',
 db.define_table('Affiliations',
 	Field('Member', 'reference Members', writable=False),
 	Field('College', 'reference Colleges'),
-	Field('Matr', 'integer', requires=IS_INT_IN_RANGE(1900,LOCAL_NOW.date().year+1),
+	Field('Matr', 'integer', requires=IS_INT_IN_RANGE(1900,datetime.datetime.now(TIME_ZONE).date().year+1),
 			comment='Please enter your matriculation year, not graduation year'),
 	Field('Notes', 'string', default=''),
 	Field('Modified', 'datetime', compute=set_modified, writable=False),
@@ -250,7 +250,7 @@ db.define_table('Reservations',
 				requires=IS_EMPTY_OR(IS_DECIMAL_IN_RANGE(0, 10000))), #total paid, confirmed by download from Stripe, Bank
 	Field('Charged', 'decimal(6,2)', readable=False, writable=False),	#payment made, not yet downloaded from Stripe
 	Field('Checkout', 'string', readable=False, writable=False),	#session.vars of incomplete checkout
-	Field('Created', 'datetime', default=LOCAL_NOW, readable=False, writable=False),
+	Field('Created', 'datetime', default=datetime.datetime.now(TIME_ZONE), readable=False, writable=False),
 	Field('Modified', 'datetime', compute=set_modified, writable=False),
 	singular="Reservation", plural="Reservations")
 db.Reservations.Event.requires=IS_IN_DB(db, 'Events.id', '%(Event)s', zero=None, orderby=~db.Events.DateTime)
@@ -306,7 +306,7 @@ db.define_table('Bank_Accounts',
 db.Bank_Accounts.Name.requires = [IS_NOT_EMPTY(), IS_NOT_IN_DB(db, 'Bank_Accounts.Name')]
 	
 db.define_table('AccTrans',
-	Field('Timestamp', 'datetime', default=LOCAL_NOW, writable=False),
+	Field('Timestamp', 'datetime', default=datetime.datetime.now(TIME_ZONE), writable=False),
 	Field('Bank', 'reference Bank_Accounts', writable=False,
 				requires=IS_IN_DB(db, 'Bank_Accounts.id', '%(Name)s')),	#e.g. PayPal, Cambridge Trust, ...
 	Field('Account', 'reference CoA', requires=IS_IN_DB(db, 'CoA.id', '%(Name)s')),

@@ -13,7 +13,7 @@ from .common import db, session, flash
 from .controllers import checkaccess, form_style, grid_style
 from py4web.utils.form import Form, FormStyleDefault
 from py4web.utils.grid import Grid
-from .settings_private import STRIPE_SKEY, SOCIETY_DOMAIN
+from .settings import STRIPE_SKEY, SOCIETY_DOMAIN
 from yatl.helpers import H5, BEAUTIFY
 import stripe, io
 from io import StringIO

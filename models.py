@@ -3,7 +3,7 @@ This file defines the database models
 """
 
 from .common import db, Field
-from .settings_private import MEMBER_CATEGORIES, ACCESS_LEVELS
+from .settings import MEMBER_CATEGORIES, ACCESS_LEVELS, LOCAL_NOW
 from pydal.validators import IS_IN_DB, IS_EMPTY_OR, IS_IN_SET, IS_NOT_EMPTY, IS_DATE,\
 	IS_NOT_IN_DB, IS_MATCH, IS_EMAIL, IS_DECIMAL_IN_RANGE, IS_DATETIME, IS_INT_IN_RANGE
 from yatl.helpers import CAT, A
@@ -19,7 +19,7 @@ import datetime, decimal
 #
 
 def set_modified(fields):
-	return datetime.datetime.now()
+	return LOCAL_NOW
 
 db.define_table('users', 
 	Field('email', 'string'),
@@ -83,12 +83,6 @@ db.define_table('Members',
 	Field('Firstname', 'string', requires = IS_NOT_EMPTY(),comment='*'),
 	Field('Lastname', 'string', requires = IS_NOT_EMPTY(),comment='*'),
 	Field('Suffix', 'string'),
-	Field.Virtual('Name', lambda r: member_name(r['id']), readable=False),
-	Field.Virtual('Primary_Affiliation', lambda r: primary_affiliation(r['id']), readable=False),
-	Field.Virtual('Affiliations', lambda r: member_affiliations(r['id']), readable=False),
-	Field.Virtual('Matr', lambda r: primary_matriculation(r['id']), readable=False),
-	Field.Virtual('Primary_Email', lambda r: primary_email(r['id']), readable=False),
-	Field.Virtual('Emails', lambda r: member_emails(r['id']), readable=False),
 	Field('Membership', 'string', requires=IS_EMPTY_OR(IS_IN_SET(MEMBER_CATEGORIES))),
 	Field('Paiddate', 'date', requires = IS_EMPTY_OR(IS_DATE())),
 	Field('Stripe_id', 'string'),
@@ -108,7 +102,7 @@ db.define_table('Members',
 	Field('Homephone', 'string'),
 	Field('Workphone', 'string'),
 	Field('Cellphone', 'string', comment='Cellphone for Society use only, will not be published in Directory'),
-	Field('Created', 'datetime', default=datetime.datetime.now(), writable=False),
+	Field('Created', 'datetime', default=LOCAL_NOW, writable=False),
 	Field('Modified', 'datetime', compute=set_modified, writable=False),
 	plural="Members", singular="Member",
 	format=lambda r: f"{r['Lastname']}, {r['Title'] or ''} {r['Firstname']} {r['Suffix'] or ''}")
@@ -128,11 +122,10 @@ db.define_table('Dues',
 	Field('Member', 'reference Members', writable=False),
 	Field('Status', 'string', requires=IS_EMPTY_OR(IS_IN_SET(MEMBER_CATEGORIES)), writable=True, readable=True),
 	Field('Amount', 'decimal(6,2)', requires=[IS_NOT_EMPTY(), IS_DECIMAL_IN_RANGE(0, 500)]),
-	Field('Date', 'date', default=datetime.datetime.now().date(), writable=False),
+	Field('Date', 'date', default=LOCAL_NOW.date(), writable=False),
 	Field('Notes', 'string', default=''),
 	Field('Prevpaid', 'date'), #used to track paid member history
 	Field('Nowpaid', 'date'), #paid date after this payment
-	Field.Virtual('Type', lambda d: dues_type(d['Date'], d['Prevpaid'])),
 	singular="Dues", plural="Dues")
 	
 def event_revenue(event_id):	#revenue from confirmed tickets
@@ -176,10 +169,6 @@ db.define_table('Events',
 	Field('Speaker', 'string'),
 	Field('Tickets', 'list:string',
        comment="empty for free events, or list ticket types (full member price first). Example ticket types are: 	'$45.00', 'Student $35.00', 'Fresher $0.00', 'Non-Member $55', ..."),
-	Field.Virtual('Attend', lambda r: event_attend(r['id']) or '', readable=False),
-	Field.Virtual('Wait', lambda r: event_wait(r['id']) or '', readable=False),
-	Field.Virtual('Paid', lambda r: event_revenue(r['id']) or '', readable=False),
-	Field.Virtual('Unpaid', lambda r: event_unpaid(r['id']) or '', readable=False),
 	Field('Selections', 'list:string',
        comment="if selection required, list one choice per line"), #e.g. Menuchoices
 	Field('Notes', 'text', comment="included on registration confirmation"),
@@ -192,7 +181,7 @@ db.define_table('Events',
 db.define_table('Affiliations',
 	Field('Member', 'reference Members', writable=False),
 	Field('College', 'reference Colleges'),
-	Field('Matr', 'integer', requires=IS_INT_IN_RANGE(1900,datetime.datetime.now().date().year+1),
+	Field('Matr', 'integer', requires=IS_INT_IN_RANGE(1900,LOCAL_NOW.date().year+1),
 			comment='Please enter your matriculation year, not graduation year'),
 	Field('Notes', 'string', default=''),
 	Field('Modified', 'datetime', compute=set_modified, writable=False),
@@ -219,6 +208,15 @@ def res_tbc(member_id, event_id, dues=False):	#cost of confirmed still tbc
 def res_wait(member_id, event_id):
 	wait = db((db.Reservations.Member==member_id)&(db.Reservations.Event==event_id)&(db.Reservations.Waitlist==True)).count()
 	return wait if wait!=0 else None
+
+def res_prov(member_id, event_id):
+	prov = db((db.Reservations.Member==member_id)&(db.Reservations.Event==event_id)&(db.Reservations.Provisional==True)).count()
+	return prov if prov!=0 else None
+
+def res_conf(member_id, event_id):
+	conf = db((db.Reservations.Member==member_id)& (db.Reservations.Waitlist==False) &\
+			(db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)).count()
+	return conf if conf!=0 else None
 
 def res_status(reservation_id):
 	r= db.Reservations[reservation_id]
@@ -248,21 +246,11 @@ db.define_table('Reservations',
 	Field('Waitlist', 'boolean', default=False),	#now meaningfull in each individual reservation
 	
 	#following fields meaningfull only on the member's own reservation (Host==True)
-	Field.Virtual('Cost', lambda r: res_totalcost(r['Member'], r['Event']) or '', readable=False),
-	Field.Virtual('Tbc', lambda r: res_tbc(r['Member'], r['Event']) or '', readable=False),	#tickets only
-	Field.Virtual('TBC', lambda r: res_tbc(r['Member'], r['Event'], True) or '', readable=False),	#include dues
-	Field.Virtual('Status', lambda r: res_status(r['id'])),
 	Field('Paid', 'decimal(8,2)', readable=False, writable=False,
 				requires=IS_EMPTY_OR(IS_DECIMAL_IN_RANGE(0, 10000))), #total paid, confirmed by download from Stripe, Bank
 	Field('Charged', 'decimal(6,2)', readable=False, writable=False),	#payment made, not yet downloaded from Stripe
 	Field('Checkout', 'string', readable=False, writable=False),	#session.vars of incomplete checkout
-	Field.Virtual('Conf', lambda r: db((db.Reservations.Member==r['Member'])& \
-								(db.Reservations.Event==r['Event'])&(db.Reservations.Provisional==False)& \
-								(db.Reservations.Waitlist==False)).count(), readable=False),
-	Field.Virtual('Wait', lambda r: res_wait(r['Member'], r['Event']) or '', readable=False),
-	Field.Virtual('Prov', lambda r: db((db.Reservations.Member==r['Member'])& \
-								(db.Reservations.Event==r['Event'])&(db.Reservations.Provisional==True)).count(), readable=False),
-	Field('Created', 'datetime', default=datetime.datetime.now(), readable=False, writable=False),
+	Field('Created', 'datetime', default=LOCAL_NOW, readable=False, writable=False),
 	Field('Modified', 'datetime', compute=set_modified, writable=False),
 	singular="Reservation", plural="Reservations")
 db.Reservations.Event.requires=IS_IN_DB(db, 'Events.id', '%(Event)s', zero=None, orderby=~db.Events.DateTime)
@@ -298,7 +286,6 @@ db.define_table('Bank_Accounts',
 	Field('Name', 'string'),
 	Field('Balance', 'decimal(9,2)',
 				requires=IS_EMPTY_OR(IS_DECIMAL_IN_RANGE(0, 100000))),	#used to maintain PayPal, Stripe and Bank balances
-	Field.Virtual('Accrued', lambda r: bank_accrual(r['id'])),
 	Field('Bankurl', 'string', comment=" URL for the bank's login page"),
 	Field('Csvheaders', 'string', length=2048, comment=" List of column headings in downloaded CSV file (copy first line of file)"),
 	Field('Reference', 'string', comment=" List of columns forming a unique ID for each transaction"),
@@ -319,7 +306,7 @@ db.define_table('Bank_Accounts',
 db.Bank_Accounts.Name.requires = [IS_NOT_EMPTY(), IS_NOT_IN_DB(db, 'Bank_Accounts.Name')]
 	
 db.define_table('AccTrans',
-	Field('Timestamp', 'datetime', default=datetime.datetime.now(), writable=False),
+	Field('Timestamp', 'datetime', default=LOCAL_NOW, writable=False),
 	Field('Bank', 'reference Bank_Accounts', writable=False,
 				requires=IS_IN_DB(db, 'Bank_Accounts.id', '%(Name)s')),	#e.g. PayPal, Cambridge Trust, ...
 	Field('Account', 'reference CoA', requires=IS_IN_DB(db, 'CoA.id', '%(Name)s')),

@@ -27,12 +27,13 @@ Warning: Fixtures MUST be declared with @action.uses({fixtures}) else your app w
 from py4web import action, request, response, redirect, URL, Field
 from yatl.helpers import H5, H6, XML, HTML, DIV, P, TABLE, TH, TD, THEAD, TR
 from .common import db, session, auth, flash
-from .settings_private import SOCIETY_DOMAIN, STRIPE_PKEY, STRIPE_SKEY, LETTERHEAD,\
+from .settings import SOCIETY_DOMAIN, STRIPE_PKEY, STRIPE_SKEY, LETTERHEAD,\
 	SUPPORT_EMAIL, GRACE_PERIOD, SOCIETY_NAME, MEMBERSHIP, STRIPE_EVENT,\
-	MEMBER_CATEGORIES, MAIL_LISTS, STRIPE_FULL, STRIPE_STUDENT
+	MEMBER_CATEGORIES, MAIL_LISTS, STRIPE_FULL, STRIPE_STUDENT,LOCAL_NOW
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
-	primary_matriculation, dues_type, event_revenue, event_unpaid, res_tbc
+	primary_matriculation, dues_type, event_revenue, event_unpaid, res_tbc, res_status,\
+	res_conf, res_totalcost, res_wait, res_prov, bank_accrual
 from pydal.validators import IS_LIST_OF_EMAILS, IS_EMPTY_OR, IS_IN_DB, IS_IN_SET,\
 	IS_NOT_EMPTY, IS_DATE, IS_DECIMAL_IN_RANGE, IS_INT_IN_RANGE
 from .utilities import member_good_standing, ageband, update_Stripe_email, newpaiddate,\
@@ -66,7 +67,7 @@ def index():
 	else:
 		message = CAT(message, A("Join our mailing list(s)", _href=URL("registration", vars=dict(mail_lists='Y'))), XML('<br>'))
 
-	if member and member.Stripe_subscription!='Cancelled' and member_good_standing(member, (datetime.datetime.now()-datetime.timedelta(days=45)).date()):
+	if member and member.Stripe_subscription!='Cancelled' and member_good_standing(member, (LOCAL_NOW-datetime.timedelta(days=45)).date()):
 		if member.Stripe_subscription:
 			message = CAT(message, A("View membership subscription/Update credit card", _href=URL('update_card')), XML('<br>'))
 		message = CAT(message, A("Cancel your membership", _href=URL('cancel_subscription')), XML('<br>'))
@@ -74,11 +75,11 @@ def index():
 	message = CAT(message, XML('<br>'),
 	       H6(XML(f"To register for events use links below or visit {A(f'www.{SOCIETY_DOMAIN}.org', _href=f'https://www.{SOCIETY_DOMAIN}.org')}:")),
 	       XML('<br>'))
-	events = db(db.Events.DateTime>=datetime.datetime.now()).select(orderby = db.Events.DateTime)
-	events = events.find(lambda e: e.Booking_Closed>=datetime.datetime.now() or event_attend(e.id))
+	events = db(db.Events.DateTime>=LOCAL_NOW).select(orderby = db.Events.DateTime)
+	events = events.find(lambda e: e.Booking_Closed>=LOCAL_NOW or event_attend(e.id))
 	for event in events:
 		waitlist = ''
-		if event.Booking_Closed < datetime.datetime.now():
+		if event.Booking_Closed < LOCAL_NOW:
 			waitlist = ' *Booking Closed, waitlisting*'
 		elif event_wait(event.id) or (event.Capacity and (event_attend(event.id) or 0) >= event.Capacity):
 			waitlist = ' *Sold Out, waitlisting*'
@@ -105,8 +106,7 @@ def members(path=None):
 	if not admin:
 		db.Members.Access.writable = False
 	db.Members.City.requires=db.Members.State.requires=db.Members.Zip.requires=None
-	db.Members.Affiliations.readable = False
-	db.Members.Created.default = datetime.datetime.now()
+	db.Members.Created.default = LOCAL_NOW
 
 	search_form=Form([
 		Field('mailing_list', 'reference Email_Lists', 
@@ -121,8 +121,6 @@ def members(path=None):
 		keep_values=True, formstyle=FormStyleBulma)
 	
 	if path=='select':
-		db.Members.Name.readable = True
-		db.Members.Affiliations.readable = True
 		if len(search_form.vars) == 0:
 			search_form.vars = session.get('filter') or {}
 		else:
@@ -168,7 +166,7 @@ def members(path=None):
 			query.append(f"(db.Reservations.Member==db.Members.id)&(db.Reservations.Event=={search_form.vars.get('event')})&(db.Reservations.Host==True)&(db.Reservations.Provisional!=True)&(db.Reservations.Waitlist!=True)")
 		qdesc += f"{'excluding ' if search_form.vars.get('mailing_list') else ''}{db.Events[search_form.vars.get('event')].Description[0:25]} attendees, "
 	if search_form.vars.get('good_standing'):
-		query.append("((db.Members.Membership!=None)&(((db.Members.Paiddate==None)|(db.Members.Paiddate>=datetime.datetime.now()))|(db.Members.Charged!=None)|((db.Members.Stripe_subscription!=None)&(db.Members.Stripe_subscription!=('Cancelled')))))")
+		query.append("((db.Members.Membership!=None)&(((db.Members.Paiddate==None)|(db.Members.Paiddate>=LOCAL_NOW))|(db.Members.Charged!=None)|((db.Members.Stripe_subscription!=None)&(db.Members.Stripe_subscription!=('Cancelled')))))")
 		qdesc += ' in good standing, '
 	if search_form.vars.get('value'):
 		field = search_form.vars.get('field')
@@ -266,9 +264,9 @@ using an optional operator (=, <, >, <=, >=) together with a value."))
 
 	grid = Grid(path, eval(query), left=eval(left) if left else None,
 	     	orderby=db.Members.Lastname|db.Members.Firstname,
-			columns=[db.Members.Name,
+			columns=[Column('Name', lambda r: member_name(r['id'])),
 	    			db.Members.Membership, db.Members.Paiddate,
-					db.Members.Affiliations,
+				    Column('Affiliations', lambda r: member_affiliations(r['id'])),
 					db.Members.Access],
 			headings=['Name', 'Status', 'Until', 'College', 'Access'],
 			details=not write, editable=write, create=write, show_id=True,
@@ -325,7 +323,7 @@ def member_analytics(path=None):
 					left = left)
 	
 	l = None
-	thisyear = datetime.datetime.now().year
+	thisyear = LOCAL_NOW.year
 	for r in rows:
 		if r.Members.Lastname == 'Allen':
 			pass
@@ -357,7 +355,7 @@ def member_analytics(path=None):
 		else:				#dues payments recorded
 			startyear = max(r.Dues.Date.year, endyear+1)
 			endyear = r.Dues.Nowpaid.year-1
-			if r.Dues.Nowpaid>=datetime.datetime.now().date() and endyear==thisyear-1:
+			if r.Dues.Nowpaid>=LOCAL_NOW.date() and endyear==thisyear-1:
 				endyear = thisyear	#assume renewal later this year
 	
 		while startyear <= endyear:
@@ -375,7 +373,6 @@ def member_analytics(path=None):
 def member_reservations(member_id, path=None):
 # .../member_reservations/member_id/...
 	access = session['access']	#for layout.html
-	db.Reservations.Wait.readable = db.Reservations.Conf.readable = db.Reservations.Cost.readable = db.Reservations.TBC.readable = True
 	header = CAT(A('back', _href=URL(f"members/{'details' if access=='read' else 'edit'}/{member_id}", scheme=True)),
 				H5('Member Reservations'),
 	      		H6(member_name(member_id)),
@@ -386,8 +383,10 @@ def member_reservations(member_id, path=None):
 			orderby=~db.Events.DateTime,
 			columns=[db.Events.DateTime,
 	    			Column('event', lambda row: A(row.Reservations.Event.Description[0:23], _href=URL(f"reservation/N/{member_id}/{row.Reservations.Event}"))),
-	    			db.Reservations.Wait, db.Reservations.Conf, db.Reservations.Cost,
-					db.Reservations.TBC],
+				    Column('wait', lambda row: res_wait(row.Reservations.Member, row.Reservations.Event) or ''),
+				    Column('conf', lambda row: res_conf(row.Reservations.Member, row.Reservations.Event) or ''),
+				    Column('cost', lambda row: res_totalcost(row.Reservations.Member, row.Reservations.Event) or ''),
+				    Column('tbc', lambda row: res_tbc(row.Reservations.Member, row.Reservations.Event, True) or '')],
 			grid_class_style=grid_style,
 			formstyle=form_style,
 			details=False, editable = False, create = False, deletable = False)
@@ -426,7 +425,7 @@ def affiliations(ismember, member_id, path=None):
 	else:
 		if not session.get('access'):
 			redirect(URL('accessdenied'))
-		db.Affiliations.Matr.requires=IS_EMPTY_OR(IS_INT_IN_RANGE(1900,datetime.datetime.now().date().year+1))
+		db.Affiliations.Matr.requires=IS_EMPTY_OR(IS_INT_IN_RANGE(1900,LOCAL_NOW.date().year+1))
 		#allow matr to be omitted, may get it from member later.
 		write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 	db.Affiliations.Member.default=member_id
@@ -465,7 +464,7 @@ def send_email_confirmation():
 		user = db.users[db.users.insert(email=email, remote_addr = request.remote_addr)]
 	token = str(random.randint(10000,999999))
 	user.update_record(tokens= [token]+(user.tokens or []), url=session['url'],
-						email = email, when_issued = datetime.datetime.now())
+						email = email, when_issued = LOCAL_NOW)
 	message = HTML(CAT(XML(f"{LETTERHEAD.replace('&lt;subject&gt;', ' ')}<br><br>"),
 				A("Please click to continue to "+SOCIETY_DOMAIN, _href=URL('validate', user.id, token, scheme=True)),
 				XML("<br>Please ignore this message if you did not request it.<br>"),
@@ -618,11 +617,11 @@ def dues_payments(path=None):
 
 	grid = Grid(path, eval(session.get('query2')),
 			orderby=~db.Dues.Date,
-			left=db.Members.on(db.Members.id == db.Dues.Member),
 			columns=[Column("Name", lambda row: A(member_name(row['Member'])[0:20], _href=URL(f"members/edit/{row['Member']}"))),
 	    			Column("College", lambda row: primary_affiliation(row['Member'])),
 	    			Column("Matr", lambda row: primary_matriculation(row['Member'])),
-					db.Dues.Status, db.Dues.Date, db.Dues.Prevpaid, db.Dues.Nowpaid, db.Dues.Type],
+					db.Dues.Status, db.Dues.Date, db.Dues.Prevpaid, db.Dues.Nowpaid,
+					Column("Type", lambda row: dues_type(row['Date'], row['Prevpaid']))],
 			deletable=False, details=False, editable=False, create=False,
 			grid_class_style=grid_style,
 			formstyle=form_style,
@@ -667,8 +666,6 @@ def events(path=None):
 	elif path=='select':
 		footer = CAT(A("Export all Events as CSV file", _href=URL('events_export')), XML('<br>'),
 			A("Export event analytics as CSV file", _href=URL('event_analytics')))
-		db.Events.Paid.readable = db.Events.Unpaid.readable = True
-		db.Events.Wait.readable = db.Events.Attend.readable = True
 	elif path=='new':
 		header = CAT(A('back', _href=back), H5('New Event'))
 	else:
@@ -690,8 +687,11 @@ def events(path=None):
 		    headings=['Datetime', 'Event', 'Venue','Speaker', 'Paid', 'TBC', 'Conf', 'Wait'],
 			columns=[db.Events.DateTime,
 					Column('event', lambda row: A(row.Description[0:23], _href=URL(f"event_reservations/{row['id']}"))),
-	   				db.Events.Venue, db.Events.Speaker, db.Events.Paid,
-	    			db.Events.Unpaid, db.Events.Attend, db.Events.Wait],
+	   				db.Events.Venue, db.Events.Speaker, 
+					Column('Paid', lambda row: event_revenue(row.id) or ''),
+					Column('Unpaid', lambda row: event_unpaid(row.id) or ''),
+					Column('Attend', lambda row: event_attend(row.id) or ''),
+					Column('Wait', lambda row: event_wait(row.id) or '')],
 			search_queries=[["Event", lambda value: db.Events.Description.ilike(f'%{value}%')],
 		    				["Venue", lambda value: db.Events.Venue.ilike(f'%{value}%')],
 						    ["Speaker", lambda value: db.Events.Speaker.ilike(f'%{value}%')]],
@@ -755,12 +755,6 @@ def event_reservations(event_id, path=None):
 # request.query: waitlist=True, provisional=True
 	access = session['access']	#for layout.html
 	db.Reservations.id.readable=db.Reservations.Event.readable=False
-	if path=='select':
-		db.Reservations.Cost.readable=True
-		db.Reservations.TBC.readable=True
-		db.Reservations.Conf.readable=True
-		db.Reservations.Wait.readable=True
-		db.Reservations.Prov.readable=True
 	back=URL(f'event_reservations/{event_id}/select', vars=request.query, scheme=True)
 
 	event = db.Events[event_id]
@@ -797,9 +791,11 @@ select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 			left=db.Members.on(db.Members.id == db.Reservations.Member),
 			orderby=db.Reservations.Created if request.query.get('waitlist') else db.Reservations.Lastname|db.Reservations.Firstname,
 			columns=[Column('member', lambda row: A(member_name(row.Reservations.Member)[0:20], _href=URL(f"reservation/N/{row.Reservations.Member}/{event_id}/select"))),
-	    				db.Members.Membership, db.Members.Paiddate, db.Reservations.Affiliation, db.Reservations.Notes, 
-						db.Reservations.Cost, db.Reservations.TBC,
-						db.Reservations.Wait if request.query.get('waitlist') else db.Reservations.Prov if request.query.get('provisional') else db.Reservations.Conf],
+	    				db.Members.Membership, db.Members.Paiddate, db.Reservations.Affiliation, db.Reservations.Notes,
+					    Column('cost', lambda row: res_totalcost(row.Reservations.Member, row.Reservations.Event) or ''),
+					    Column('tbc', lambda row: res_tbc(row.Reservations.Member, row.Reservations.Event, True) or ''),
+					    Column('count', lambda row: (res_wait(row.Reservations.Member, row.Reservations.Event) if request.query.get('waitlist')\
+				      		else res_prov(row.Reservations.Member, row.Reservations.Event) if request.query.get('provisional') else res_conf(row.Reservations.Member, row.Reservations.Event)) or'')],
 			headings=['Member', 'Type', 'Until', 'College', 'Notes', 'Cost', 'Tbc', '#'],
 			details=False, editable = False, create = False, deletable = False,
 			rows_per_page=200, grid_class_style=grid_style, formstyle=form_style)
@@ -826,7 +822,7 @@ def reservation(ismember, member_id, event_id, path=None):
 			redirect(URL('accessdenied'))
 		write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 
-	db.Reservations.Created.default = datetime.datetime.now()
+	db.Reservations.Created.default = LOCAL_NOW
 	member = db.Members[member_id]
 	event = db.Events[event_id]
 	is_good_standing = member_good_standing(member, event.DateTime.date())
@@ -873,7 +869,7 @@ def reservation(ismember, member_id, event_id, path=None):
 			attend = event_attend(event_id) or 0
 			wait = event_wait(event_id) or 0
 			waitlist = False
-			if datetime.datetime.now() > event.Booking_Closed:
+			if LOCAL_NOW > event.Booking_Closed:
 				waitlist = True
 				flash.set("Registration is closed, new registrations will be waitlisted.")
 			elif wait > 0 or (event.Capacity and attend+adding>event.Capacity):
@@ -1011,7 +1007,8 @@ Moving member on/off waitlist will also affect all guests."))
 	grid = Grid(path, (db.Reservations.Member==member.id)&(db.Reservations.Event==event.id),
 			orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname,
 			columns=[db.Reservations.Lastname, db.Reservations.Firstname, 
-					db.Reservations.Notes, db.Reservations.Unitcost, db.Reservations.Status],
+					db.Reservations.Notes, db.Reservations.Unitcost,
+					Column('Status', lambda row: res_status(row.id))],
 			headings=['Last', 'First', 'Notes', 'Price', 'Status'],
 			deletable=lambda row: write and (len(all_guests)==1 and ismember!='Y' or row['id'] != host_reservation.id) \
 						and (ismember!='Y' or row.Provisional or row.Waitlist),
@@ -1121,11 +1118,11 @@ def get_date_range():
 #				 taxyear - prior full calendar year
 #		otherwise one full year ending now
 	access = session['access']	#for layout.html
-	today = datetime.datetime.now().date()
-	year_ago = (datetime.datetime.now() - datetime.timedelta(days=365) + datetime.timedelta(days=1)).date()
-	year_begin = datetime.date(datetime.datetime.now().year, 1, 1)	#start of current calendar 
-	prev_year_begin = datetime.date(datetime.datetime.now().year-1, 1, 1)
-	prev_year_end = datetime.date(datetime.datetime.now().year-1, 12, 31)
+	today = LOCAL_NOW.date()
+	year_ago = (LOCAL_NOW - datetime.timedelta(days=365) + datetime.timedelta(days=1)).date()
+	year_begin = datetime.date(LOCAL_NOW.year, 1, 1)	#start of current calendar 
+	prev_year_begin = datetime.date(LOCAL_NOW.year-1, 1, 1)
+	prev_year_end = datetime.date(LOCAL_NOW.year-1, 12, 31)
 
 	header=H5(request.query.get('title'))		
 
@@ -1386,7 +1383,9 @@ def accounting(path=None):
 
 	grid = Grid(path, db.Bank_Accounts.id>0,
 				orderby=db.Bank_Accounts.Name,
-				columns=[db.Bank_Accounts.Name, db.Bank_Accounts.Accrued, db.Bank_Accounts.Balance,
+				columns=[db.Bank_Accounts.Name,
+	     			Column('Accrued', lambda row: bank_accrual(row.id)),
+	     			db.Bank_Accounts.Balance,
 					Column('', lambda row: A('Upload', _href=URL(f'bank_file/{row.id}'))),
 					Column('', lambda row: A('Transactions', _href=URL('transactions',
 								vars=dict(query=f"db.AccTrans.Bank=={row.id}")))),
@@ -1774,12 +1773,11 @@ def directory(path=None):
 	query = "(db.Members.Membership!=None)&(db.Members.Membership!='')"
 	header = CAT(H5('Member Directory'),
 	      XML(f"You can search by last name, town, state, or college/university using the boxes below; click on a name to view contact information"))
-	db.Members.Name.readable = True
-	db.Members.Affiliations.readable = True
 
 	grid = Grid(path, eval(query),
 		columns=(Column('Name', lambda r: A(f"{member_name(r['id'])}", _href=URL(f"contact_details/{r['id']}"))),
-				db.Members.Affiliations, db.Members.City, db.Members.State),
+	   			Column('Affiliations', lambda r: member_affiliations(r['id'])),
+				db.Members.City, db.Members.State),
 		orderby=db.Members.Lastname|db.Members.Firstname,
 		search_queries=[["Last Name", lambda value: db.Members.Lastname.ilike(f'%{value}%')],
 						["Town", lambda value: db.Members.City.ilike(f'%{value}%')],
@@ -1828,14 +1826,14 @@ def contact_details(member_id):
 def registration(event_id=None):	#deal with eligibility, set up member record and affiliation record as necessary
 #used for both event booking and join/renewal
 	access = session['access']	#for layout.html
-	db.Members.Created.default = datetime.datetime.now()
-	db.Reservations.Created.default = datetime.datetime.now()
+	db.Members.Created.default = LOCAL_NOW
+	db.Reservations.Created.default = LOCAL_NOW
 	if event_id:
 		event = db(db.Events.id==event_id).select().first()
-		if not event or datetime.datetime.now() > event.DateTime or (datetime.datetime.now() > event.Booking_Closed and not event_attend(event_id)):
+		if not event or LOCAL_NOW > event.DateTime or (LOCAL_NOW > event.Booking_Closed and not event_attend(event_id)):
 			flash.set('Event is not open for booking.')
 			redirect(URL('index'))
-		if datetime.datetime.now() > event.Booking_Closed:
+		if LOCAL_NOW > event.Booking_Closed:
 			flash.set('Booking is closed, but you may join the wait list.')
 		session['event_id'] = event_id
 		session['membership'] = None	#gets set if membership dues to be collected
@@ -1880,7 +1878,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 			redirect(URL(f"emails/Y/{member_id}"))
 		else:		#dues payment or profile update
 			if not session.get('membership') and \
-					member_good_standing(member, (datetime.datetime.now()+datetime.timedelta(days=GRACE_PERIOD)).date()):
+					member_good_standing(member, (LOCAL_NOW+datetime.timedelta(days=GRACE_PERIOD)).date()):
 				redirect(URL('profile')) #edit profile if good standing for at least grace period
 			if member.Stripe_subscription == 'Cancelled':
 				member.update_record(Stripe_subscription = None, Stripe_next = None)
@@ -1911,7 +1909,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 								'Please select your College' if not member or not member.Membership else ''))))
 	if not affinity or not affinity.Matr:
 		fields.append(Field('matr', 'integer', default = affinity.Matr if affinity else None,
-				requires=IS_EMPTY_OR(IS_INT_IN_RANGE(datetime.datetime.now().year-100,datetime.datetime.now().year+1)),
+				requires=IS_EMPTY_OR(IS_INT_IN_RANGE(LOCAL_NOW.year-100,LOCAL_NOW.year+1)),
 				comment='Please enter your matriculation year, not graduation year'))
 
 	if event:
@@ -1948,7 +1946,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 		
 	if form.accepted:
 		if member:
-			notes = f"{datetime.datetime.now().strftime('%m/%d/%y')} {form.vars.get('notes')}"
+			notes = f"{LOCAL_NOW.strftime('%m/%d/%y')} {form.vars.get('notes')}"
 			if member.Notes:
 				notes = member.Notes+'\n'+notes
 				
@@ -2001,7 +1999,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 		if event:
 			redirect(URL(f'reservation/Y/{member_id}/{event_id}/new'))	#go create this member's reservation
 		else:	#joining or renewing
-			if not member.Paiddate or member.Paiddate < datetime.datetime.now()-datetime.timedelta(GRACE_PERIOD):
+			if not member.Paiddate or member.Paiddate < LOCAL_NOW-datetime.timedelta(GRACE_PERIOD):
 				#new/reinstated member, gather additional profile information
 				flash.set("Next, please review/complete your directory profile")
 				redirect(URL('profile')) #gather profile info
@@ -2025,7 +2023,7 @@ def profile():
 	header = H5('Profile Information')
 	if member.Paiddate:
 		header = CAT(header,
-	       XML(f"Your membership {'expired' if member.Paiddate < datetime.datetime.now().date() else 'expires'} on {member.Paiddate.strftime('%m/%d/%Y')}"))
+	       XML(f"Your membership {'expired' if member.Paiddate < LOCAL_NOW.date() else 'expires'} on {member.Paiddate.strftime('%m/%d/%Y')}"))
 	if member.Stripe_next:
 		header = CAT(header, XML(f" Renewal payment will be charged on {member.Stripe_next.strftime('%m/%d/%Y')}."))
 	header = CAT(header,
@@ -2144,7 +2142,7 @@ def cancel_subscription():
 	if not session.get('member_id'):
 		redirect(URL('index'))
 	member = db.Members[session['member_id']]
-	if not (member and member_good_standing(member, (datetime.datetime.now()-datetime.timedelta(days=45)).date())):
+	if not (member and member_good_standing(member, (LOCAL_NOW-datetime.timedelta(days=45)).date())):
 		raise Exception("perhaps Back button or mobile auto re-request?")
 	
 	header = CAT(H5('Membership Cancellation'),
@@ -2164,7 +2162,7 @@ def cancel_subscription():
 		if not member.Paiddate:	#just joined but changed their mind?
 			member.update_record(Membership=None, Charged=None)
 
-		effective = max(member.Paiddate or datetime.datetime.now().date(), datetime.datetime.now().date()).strftime('%m/%d/%Y')
+		effective = max(member.Paiddate or LOCAL_NOW.date(), LOCAL_NOW.date()).strftime('%m/%d/%Y')
 		notification(member, 'Membership Cancelled', f'Your membership is cancelled effective {effective}.')
 		flash.set(f'Your membership is cancelled effective {effective}.')
 		redirect(URL('index'))

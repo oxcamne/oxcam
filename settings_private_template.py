@@ -5,6 +5,8 @@ for database (if using, e.g., MySql), the email server for sending out notices e
 and account specific information for the Stripe payment processor
 """
 from py4web import URL
+import datetime
+from dateutil import tz
 
 DB_URI = "sqlite://storage.db"
 DB_POOL_SIZE = 10
@@ -59,4 +61,6 @@ talk/receptions, and outdoor events. Some are for members only, others are open 
 University sports team events, and events organized by Cambridge in America or Oxford North America.<br>\
 <b>OxCam10</b> includes informal events organized by OxCam10 for alumni within 10 years of graduation."
 IS_PRODUCTION = False
-TIME_ZONE = 'America/New_York' #see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+#within the database, time and datetime will use local time specified here
+TIME_ZONE = tz.gettz('America/New_York') #see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+LOCAL_NOW = None                        #filled in by @checkaccess decorator

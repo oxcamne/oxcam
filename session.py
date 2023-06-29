@@ -3,7 +3,7 @@ This file contains controllers used to manage the user's session
 """
 from py4web import URL, request, redirect, action, Field, response
 from .common import db, session, flash, logger
-from .settings_private import SUPPORT_EMAIL
+from .settings import SUPPORT_EMAIL, TIME_ZONE, LOCAL_NOW
 from .models import ACCESS_LEVELS, member_name
 from yatl.helpers import A, H6, XML, P
 from py4web.utils.form import Form, FormStyleBulma
@@ -21,6 +21,7 @@ for an explanation see the blog article from which I cribbed
 def checkaccess(requiredaccess):
 	def wrap(f):
 		def wrapped_f(*args, **kwds):
+			LOCAL_NOW = datetime.datetime.now(TIME_ZONE)
 			session['url_prev'] = session.get('url')
 			session['url']=request.url
 			if session.get('back') and len(session['back'])>0 and request.url==session['back'][-1]:

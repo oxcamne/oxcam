@@ -132,7 +132,7 @@ def members(path=None):
 				filter['good_standing'] = 'On'
 			session['filter'] = filter
 		header = CAT(header, A("Send Email to Specific Address(es)", _href=URL('composemail')), XML('<br>'))
-		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/member-search/members-page?authuser=1"
+		#_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/member-search/members-page?authuser=1"
 	elif path:
 		caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev']).group(1)
 		if caller!='members' and caller not in ['composemail', 'affiliations', 'emails', 'dues', 'member_reservations']:
@@ -140,7 +140,7 @@ def members(path=None):
 		if len(session['back'])>0 and re.match(f'.*/{request.app_name}/([a-z_]*).*', session['back'][-1]).group(1)!='members':
 			back = session['back'][-1]
 		header = CAT(A('back', _href=back), H5('Member Record'))
-		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/member-search/member-record?authuser=1"
+		#_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/member-search/member-record?authuser=1"
 		if path.startswith('edit') or path.startswith('details'):
 			member_id = path[path.find('/')+1:]
 			header= CAT(header, 
@@ -428,6 +428,7 @@ def affiliations(ismember, member_id, path=None):
 		db.Affiliations.Matr.requires=IS_EMPTY_OR(IS_INT_IN_RANGE(1900,datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date().year+1))
 		#allow matr to be omitted, may get it from member later.
 		write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
+		#_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/member-search/member-affiliations?authuser=1"
 	db.Affiliations.Member.default=member_id
 
 	header = CAT(A('back', _href=session['url_prev']),
@@ -463,7 +464,7 @@ def send_email_confirmation():
 	else:
 		user = db.users[db.users.insert(email=email, remote_addr = request.remote_addr)]
 	token = str(random.randint(10000,999999))
-	user.update_record(tokens= [token]+(user.tokens or []), url=session['url'],
+	user.update_record(tokens= [token]+(user.tokens or []), url=session.get('url') or URL('index'),
 						email = email, when_issued = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))
 	message = HTML(CAT(XML(f"{LETTERHEAD.replace('&lt;subject&gt;', ' ')}<br><br>"),
 				A("Please click to continue to "+SOCIETY_DOMAIN, _href=URL('validate', user.id, token, scheme=True)),
@@ -504,6 +505,7 @@ def emails(ismember, member_id, path=None):
 		if not session['access']:
 			redirect(URL('accessdenied'))
 		write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
+		#_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/member-search/member-emails?authuser=1"
 	db.Emails.Member.default=member_id
 
 	if path=='new':
@@ -573,6 +575,7 @@ def dues(member_id, path=None):
 	access = session['access']	#for layout.html
 	session['url']=session['url_prev']	#preserve back link
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
+	#_help = ""
 	db.Dues.Member.default=member_id
 
 	member=db.Members[member_id]

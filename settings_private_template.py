@@ -62,4 +62,3 @@ University sports team events, and events organized by Cambridge in America or O
 IS_PRODUCTION = False
 #within the database, time and datetime will use local time specified here
 TIME_ZONE = tz.gettz('America/New_York') #see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
-LOCAL_NOW = datetime.datetime.now()        #updated by @checkaccess decorator for each call

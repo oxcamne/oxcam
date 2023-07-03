@@ -66,8 +66,9 @@ you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _h
 def validate(id, token):
 	user = db(db.users.id == id).select().first()
 	if not user or not int(token) in user.tokens or \
-			datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > user.when_issued + datetime.timedelta(minutes = 15) or \
-			user.remote_addr != request.remote_addr:
+			datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > user.when_issued + datetime.timedelta(minutes = 15):
+			#user.remote_addr != request.remote_addr:	#this check may be too strong,
+			#there may be configurations where the IP switches between browser and email??
 		redirect(URL('index'))
 	rows = db((db.Members.id == db.Emails.Member) & db.Emails.Email.ilike(user.email)).select(
 				db.Members.ALL, distinct=True)

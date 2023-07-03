@@ -9,7 +9,7 @@ from yatl.helpers import A, TABLE, TH, THEAD, H6, TR, TD, CAT, HTML, XML
 import stripe, datetime, re, markmin
 
 #check if member is in good standing at a particular date
-def member_good_standing(member, date=datetime.datetime.now().date()):
+def member_good_standing(member, date=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()):
 	return member and member.Membership and ((not member.Paiddate or member.Paiddate>=date)\
 			or member.Charged or (member.Stripe_subscription and member.Stripe_subscription != 'Cancelled'))
 
@@ -56,10 +56,10 @@ def notification(member, subject, body):
 	message += body
 	msg_send(member, subject, message)
 
-def newpaiddate(paiddate, timestamp=datetime.datetime.now(), graceperiod=GRACE_PERIOD):
+def newpaiddate(paiddate, timestamp=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), graceperiod=GRACE_PERIOD):
 #within graceperiod days of expiration is treated as renewal if renewed by check, or if student subscription.
 #auto subscription will start from actual date
-	basedate = timestamp.date() if not paiddate or paiddate<datetime.datetime.now().date()-datetime.timedelta(days=graceperiod) else paiddate
+	basedate = timestamp.date() if not paiddate or paiddate<datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()-datetime.timedelta(days=graceperiod) else paiddate
 	if basedate.month==2 and basedate.day==29: basedate -= datetime.timedelta(days=1)
 	return datetime.date(basedate.year+1, basedate.month, basedate.day)
 
@@ -122,7 +122,7 @@ def financial_content(event, query, left):
 	rows.append(THEAD(TR(TH('Net Revenue'), tdnum(totrev - totexp - cardfees, th=True))))
 	return CAT(message, H6('\nExpense'), TABLE(*rows))
 
-def bank_balance(bank_id, timestamp=datetime.datetime.now(), balance=0):
+def bank_balance(bank_id, timestamp=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), balance=0):
 	amt = db.AccTrans.Amount.sum()
 	fee = db.AccTrans.Fee.sum()
 	r = db((db.AccTrans.Bank==bank_id)&(db.AccTrans.Accrual==False)&(db.AccTrans.Timestamp>=timestamp)).select(amt, fee).first()
@@ -187,7 +187,7 @@ def member_profile(member):
 
 #Create the header for a member message, such as a confirmation
 def msg_header(member, subject):
-	body = f"\n\n-------------\n{datetime.datetime.now().strftime('%m/%d/%y')}||\n"
+	body = f"\n\n-------------\n{datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).strftime('%m/%d/%y')}||\n"
 	body += f"{(member.Title or '')+' '}{member.Firstname} {member.Lastname} {member.Suffix or ''}||\n"
 	if member.Address1:
 		body += f"{member.Address1}||\n"

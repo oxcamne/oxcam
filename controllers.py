@@ -511,7 +511,7 @@ def emails(ismember, member_id, path=None):
 	if path=='new':
 		db.Emails.Email.writable = True
 		old_primary_email = db(db.Emails.Member == member_id).select(orderby=~db.Emails.Modified).first()
-		db.Emails.Mailings.default = old_primary_email.Mailings
+		db.Emails.Mailings.default = old_primary_email.Mailings if old_primary_email else None
 		if ismember=='Y':
 			db.Emails.Mailings.readable=db.Emails.Mailings.writable=False
 	elif path=='select':

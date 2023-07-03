@@ -2002,7 +2002,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 		if event:
 			redirect(URL(f'reservation/Y/{member_id}/{event_id}/new'))	#go create this member's reservation
 		else:	#joining or renewing
-			if not member.Paiddate or member.Paiddate < datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)-datetime.timedelta(GRACE_PERIOD):
+			if not member.Paiddate or member.Paiddate < (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)-datetime.timedelta(GRACE_PERIOD)).date():
 				#new/reinstated member, gather additional profile information
 				flash.set("Next, please review/complete your directory profile")
 				redirect(URL('profile')) #gather profile info

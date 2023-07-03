@@ -152,8 +152,11 @@ def emailparse(body, subject, query=None):
 			if not query or m.group(2)=='reservation' and not ('Reservations.Event' in query):
 				raise Exception(f"<{m.group(2)}> can't be used in this context")
 			func=m.group(2) #will be generated individually for each target later
-		else:	#should be <name> where name is defined in settings_private, for example <letterhead>
+		#should be <name> where name is defined in settings_private, for example <letterhead>
+		elif m.group(2).lower() in ['letterhead', 'society_domain', 'society_name', 'home_url', 'support_email']:
 			text = eval(m.group(2).upper()).replace('&lt;subject&gt;', subject)
+		else:
+			raise Exception(f"<{m.group(2)}> is not recognized")
 		bodyparts = [(text, func)]
 		if m.group(1)!='':
 			bodyparts = emailparse(m.group(1), subject, query)+bodyparts

@@ -466,10 +466,11 @@ def send_email_confirmation():
 	token = str(random.randint(10000,999999))
 	user.update_record(tokens= [token]+(user.tokens or []), url=session.get('url') or URL('index'),
 						email = email, when_issued = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))
-	message = HTML(CAT(XML(f"{LETTERHEAD.replace('&lt;subject&gt;', ' ')}<br><br>"),
-				A("Please click to continue to "+SOCIETY_DOMAIN, _href=URL('validate', user.id, token, scheme=True)),
-				XML("<br>Please ignore this message if you did not request it.<br>"),
-				XML(f"If you have questions, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}.")))
+	message = HTML(XML(f"{LETTERHEAD.replace('&lt;subject&gt;', ' ')}<br><br>\
+Please click {URL('validate', user.id, token, scheme=True)} to continue to {SOCIETY_DOMAIN}.<br><br>\
+Please ignore this message if you did not request it.<br><br>\
+If the link doesn't work, please try copy & pasting it to your browser's address bar.<br><br>\
+If you are unable to login, please contact {SUPPORT_EMAIL}."))
 	auth.sender.send(to=email, subject='Please Confirm Email', body=message)
 	header = DIV(P("Please click the link sent to your email to continue. If you don't see the validation message, please check your spam folder."),
 				P('This link is valid for 15 minutes. You may close this window.'))
@@ -1690,10 +1691,11 @@ def composemail():
 	fields.append(Field('bcc', 'string', requires=IS_LIST_OF_EMAILS(), default=''))
 	fields.append(Field('subject', 'string', requires=IS_NOT_EMPTY(), default=proto.Subject if proto else ''))
 	fields.append(Field('body', 'text', requires=IS_NOT_EMPTY(), default=proto.Body if proto else "<Letterhead>\n<greeting>\n\n" if query else "<Letterhead>\n\n",
-				comment=CAT("You can use <subject>, <greeting>, <member>, <reservation>, <email>, or <metadata> ",
-				"where metadata is 'Letterhead', 'support_email' or  'society_domain', etc.  ",
+				comment=CAT("You can use placeholders <letterhead>, <subject>, <greeting>, <member>, <reservation>, <email>, ",
+				"<support_email>, <society_domain>, <society_name>, or <home_url>, depending on the context. ",
 				"You can also include html content thus: {{content}}. Email is formatted using ",
-					A('Markmin', _href='http://www.web2py.com/examples/static/markmin.html', _target='Markmin'), '.')))
+				A('Markmin', _href='http://www.web2py.com/examples/static/markmin.html', _target='Markmin'), '.')))
+#'letterhead', 'society_domain', 'society_name', 'home_url', 'support_email'
 	fields.append(Field('save', 'boolean', default=proto!=None, comment='store/update template'))
 	if proto:
 		form=None

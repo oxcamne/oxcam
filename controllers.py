@@ -25,7 +25,7 @@ session, db, T, auth, and tempates are examples of Fixtures.
 Warning: Fixtures MUST be declared with @action.uses({fixtures}) else your app will result in undefined behavior
 """
 from py4web import action, request, response, redirect, URL, Field
-from yatl.helpers import H5, H6, XML, HTML, DIV, P, TABLE, TH, TD, THEAD, TR
+from yatl.helpers import H5, H6, XML, HTML, TABLE, TH, TD, THEAD, TR
 from .common import db, session, auth, flash
 from .settings import SOCIETY_DOMAIN, STRIPE_PKEY, STRIPE_SKEY, LETTERHEAD,\
 	SUPPORT_EMAIL, GRACE_PERIOD, SOCIETY_NAME, MEMBERSHIP, STRIPE_EVENT,\
@@ -43,7 +43,7 @@ from .session import checkaccess
 from py4web.utils.grid import Grid, GridClassStyleBulma, Column
 from py4web.utils.form import Form, FormStyleBulma
 from py4web.utils.factories import Inject
-import datetime, random, re, markmin, stripe, csv, decimal, io
+import datetime, re, markmin, stripe, csv, decimal, io
 from io import StringIO
 
 grid_style = GridClassStyleBulma
@@ -450,30 +450,6 @@ is used on name badges etc."
 			grid_class_style=grid_style,
 			formstyle=form_style,
 			)
-	return locals()
-
-#send email confirmation message
-@action('send_email_confirmation', method=['GET'])
-@action.uses("gridform.html", session, db)
-def send_email_confirmation():
-	access = None	#for layout.html
-	email = request.query.get('email').lower()
-	user = db(db.users.email==email).select().first()
-	if user:
-		user.update_record(remote_addr = request.remote_addr)
-	else:
-		user = db.users[db.users.insert(email=email, remote_addr = request.remote_addr)]
-	token = str(random.randint(10000,999999))
-	user.update_record(tokens= [token]+(user.tokens or []), url=session.get('url') or URL('index'),
-						email = email, when_issued = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))
-	message = HTML(XML(f"{LETTERHEAD.replace('&lt;subject&gt;', ' ')}<br><br>\
-Please click {URL('validate', user.id, token, scheme=True)} to continue to {SOCIETY_DOMAIN}.<br><br>\
-Please ignore this message if you did not request it.<br><br>\
-If the link doesn't work, please try copy & pasting it to your browser's address bar.<br><br>\
-If you are unable to login, please contact {SUPPORT_EMAIL}."))
-	auth.sender.send(to=email, subject='Please Confirm Email', body=message)
-	header = DIV(P("Please click the link sent to your email to continue. If you don't see the validation message, please check your spam folder."),
-				P('This link is valid for 15 minutes. You may close this window.'))
 	return locals()
 
 #switch user's primary email to newly validated email

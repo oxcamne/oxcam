@@ -2,13 +2,13 @@
 This file contains controllers used to manage the user's session
 """
 from py4web import URL, request, redirect, action, Field, response
-from .common import db, session, flash, logger
-from .settings import SUPPORT_EMAIL, TIME_ZONE
+from .common import db, session, flash, logger, auth
+from .settings import SUPPORT_EMAIL, TIME_ZONE, LETTERHEAD, SOCIETY_DOMAIN
 from .models import ACCESS_LEVELS, member_name
-from yatl.helpers import A, H6, XML, P
+from yatl.helpers import A, H6, XML, P, HTML, DIV
 from py4web.utils.form import Form, FormStyleBulma
 from pydal.validators import IS_IN_SET, IS_NOT_EMPTY, IS_EMAIL
-import datetime
+import datetime, random
 
 """
 decorator for validating login & access permission using a one-time code
@@ -59,6 +59,31 @@ you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _h
 		log =f"login {request.remote_addr} {request.environ['HTTP_USER_AGENT']} {form.vars['email']} {session.get('url') or ''}"
 		logger.info(log)
 		redirect(URL('send_email_confirmation', vars=dict(email=form.vars['email'])))
+	return locals()
+
+#send email confirmation message
+@action('send_email_confirmation', method=['GET'])
+@action.uses("gridform.html", session, db)
+def send_email_confirmation():
+	access = None	#for layout.html
+	email = request.query.get('email').lower()
+	user = db(db.users.email==email).select().first()
+	if user:
+		user.update_record(remote_addr = request.remote_addr)
+	else:
+		user = db.users[db.users.insert(email=email, remote_addr = request.remote_addr)]
+	token = str(random.randint(10000,999999))
+	user.update_record(tokens= [token]+(user.tokens or []), url=session.get('url') or URL('index'),
+						email = email, when_issued = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))
+	link = URL('validate', user.id, token, scheme=True)
+	message = HTML(XML(f"{LETTERHEAD.replace('&lt;subject&gt;', ' ')}<br><br>\
+Please click {A(link, _href=link)} to continue to {SOCIETY_DOMAIN}.<br><br>\
+Please ignore this message if you did not request it.<br><br>\
+If the link doesn't work, please try copy & pasting it to your browser's address bar.<br><br>\
+If you are unable to login, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}."))
+	auth.sender.send(to=email, subject='Please Confirm Email', body=message)
+	header = DIV(P("Please click the link sent to your email to continue. If you don't see the validation message, please check your spam folder."),
+				P('This link is valid for 15 minutes. You may close this window.'))
 	return locals()
 
 @action('validate/<id:int>/<token:int>', method=['GET', 'POST'])

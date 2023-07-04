@@ -216,7 +216,7 @@ def event_confirm(event_id, member_id, justpaid=0, event_only=False):
 	body += '**Date:**|' + event.DateTime.strftime("%A %B %d, %Y") + '\n'
 	body += '**Time:**|' + event.DateTime.strftime("%I:%M%p") + '\n'
 	body += '------------------------\n'
-	if event_only or not resvtns: return body
+	if event_only or not resvtns: return markmin.markmin2html(body)
 	tbc = res_tbc(member_id, event_id) or 0
 	tbcdues = res_tbc(member_id, event_id, True) or 0
 	cost = res_totalcost(member_id, event_id) or 0

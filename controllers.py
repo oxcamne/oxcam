@@ -741,7 +741,7 @@ def event_reservations(event_id, path=None):
 	header = CAT(A('back', _href=URL('events/select')),
 	      		H5('Provisional Reservations' if request.query.get('provisional') else 'Waitlist' if request.query.get('waitlist') else 'Reservations'),
 				H6(f"{event.DateTime}, {event.Description}"),
-				XML("Use the 'Edit/Details' button to drill down on a reservation and view detail or edit individual reservations."), XML('<br>'))
+				XML("Click on the member name to drill down on a reservation and view/edit the details."), XML('<br>'))
 	query = f'(db.Reservations.Event=={event_id})'
 	#for waitlist or provisional, have to include hosts with waitlisted or provisional guests
 	if request.query.get('waitlist') or request.query.get('provisional'):
@@ -838,7 +838,7 @@ def reservation(ismember, member_id, event_id, path=None):
 			back = session['back'][-1]
 
 	header = CAT(H5('Event Registration'), H6(member_name(member_id)),
-			XML(markmin.markmin2html(event_confirm(event.id, member.id, event_only=True))))
+			XML(event_confirm(event.id, member.id, event_only=True)))
 	if ismember!='Y':
 		header = CAT(A('back', _href=back), header)
 
@@ -987,9 +987,9 @@ Moving member on/off waitlist will also affect all guests."))
 	grid = Grid(path, (db.Reservations.Member==member.id)&(db.Reservations.Event==event.id),
 			orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname,
 			columns=[db.Reservations.Lastname, db.Reservations.Firstname, 
-					db.Reservations.Notes, db.Reservations.Unitcost,
+					db.Reservations.Notes, db.Reservations.Selection, db.Reservations.Unitcost,
 					Column('Status', lambda row: res_status(row.id))],
-			headings=['Last', 'First', 'Notes', 'Price', 'Status'],
+			headings=['Last', 'First', 'Notes', 'Selection', 'Price', 'Status'],
 			deletable=lambda row: write and (len(all_guests)==1 and ismember!='Y' or row['id'] != host_reservation.id) \
 						and (ismember!='Y' or row.Provisional or row.Waitlist),
 			details=not write, 

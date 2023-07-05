@@ -78,9 +78,8 @@ def send_email_confirmation():
 	link = URL('validate', user.id, token, scheme=True)
 	message = HTML(XML(f"{LETTERHEAD.replace('&lt;subject&gt;', ' ')}<br><br>\
 Please click {A(link, _href=link)} to continue to {SOCIETY_DOMAIN}.<br><br>\
-Please ignore this message if you did not request it.<br><br>\
 If the link doesn't work, please try copy & pasting it to your browser's address bar.<br><br>\
-If you are unable to login, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}."))
+If you are unable to login or have other questions, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}."))
 	auth.sender.send(to=email, subject='Please Confirm Email', body=message)
 	header = DIV(P("Please click the link sent to your email to continue. If you don't see the validation message, please check your spam folder."),
 				P('This link is valid for 15 minutes. You may close this window.'))

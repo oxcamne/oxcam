@@ -132,7 +132,7 @@ def members(path=None):
 				filter['good_standing'] = 'On'
 			session['filter'] = filter
 		header = CAT(header, A("Send Email to Specific Address(es)", _href=URL('composemail')), XML('<br>'))
-		#_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/member-search/members-page?authuser=1"
+		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/members-page?authuser=1"
 	elif path:
 		caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev']).group(1)
 		if caller!='members' and caller not in ['composemail', 'affiliations', 'emails', 'dues', 'member_reservations']:
@@ -140,7 +140,7 @@ def members(path=None):
 		if len(session['back'])>0 and re.match(f'.*/{request.app_name}/([a-z_]*).*', session['back'][-1]).group(1)!='members':
 			back = session['back'][-1]
 		header = CAT(A('back', _href=back), H5('Member Record'))
-		#_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/member-search/member-record?authuser=1"
+		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/members-page/member-record?authuser=1"
 		if path.startswith('edit') or path.startswith('details'):
 			member_id = path[path.find('/')+1:]
 			header= CAT(header, 
@@ -156,14 +156,14 @@ def members(path=None):
 		session['back'] = []
 
 	if search_form.vars.get('mailing_list'):
-		query.append(f"(db.Emails.Member==db.Members.id)&db.Emails.Mailings.contains({search_form.vars.get('mailing_list')})")
+		query.append(f"(db.Members.id==db.Emails.Member)&db.Emails.Mailings.contains({search_form.vars.get('mailing_list')})")
 		qdesc = f"{db.Email_Lists[search_form.vars.get('mailing_list')].Listname} mail list, "
 	if search_form.vars.get('event'):
 		if search_form.vars.get('mailing_list'):
 			left=f"db.Reservations.on((db.Reservations.Member == db.Members.id)&(db.Reservations.Event=={search_form.vars.get('event')})&(db.Reservations.Host==True)&(db.Reservations.Provisional!=True)&(db.Reservations.Waitlist!=True))"
 			query.append("(db.Reservations.id==None)")
 		else:
-			query.append(f"(db.Reservations.Member==db.Members.id)&(db.Reservations.Event=={search_form.vars.get('event')})&(db.Reservations.Host==True)&(db.Reservations.Provisional!=True)&(db.Reservations.Waitlist!=True)")
+			query.append(f"(db.Members.id==db.Reservations.Member)&(db.Reservations.Event=={search_form.vars.get('event')})&(db.Reservations.Host==True)&(db.Reservations.Provisional!=True)&(db.Reservations.Waitlist!=True)")
 		qdesc += f"{'excluding ' if search_form.vars.get('mailing_list') else ''}{db.Events[search_form.vars.get('event')].Description[0:25]} attendees, "
 	if search_form.vars.get('good_standing'):
 		query.append("((db.Members.Membership!=None)&(((db.Members.Paiddate==None)|(db.Members.Paiddate>=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()))|(db.Members.Charged!=None)|((db.Members.Stripe_subscription!=None)&(db.Members.Stripe_subscription!=('Cancelled')))))")
@@ -177,7 +177,7 @@ def members(path=None):
 			query.append(f"db.Colleges.Name.ilike('%{value}%')&(db.Affiliations.College==db.Colleges.id)&(db.Members.id==db.Affiliations.Member)")
 			qdesc += f" with affiliation matching '{value}'."
 		elif field == 'Email':
-			query.append(f"db.Emails.Email.ilike('%{value}%')&(db.Emails.Member==db.Members.id)")
+			query.append(f"(db.Members.id==db.Emails.Member)&db.Emails.Email.ilike('%{value}%')")
 			qdesc += f" with email matching '{value}'."
 		else:
 			fieldtype = eval("db.Members."+field+'.type')
@@ -377,6 +377,10 @@ def member_reservations(member_id, path=None):
 				H5('Member Reservations'),
 	      		H6(member_name(member_id)),
 				A('Add New Reservation', _href=URL(f'add_member_reservation/{member_id}', scheme=True)))
+	if path=='select':
+		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/members-page/member-reservations?authuser=1"
+	else:
+		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/events-page/reservation-display?authuser=1"
 
 	grid = Grid(path, (db.Reservations.Member==member_id)&(db.Reservations.Host==True),
 			left=db.Events.on(db.Events.id == db.Reservations.Event),
@@ -428,7 +432,7 @@ def affiliations(ismember, member_id, path=None):
 		db.Affiliations.Matr.requires=IS_EMPTY_OR(IS_INT_IN_RANGE(1900,datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date().year+1))
 		#allow matr to be omitted, may get it from member later.
 		write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
-		#_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/member-search/member-affiliations?authuser=1"
+		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/members-page/member-affiliations?authuser=1"
 	db.Affiliations.Member.default=member_id
 
 	header = CAT(A('back', _href=session['url_prev']),
@@ -482,7 +486,7 @@ def emails(ismember, member_id, path=None):
 		if not session['access']:
 			redirect(URL('accessdenied'))
 		write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
-		#_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/member-search/member-emails?authuser=1"
+		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/members-page/member-emails?authuser=1"
 	db.Emails.Member.default=member_id
 
 	if path=='new':
@@ -552,7 +556,7 @@ def dues(member_id, path=None):
 	access = session['access']	#for layout.html
 	session['url']=session['url_prev']	#preserve back link
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
-	#_help = ""
+	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/members-page/member-dues?authuser=1"
 	db.Dues.Member.default=member_id
 
 	member=db.Members[member_id]
@@ -646,13 +650,16 @@ def events(path=None):
 	elif path=='select':
 		footer = CAT(A("Export all Events as CSV file", _href=URL('events_export')), XML('<br>'),
 			A("Export event analytics as CSV file", _href=URL('event_analytics')))
+		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/events-page?authuser=1"
 	elif path=='new':
 		header = CAT(A('back', _href=back), H5('New Event'))
+		_help = "https://sites.google.com/oxcamne.org/help-new/how-to/set-up-a-new-event?authuser=1"
 	else:
 		url = URL('register', path[path.find('/')+1:], scheme=True)
 		header = CAT(A('back', _href=back), H5('Event Record'),
 	       			"Booking link is ", A(url, _href=url), XML('<br>'),
 	       			A('Make a Copy of This Event', _href=URL('event_copy', path[path.find('/')+1:])))
+		_help = "https://sites.google.com/oxcamne.org/help-new/how-to/set-up-a-new-event?authuser=1"
 	       		
 	def checktickets(form):
 		for t in form.vars['Tickets']:
@@ -664,13 +671,13 @@ def events(path=None):
 
 	grid = Grid(path, db.Events.id>0,
 	     	orderby=~db.Events.DateTime,
-		    headings=['Datetime', 'Event', 'Venue','Speaker', 'Paid', 'TBC', 'Conf', 'Wait'],
+		    headings=['Datetime', 'Event', 'Venue', 'Paid', 'TBC', 'Conf', 'Wait'],
 			columns=[db.Events.DateTime,
 					Column('event', lambda row: A(row.Description[0:23], _href=URL(f"event_reservations/{row['id']}"))),
-	   				db.Events.Venue, db.Events.Speaker, 
+	   				db.Events.Venue,
 					Column('Paid', lambda row: event_revenue(row.id) or ''),
-					Column('Unpaid', lambda row: event_unpaid(row.id) or ''),
-					Column('Attend', lambda row: event_attend(row.id) or ''),
+					Column('TBC', lambda row: event_unpaid(row.id) or ''),
+					Column('Conf', lambda row: event_attend(row.id) or ''),
 					Column('Wait', lambda row: event_wait(row.id) or '')],
 			search_queries=[["Event", lambda value: db.Events.Description.ilike(f'%{value}%')],
 		    				["Venue", lambda value: db.Events.Venue.ilike(f'%{value}%')],
@@ -742,6 +749,8 @@ def event_reservations(event_id, path=None):
 	      		H5('Provisional Reservations' if request.query.get('provisional') else 'Waitlist' if request.query.get('waitlist') else 'Reservations'),
 				H6(f"{event.DateTime}, {event.Description}"),
 				XML("Click on the member name to drill down on a reservation and view/edit the details."), XML('<br>'))
+	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/events-page/reservation-list?authuser=1"
+
 	query = f'(db.Reservations.Event=={event_id})'
 	#for waitlist or provisional, have to include hosts with waitlisted or provisional guests
 	if request.query.get('waitlist') or request.query.get('provisional'):
@@ -801,6 +810,7 @@ def reservation(ismember, member_id, event_id, path=None):
 			session['url'] = session['url_prev']
 			redirect(URL('accessdenied'))
 		write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
+		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/events-page/reservation-display?authuser=1"
 
 	db.Reservations.Created.default = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
 	member = db.Members[member_id]

@@ -1165,6 +1165,7 @@ def financial_statement():
 		redirect(URL('get_date_range', vars=dict(function='financial_statement',title='Financial Statement')))
 		
 	message = CAT(H5(title), H6('Assets'))
+	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/accounts/financial-statement?authuser=1"
 
 	sumamt = db.AccTrans.Amount.sum()
 	sumfee = db.AccTrans.Fee.sum()
@@ -1275,6 +1276,7 @@ def tax_statement():
 	startdate = datetime.date.fromisoformat(start)
 	enddate = datetime.date.fromisoformat(end)
 	title = f"Financial Statement (cash based) for period {start} to {end}"
+	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/accounts/tax-statement?authuser=1"
 
 	if not start or not end:
 		redirect(URL('get_date_range', vars=dict(function='financial_statement',title='Financial Statement')))
@@ -1370,6 +1372,7 @@ def accounting(path=None):
 				"Use Upload to load a file you've downloaded from bank/payment processor into accounting")
 	else:
 		header = CAT(A('back', _href=URL('accounting')) , H5('Banks'))
+	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/accounts?authuser=1"
 
 	grid = Grid(path, db.Bank_Accounts.id>0,
 				orderby=db.Bank_Accounts.Name,
@@ -1566,6 +1569,8 @@ def transactions(path=None):
 	access = session['access']	#for layout.html
 	db.AccTrans.Fee.writable = False
 
+	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/accounts/transaction-list?authuser=1"
+
 	back = URL('transactions/select', scheme=True)
 	if not path:
 		session['back'].append(session['url_prev'])
@@ -1643,6 +1648,9 @@ def transactions(path=None):
 def composemail():
 	access = session['access']	#for layout.html
 	session['url']=session['url_prev']	#preserve back link
+
+	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/members-page/send-email?authuser=1"
+	
 	query = request.query.get('query')
 	qdesc = request.query.get('qdesc')
 	left = request.query.get('left')

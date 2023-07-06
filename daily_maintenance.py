@@ -17,17 +17,20 @@ it can be run in vscode using a configuration:
 """
 import datetime
 import os
+from pathlib import Path
 from .common import db, auth, logger
 from .settings_private import SOCIETY_DOMAIN, STRIPE_SKEY, IS_PRODUCTION, SUPPORT_EMAIL,\
 	LETTERHEAD, SOCIETY_NAME
-from .utilities import notify_support, member_greeting
+from .utilities import member_greeting
 from .models import primary_email
 from py4web import URL
 from yatl.helpers import HTML, XML
 import stripe
+
 stripe.api_key = STRIPE_SKEY
 
 def daily_maintenance():
+	os.chdir(Path(__file__).resolve().parent.parent.parent) #working directory py4web
 	#keep only most recent month's backup plus monthly (month day 1) backups for one year
 	items = os.listdir(".")
 	dname = datetime.date.today().strftime("%d") + '.csv'
@@ -86,6 +89,5 @@ If you have any questions, please contact {SUPPORT_EMAIL}"
 			pass
 				
 		logger.info(f"Membership Subscription Cancelled {primary_email(m.id)}")
-		notify_support(m, 'Membership Cancelled', f"{primary_email(m.id)} Stripe auto-renew failed")
 		m.update_record(Stripe_subscription = 'Cancelled', Stripe_next=None, Modified=datetime.datetime.now())
 	db.commit()

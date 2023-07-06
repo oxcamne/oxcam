@@ -19,6 +19,7 @@ and in PythonAnywhere environment, where it is run as a Pythonanywhere 'run fore
 	py4web/py4web.py call py4web/apps oxcam.email_daemon.email_daemon
 """
 import time, markmin, os, random
+from pathlib import Path
 from .common import db, auth,logger
 from .settings_private import VISIT_WEBSITE_INSTRUCTIONS
 from .utilities import member_profile, event_confirm, member_greeting
@@ -28,8 +29,9 @@ from yatl.helpers import HTML, XML
 
 def email_daemon():
 
-	path = os.path.dirname(os.path.abspath(__file__))
-	print(path+' email_daemon running')
+	path = Path(__file__).resolve().parent.parent.parent
+	os.chdir(path)		 #working directory py4web
+	print(str(path)+' email_daemon running')
 
 	while True:
 		notice = db(db.emailqueue.id > 0).select().first()

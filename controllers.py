@@ -1000,7 +1000,7 @@ Moving member on/off waitlist will also affect all guests."))
 					db.Reservations.Notes, db.Reservations.Selection, db.Reservations.Unitcost,
 					Column('Status', lambda row: res_status(row.id))],
 			headings=['Last', 'First', 'Notes', 'Selection', 'Price', 'Status'],
-			deletable=lambda row: write and (len(all_guests)==1 and ismember!='Y' or row['id'] != host_reservation.id) \
+			deletable=lambda row: write and (len(all_guests)==1 or row['id'] != host_reservation.id) \
 						and (ismember!='Y' or row.Provisional or row.Waitlist),
 			details=not write, 
 			editable=lambda row: write and (ismember!='Y' or row['Provisional'] or row['Waitlist']), 
@@ -1359,6 +1359,7 @@ def tax_statement():
 @checkaccess('accounting')
 def accounting(path=None):
 	access = session['access']	#for layout.html
+
 	if not path:
 		session['back'] = []	#stack or return addresses for controllers with multiple routes to reach them
 		session['query'] = None	#query stored by transactions controller

@@ -122,7 +122,8 @@ def validate(id, token):
 		session['access'] = db.Members[member_id].Access
 	log = 'verified '+request.remote_addr+' '+user.email
 	logger.info(log)
-	user.update_record(tokens=[])
+	if request.method!="HEAD":	#some browser's send HEAD request before GET when link clicked?
+		user.update_record(tokens=[])
 	redirect(user.url)
 
 @action('accessdenied')

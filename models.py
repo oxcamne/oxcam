@@ -109,7 +109,7 @@ db.define_table('Members',
 	
 db.define_table('Emails',
 	Field('Member', 'reference Members', writable=False),
-	Field('Email', 'string', remequires=IS_EMAIL(), writable=False),
+	Field('Email', 'string', requires=IS_EMAIL(), writable=False),
 	Field('Mailings', 'list:reference Email_Lists', #widget=ListRefCheckboxWidget,
 			comment='On desktop Ctrl-click on list name in list above to toggle selection'),
 	Field('Modified', 'datetime', compute=set_modified, writable=False),

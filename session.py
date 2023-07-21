@@ -48,7 +48,7 @@ def checkaccess(requiredaccess):
 def login():
 	user = db(db.users.remote_addr==request.remote_addr).select().first()
 	form = Form([Field('email', 'string',
-				requires=[IS_NOT_EMPTY(), IS_EMAIL()],
+				requires=IS_EMAIL(),
 				default = user.email if user else session.get('email'))],
 				formstyle=FormStyleBulma)
 	header = P(XML(f"Please specify your email to login.<br />If you have signed in previously, please use the \
@@ -70,6 +70,8 @@ def send_email_confirmation():
 	user = db(db.users.email==email).select().first()
 	if user:
 		user.update_record(remote_addr = request.remote_addr)
+		if datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > user.when_issued + datetime.timedelta(minutes = 15):
+			user.update_record(tokens=None)	#clear old expired tokens
 	else:
 		user = db.users[db.users.insert(email=email, remote_addr = request.remote_addr)]
 	token = str(random.randint(10000,999999))
@@ -122,8 +124,6 @@ def validate(id, token):
 		session['access'] = db.Members[member_id].Access
 	log = 'verified '+request.remote_addr+' '+user.email
 	logger.info(log)
-	if request.method!="HEAD":	#some browser's send HEAD request before GET when link clicked?
-		user.update_record(tokens=[])
 	redirect(user.url)
 
 @action('accessdenied')

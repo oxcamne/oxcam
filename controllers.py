@@ -1704,7 +1704,7 @@ def composemail():
 			if form2.vars['delete']:
 				db(db.EMProtos.id == proto.id).delete()
 				flash.set("Template deleted: "+ proto.Subject)
-				redirect(session['url_back'])
+				redirect(session['url_prev'])
 			if form2.vars['save']:
 				proto.update_record(Subject=form2.vars['subject'],
 					Body=form2.vars['body'])

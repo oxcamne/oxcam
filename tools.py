@@ -88,7 +88,7 @@ def db_restore():
 	form = Form([Field('backup_file', 'upload', uploadfield = False),
 	      		Field('overwrite_existing_database', 'boolean',
 	       				default=True, comment='clear if new empty database')],
-				submit_button = 'Import')
+				submit_value = 'Restore')
 	
 	if not form.accepted:
 		return locals()

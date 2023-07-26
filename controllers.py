@@ -29,7 +29,8 @@ from yatl.helpers import H5, H6, XML, HTML, TABLE, TH, TD, THEAD, TR
 from .common import db, session, auth, flash
 from .settings import SOCIETY_DOMAIN, STRIPE_PKEY, STRIPE_SKEY, LETTERHEAD,\
 	SUPPORT_EMAIL, GRACE_PERIOD, SOCIETY_NAME, MEMBERSHIP, STRIPE_EVENT,\
-	MEMBER_CATEGORIES, MAIL_LISTS, STRIPE_FULL, STRIPE_STUDENT, TIME_ZONE
+	MEMBER_CATEGORIES, MAIL_LISTS, STRIPE_FULL, STRIPE_STUDENT, TIME_ZONE,\
+	UPLOAD_FOLDER
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
 	primary_matriculation, dues_type, event_revenue, event_unpaid, res_tbc, res_status,\
@@ -45,6 +46,7 @@ from py4web.utils.form import Form, FormStyleBulma
 from py4web.utils.factories import Inject
 import datetime, re, markmin, stripe, csv, decimal, io
 from io import StringIO
+from py4web.utils.mailer import Mailer
 
 grid_style = GridClassStyleBulma
 form_style = FormStyleBulma
@@ -174,7 +176,7 @@ def members(path=None):
 		if not search_form.vars.get('field'):
 			errors = 'Please specify which field to search'
 		elif field == 'Affiliation':
-			query.append(f"db.Colleges.Name.ilike('%{value}%')&(db.Affiliations.College==db.Colleges.id)&(db.Members.id==db.Affiliations.Member)")
+			query.append(f'db.Colleges.Name.ilike("%{value}%")&(db.Affiliations.College==db.Colleges.id)&(db.Members.id==db.Affiliations.Member)')
 			qdesc += f" with affiliation matching '{value}'."
 		elif field == 'Email':
 			query.append(f"(db.Members.id==db.Emails.Member)&db.Emails.Email.ilike('%{value}%')")
@@ -800,7 +802,7 @@ def reservation(ismember, member_id, event_id, path=None):
 # in the latter case, ismember=='Y'
 	access = session['access']	#for layout.html
 	if ismember=='Y':
-		if member_id!=session['member_id'] or event_id!=session.get('event_id'):
+		if member_id!=session['member_id']:
 			raise Exception(f"invalid call to reservation from member {session['member_id']}")
 		write = True
 		db.Reservations.Provisional.default = True
@@ -815,6 +817,7 @@ def reservation(ismember, member_id, event_id, path=None):
 	db.Reservations.Created.default = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
 	member = db.Members[member_id]
 	event = db.Events[event_id]
+	session['event_id'] = event_id
 	is_good_standing = member_good_standing(member, event.DateTime.date())
 	if is_good_standing:
 		membership = member.Membership
@@ -1692,8 +1695,9 @@ def composemail():
 				A('Markmin', _href='http://www.web2py.com/examples/static/markmin.html', _target='Markmin'), '.')))
 #'letterhead', 'society_domain', 'society_name', 'home_url', 'support_email'
 	fields.append(Field('save', 'boolean', default=proto!=None, comment='store/update template'))
+	#fields.append(Field('attachment', 'upload', uploadfield=False))
 	if proto:
-		form=None
+		form=''
 		fields.append(Field('delete', 'boolean', comment='tick to delete template; sends no message'))
 	form2 = Form(fields, form_name="message_form", keep_values=True,
 					submit_value = 'Send', formstyle=FormStyleBulma)
@@ -1720,6 +1724,11 @@ def composemail():
 		except Exception as e:
 			flash.set(e)
 			bodyparts = None
+
+#		if form2.vars.get('attachment'):
+#			attachment = Mailer.Attachment(form2.vars.get('attachment').file,
+#				  filename=form2.vars.get('attachment').filename)
+
 		if bodyparts:
 			if query:
 				db.emailqueue.insert(subject=form2.vars['subject'], bodyparts=str(bodyparts), sender=sender,
@@ -1732,7 +1741,8 @@ def composemail():
 				for part in bodyparts:
 					body += part[0]		
 				flash.set(f"Email sent to: {to}")
-				auth.sender.send(to=to, sender=sender, reply_to=sender, subject=form2.vars['subject'], bcc=bcc, body=HTML(XML(body)))
+				auth.sender.send(to=to, sender=sender, reply_to=sender, 
+		     		subject=form2.vars['subject'], bcc=bcc, body=HTML(XML(body)))
 			redirect(session['url_prev'])
 	return locals()
 

@@ -90,9 +90,6 @@ def db_restore():
 	       				default=True, comment='clear if new empty database')],
 				submit_value = 'Restore')
 	
-	if not form.accepted:
-		return locals()
-	
 	if form.accepted:
 		try:
 			with io.TextIOWrapper(form.vars.get('backup_file').file, encoding='utf-8') as backup_file:

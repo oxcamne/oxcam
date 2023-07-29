@@ -44,7 +44,8 @@ from .session import checkaccess
 from py4web.utils.grid import Grid, GridClassStyleBulma, Column
 from py4web.utils.form import Form, FormStyleBulma
 from py4web.utils.factories import Inject
-import datetime, re, markmin, stripe, csv, decimal, io
+import datetime, re, markmin, stripe, csv, decimal, io, pickle
+from pathlib import Path
 from io import StringIO
 from py4web.utils.mailer import Mailer
 
@@ -1693,9 +1694,8 @@ def composemail():
 				"<support_email>, <society_domain>, <society_name>, or <home_url>, depending on the context. ",
 				"You can also include html content thus: {{content}}. Email is formatted using ",
 				A('Markmin', _href='http://www.web2py.com/examples/static/markmin.html', _target='Markmin'), '.')))
-#'letterhead', 'society_domain', 'society_name', 'home_url', 'support_email'
 	fields.append(Field('save', 'boolean', default=proto!=None, comment='store/update template'))
-	#fields.append(Field('attachment', 'upload', uploadfield=False))
+	fields.append(Field('attachment', 'upload', uploadfield=False))
 	if proto:
 		form=''
 		fields.append(Field('delete', 'boolean', comment='tick to delete template; sends no message'))
@@ -1725,14 +1725,17 @@ def composemail():
 			flash.set(e)
 			bodyparts = None
 
-#		if form2.vars.get('attachment'):
-#			attachment = Mailer.Attachment(form2.vars.get('attachment').file,
-#				  filename=form2.vars.get('attachment').filename)
+		if form2.vars.get('attachment'):
+			attachment = Mailer.Attachment(form2.vars.get('attachment').file,
+				  filename=form2.vars.get('attachment').filename)
+		else:
+			attachment = None
 
 		if bodyparts:
 			if query:
 				db.emailqueue.insert(subject=form2.vars['subject'], bodyparts=str(bodyparts), sender=sender,
-			 		bcc=bcc, query=query, left=left, qdesc=qdesc,
+			 		attachment=pickle.dumps(attachment), 
+					bcc=bcc, query=query, left=left, qdesc=qdesc,
 					scheme=URL('index', scheme=True).replace('index', ''))
 				flash.set(f"email notice sent to '{qdesc}'")
 			else:
@@ -1741,8 +1744,8 @@ def composemail():
 				for part in bodyparts:
 					body += part[0]		
 				flash.set(f"Email sent to: {to}")
-				auth.sender.send(to=to, sender=sender, reply_to=sender, 
-		     		subject=form2.vars['subject'], bcc=bcc, body=HTML(XML(body)))
+				auth.sender.send(to=to, sender=sender, reply_to=sender, subject=form2.vars['subject'], 
+		     		bcc=bcc, body=HTML(XML(body)), attachments=attachment)
 			redirect(session['url_prev'])
 	return locals()
 

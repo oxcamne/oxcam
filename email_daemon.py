@@ -18,7 +18,7 @@ this is used in both test environment on PC, where it is started using email_dae
 and in PythonAnywhere environment, where it is run as a Pythonanywhere 'run forever' task:
 	py4web/py4web.py call py4web/apps oxcam.email_daemon.email_daemon
 """
-import time, markmin, os, random
+import time, markmin, os, random, pickle
 from pathlib import Path
 from .common import db, auth,logger
 from .settings_private import VISIT_WEBSITE_INSTRUCTIONS
@@ -37,6 +37,7 @@ def email_daemon():
 		notice = db(db.emailqueue.id > 0).select().first()
 		if notice:
 			bodyparts = eval(notice.bodyparts)
+			attachment = pickle.loads(notice.attachment) if notice.attachment else None
 			select_fields = [db.Members.id]
 			if 'Reservations.Member' in notice.query:	#refers to Reservation
 				select_fields.append(db.Reservations.Event)
@@ -71,7 +72,8 @@ def email_daemon():
 				retry_seconds = 2
 				while True:
 					try:
-						auth.sender.send(to=to, sender=notice.sender, reply_to=notice.sender, bcc=notice.bcc, subject=notice.subject, body=HTML(XML(body)))
+						auth.sender.send(to=to, sender=notice.sender, reply_to=notice.sender,
+		       				bcc=notice.bcc, subject=notice.subject, body=HTML(XML(body)), attachments=attachment)
 						break
 					except Exception as e:
 						if retry_seconds==14:

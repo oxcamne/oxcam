@@ -263,6 +263,7 @@ db.define_table('EMProtos',
 db.define_table('emailqueue',	#used for notices or messages targetted via membership database
 	Field('subject'),
 	Field('bodyparts', 'text'),	#str([(text, func), ...])
+	Field('attachment', 'blob'),	#pickled Mailer.Attachment
 	Field('sender'),
 	Field('bcc'),
 	Field('query', 'text'),	#query used to locate targets

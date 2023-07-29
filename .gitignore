@@ -51,3 +51,4 @@ settings_private.py
 databases/*
 !.gitattributes
 !.gitignore
+./uploads

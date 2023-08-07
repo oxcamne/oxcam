@@ -658,7 +658,7 @@ def events(path=None):
 		header = CAT(A('back', _href=back), H5('New Event'))
 		_help = "https://sites.google.com/oxcamne.org/help-new/how-to/set-up-a-new-event?authuser=1"
 	else:
-		url = URL('register', path[path.find('/')+1:], scheme=True)
+		url = URL('registration', path[path.find('/')+1:], scheme=True)
 		header = CAT(A('back', _href=back), H5('Event Record'),
 	       			"Booking link is ", A(url, _href=url), XML('<br>'),
 	       			A('Make a Copy of This Event', _href=URL('event_copy', path[path.find('/')+1:])))

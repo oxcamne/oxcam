@@ -25,7 +25,7 @@ def checkaccess(requiredaccess):
 			session['url']=request.url
 			if session.get('back') and len(session['back'])>0 and request.url==session['back'][-1]:
 				session['back'].pop()
-			if not session.get('logged_in') == True:    #logged in
+			if not session.get('logged_in') == True:    #not logged in
 				if db(db.Members.id>0).count()==0:
 					session['url']=URL('db_restore')
 				redirect(URL('login'))
@@ -56,7 +56,7 @@ same email as this identifies your record.<br />You can change your email after 
 you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}."))
  
 	if form.accepted:
-		log =f"login {request.remote_addr} {request.environ['HTTP_USER_AGENT']} {form.vars['email']} {session.get('url') or ''}"
+		log =f"login {request.remote_addr} {form.vars['email']} {session.get('url') or ''} {request.environ['HTTP_USER_AGENT']}"
 		logger.info(log)
 		redirect(URL('send_email_confirmation', vars=dict(email=form.vars['email'])))
 	return locals()
@@ -122,7 +122,7 @@ def validate(id, token):
 	if member_id:
 		session['member_id'] = int(member_id)
 		session['access'] = db.Members[member_id].Access
-	log = 'verified '+request.remote_addr+' '+user.email
+	log =f"verified {request.remote_addr} {user.email} {request.environ['HTTP_USER_AGENT']}"
 	logger.info(log)
 	redirect(user.url)
 

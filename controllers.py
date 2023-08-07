@@ -483,7 +483,8 @@ def emails(ismember, member_id, path=None):
 	session['url']=session['url_prev']	#preserve back link
 	if ismember=='Y':
 		if member_id!=session['member_id']:
-			raise Exception(f"invalid call to emails controller from member {session['member_id']}")
+			flash.set("please login using the email address recorded with the Society")
+			redirect(URL('logout'))
 		write = True
 	else:
 		if not session['access']:
@@ -974,7 +975,7 @@ Moving member on/off waitlist will also affect all guests."))
 				(not event.Tickets or len(event.Tickets)==1 or db.Reservations.Ticket.writable==False):
 				#no choices needed, create the Host reservation and display checkout screen
 				db.Reservations.insert(Member=member_id, Event=event_id, Host=True,
-			   		Firstname=member.Firstname, Lastname=member.Lastname, Affiliation=affinity.College,
+			   		Firstname=member.Firstname, Lastname=member.Lastname, Affiliation=affinity.College if affinity else None,
 					Ticket=db.Reservations.Ticket.default)
 				redirect(URL(f"reservation/Y/{member_id}/{event_id}/select"))
 	

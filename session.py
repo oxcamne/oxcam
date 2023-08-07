@@ -122,7 +122,7 @@ def validate(id, token):
 	if member_id:
 		session['member_id'] = int(member_id)
 		session['access'] = db.Members[member_id].Access
-	log =f"verified {request.remote_addr} {user.email} {request.environ['HTTP_USER_AGENT']}"
+	log =f"verified {request.remote_addr} {user.email}"
 	logger.info(log)
 	redirect(user.url)
 

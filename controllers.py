@@ -483,7 +483,7 @@ def emails(ismember, member_id, path=None):
 	session['url']=session['url_prev']	#preserve back link
 	if ismember=='Y':
 		if member_id!=session['member_id']:
-			flash.set("please login using the email address recorded with the Society")
+			flash.set("please login using the email address to which the Society sends email")
 			redirect(URL('logout'))
 		write = True
 	else:

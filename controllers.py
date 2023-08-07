@@ -767,11 +767,10 @@ select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 			 _href=(URL(f'doorlist_export/{event_id}', scheme=True))), XML('<br>'))
 	query += '&(db.Reservations.Host==True)'
 
-	if not request.query.get('provisional'):
-		header = CAT(header, A('Send Email Notice', _href=URL('composemail', vars=dict(query=query,
-			left  = "[db.Emails.on(db.Emails.Member==db.Reservations.Member),db.Members.on(db.Members.id==db.Reservations.Member)]",	
-			qdesc=f"{event.Description} {'Waitlist' if request.query.get('waitlist') else 'Attendees'}",
-			))), XML('<br>'))
+	header = CAT(header, A('Send Email Notice', _href=URL('composemail', vars=dict(query=query,
+		left  = "[db.Emails.on(db.Emails.Member==db.Reservations.Member),db.Members.on(db.Members.id==db.Reservations.Member)]",	
+		qdesc=f"{event.Description} {'Waitlist' if request.query.get('waitlist') else 'provisional' if request.query.get('provisional') else 'Attendees'}",
+		))), XML('<br>'))
 	header = CAT(header, XML('Display: '))
 	if request.query.get('waitlist') or request.query.get('provisional'):
 		header = CAT(header, A('reservations', _href=URL(f'event_reservations/{event_id}')), ' or ')

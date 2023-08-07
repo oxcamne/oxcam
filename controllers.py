@@ -871,16 +871,16 @@ def reservation(ismember, member_id, event_id, path=None):
 				flash.set("Event is full: please Checkout to add all unconfirmed guests to the waitlist.")
 			elif event.Capacity and attend+adding>=event.Capacity-2:
 				flash.set(f"Event is nearly full, registration for more than {event.Capacity-attend} places will be wait listed.")
-			dues_tbc = f", including ${session['dues']} membership dues." if session.get('dues') else '.'
+			dues_tbc = f" (including ${session['dues']} membership dues)" if session.get('dues') else ''
 			payment = (int(session.get('dues') or 0)) + confirmed_ticket_cost - (host_reservation.Paid or 0) - (host_reservation.Charged or 0)
 			if not waitlist:
 				payment += (provisional_ticket_cost or 0)
 			if not event.Guests or len(all_guests)<event.Guests:
-				header = CAT(header,  XML(f"Use the blue <b>+New</b> button to add guests.<br>"))
+				header = CAT(header,  XML(f"Use the '+New' button to add another guest.<br>"))
 			if adding!=0 or payment!=0:
-				header = CAT(header,  XML(f"Use the blue <b>Checkout</b> button (below) to complete your registration.<br>"))
+				header = CAT(header,  XML(f"Your place(s) are not allocated until you click the 'Checkout' button.<br>"))
 			if payment>0:
-				header = CAT(header, XML(f"You will be charged ${payment} at Checkout{dues_tbc}<br>"))
+				header = CAT(header, XML(f"Your place(s) are confirmed when your payment of ${payment}{dues_tbc} is received.<br>"))
 
 			fields = []
 			if event.Survey:

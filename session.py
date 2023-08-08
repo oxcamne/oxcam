@@ -67,6 +67,8 @@ you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _h
 def send_email_confirmation():
 	access = None	#for layout.html
 	email = request.query.get('email').lower()
+	if not email:	#shouldn't happen, but can be generated perhaps by safelink mechanisms?
+		redirect(URL('login'))
 	user = db(db.users.email==email).select().first()
 	if user:
 		user.update_record(remote_addr = request.remote_addr)

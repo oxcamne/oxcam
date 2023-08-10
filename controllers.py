@@ -845,10 +845,10 @@ def reservation(ismember, member_id, event_id, path=None):
 				confirmed_ticket_cost += row.Unitcost or 0
 	
 	back = URL(f'reservation/{ismember}/{member_id}/{event_id}/select')
-	caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev']).group(1)
+	caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev'] or '').group(1)
 	if caller not in ['reservation', 'composemail', 'members']:
 		session['back'].append(session['url_prev'])
-	if path=='select':
+	if path=='select' and len(session['back'])>0:
 			back = session['back'][-1]
 
 	header = CAT(H5('Event Registration'), H6(member_name(member_id)),

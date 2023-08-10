@@ -846,7 +846,7 @@ def reservation(ismember, member_id, event_id, path=None):
 	
 	back = URL(f'reservation/{ismember}/{member_id}/{event_id}/select')
 	caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev'] or '').group(1)
-	if caller not in ['reservation', 'composemail', 'members']:
+	if caller not in ['reservation', 'composemail', 'members', '']:
 		session['back'].append(session['url_prev'])
 	if path=='select' and len(session['back'])>0:
 			back = session['back'][-1]

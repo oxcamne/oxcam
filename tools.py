@@ -12,7 +12,7 @@ from py4web.utils.factories import Inject
 from .common import db, session, flash
 from .controllers import checkaccess, form_style, grid_style
 from py4web.utils.form import Form, FormStyleDefault
-from py4web.utils.grid import Grid
+from py4web.utils.grid import Grid, GridClassStyle
 from .settings import STRIPE_SKEY, SOCIETY_DOMAIN
 from yatl.helpers import H5, BEAUTIFY
 import stripe, io
@@ -72,7 +72,7 @@ Use (...)&(...) for AND, (...)|(...) for OR, and ~(...) for NOT to build more co
 		if query:
 			grid = Grid(path, eval(form.vars.get('query')),
 					details=False, editable=True, create=True, deletable=True,
-					grid_class_style=grid_style, formstyle=form_style, show_id=True,
+					grid_class_style=GridClassStyle, formstyle=form_style, show_id=True,
 					)
 	except Exception as e:
 		flash.set(e)

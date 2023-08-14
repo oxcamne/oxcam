@@ -72,8 +72,8 @@ def email_daemon():
 				retry_seconds = 2
 				while True:
 					try:
-						auth.sender.send(to=to, sender=notice.sender, reply_to=notice.sender,
-		       				bcc=notice.bcc, subject=notice.subject, body=HTML(XML(body)), attachments=attachment)
+						auth.sender.send(to=to, subject=notice.subject, sender=notice.sender, reply_to=notice.sender,
+		       				bcc=eval(notice.bcc) if notice.bcc else None, body=HTML(XML(body)), attachments=attachment)
 						break
 					except Exception as e:
 						if retry_seconds==14:

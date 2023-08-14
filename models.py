@@ -250,7 +250,7 @@ db.define_table('Reservations',
 				requires=IS_EMPTY_OR(IS_DECIMAL_IN_RANGE(0, 10000))), #total paid, confirmed by download from Stripe, Bank
 	Field('Charged', 'decimal(6,2)', readable=False, writable=False),	#payment made, not yet downloaded from Stripe
 	Field('Checkout', 'string', readable=False, writable=False),	#session.vars of incomplete checkout
-	Field('Created', 'datetime', default=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), readable=False, writable=False),
+	Field('Created', 'datetime', default=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),
 	Field('Modified', 'datetime', compute=set_modified, writable=False),
 	singular="Reservation", plural="Reservations")
 db.Reservations.Event.requires=IS_IN_DB(db, 'Events.id', '%(Event)s', zero=None, orderby=~db.Events.DateTime)

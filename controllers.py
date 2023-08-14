@@ -835,7 +835,8 @@ def reservation(ismember, member_id, event_id, path=None):
 	confirmed = 0
 	for row in all_guests:
 		if row.Ticket:
-			row.update_record(Unitcost=decimal.Decimal(re.match('.*[^0-9.]([0-9]+\.?[0-9]{0,2})$', row.Ticket).group(1)))
+			row.update_record(Unitcost=decimal.Decimal(re.match('.*[^0-9.]([0-9]+\.?[0-9]{0,2})$', row.Ticket).group(1)),
+		     			Modified=row.Modified)	#preserve Modified, else update changes it
 		if not row.Waitlist:
 			if row.Provisional:
 				adding += 1
@@ -891,7 +892,9 @@ def reservation(ismember, member_id, event_id, path=None):
 				fields.append(Field('comment', 'string', comment=event.Comment,
 									default = host_reservation.Comment if host_reservation else None))
 			if host_reservation:
-				host_reservation.update_record(Checkout=str(dict(membership=session.get('membership'), dues=session.get('dues'))).replace('Decimal','decimal.Decimal'))
+				host_reservation.update_record(Checkout=str(dict(membership=session.get('membership'),
+						     dues=session.get('dues'))).replace('Decimal','decimal.Decimal'),
+							 Modified=host_reservation.Modified)
 				form2 = Form(fields, formstyle=FormStyleBulma, keep_values=True, submit_value='Checkout')
 		else:
 			header = CAT(header, A('send email', _href=(URL('composemail', vars=dict(
@@ -913,7 +916,8 @@ Moving member on/off waitlist will also affect all guests."))
 	if host_reservation:
 		#update member's name from member record in case corrected
 		host_reservation.update_record(Title=member.Title, Firstname=member.Firstname,
-					Lastname=member.Lastname, Suffix=member.Suffix) 
+					Lastname=member.Lastname, Suffix=member.Suffix,
+					Modified=host_reservation.Modified) 
 			
 	if len(event.Selections)>0:
 		db.Reservations.Selection.requires=IS_IN_SET(event.Selections, error_message='please make a selection')

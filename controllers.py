@@ -1054,7 +1054,7 @@ def doorlist_export(event_id):
 					left=db.Members.on(db.Reservations.Member == db.Members.id))
 	try:
 		writer=csv.writer(stream)
-		writer.writerow(['HostLast','HostFirst','Notes','LastName','FirstName','CollegeName','Selection','Table','Ticket',
+		writer.writerow(['HostLast','HostFirst','Notes','LastName','FirstName','CollegeName','Matr','Selection','Table','Ticket',
 							'Email','Cell','Survey','Comment'])
 		for host in hosts:
 			guests=db((db.Reservations.Event==event_id)&(db.Reservations.Member==host.Reservations.Member)\
@@ -1065,6 +1065,7 @@ def doorlist_export(event_id):
 				email = primary_email(host.Members.id) if host.Reservations.id==guest.id else ''
 				writer.writerow([host.Reservations.Lastname, host.Reservations.Firstname, guest.Notes or '',
 									guest.Lastname, guest.Firstname, guest.Affiliation.Name if guest.Affiliation else '',
+									primary_matriculation(host.Reservations.Member) if host.Reservations.id==guest.id else '',
 									guest.Selection or '', '', guest.Ticket or '', email,
 									host.Members.Cellphone if host.Reservations.id==guest.id else '',
 									guest.Survey or '', guest.Comment or ''])

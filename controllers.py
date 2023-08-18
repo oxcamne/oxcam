@@ -1062,11 +1062,11 @@ def doorlist_export(event_id):
 				orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname)
 				
 			for guest in guests:
-				email = primary_email(host.Members.id) if host.Reservations.id==guest.id else ''
 				writer.writerow([host.Reservations.Lastname, host.Reservations.Firstname, guest.Notes or '',
 									guest.Lastname, guest.Firstname, guest.Affiliation.Name if guest.Affiliation else '',
-									primary_matriculation(host.Reservations.Member) if host.Reservations.id==guest.id else '',
-									guest.Selection or '', '', guest.Ticket or '', email,
+									primary_matriculation(guest.Member) or '' if host.Reservations.id==guest.id else '',
+									guest.Selection or '', '', guest.Ticket or '',
+									primary_email(guest.Member) if host.Reservations.id==guest.id else '',
 									host.Members.Cellphone if host.Reservations.id==guest.id else '',
 									guest.Survey or '', guest.Comment or ''])
 	except Exception as e:

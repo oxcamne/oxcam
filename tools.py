@@ -72,7 +72,7 @@ Use (...)&(...) for AND, (...)|(...) for OR, and ~(...) for NOT to build more co
 		if query:
 			grid = Grid(path, eval(form.vars.get('query')),
 					details=False, editable=True, create=True, deletable=True,
-					grid_class_style=GridClassStyle, formstyle=form_style, show_id=True,
+					grid_class_style=grid_style, formstyle=form_style, show_id=True,
 					)
 	except Exception as e:
 		flash.set(e)
@@ -85,9 +85,9 @@ def db_restore():
 	access = session['access']	#for layout.html
 	header = f"Restore {SOCIETY_DOMAIN} database from backup file"
 	
-	form = Form([Field('backup_file', 'upload', uploadfield = False),
-	      		Field('overwrite_existing_database', 'boolean',
-	       				default=True, comment='clear if new empty database')],
+	form = Form([Field('overwrite_existing_database', 'boolean',
+	       				default=True, comment='clear if new empty database'),
+				Field('backup_file', 'upload', uploadfield = False)],
 				submit_value = 'Restore')
 	
 	if form.accepted:

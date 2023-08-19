@@ -924,8 +924,10 @@ Moving member on/off waitlist will also affect all guests."))
 	else:
 		db.Reservations.Selection.writable = db.Reservations.Selection.readable = False
 		
-	if len(event.Tickets)>0:
-		db.Reservations.Ticket.requires=IS_EMPTY_OR(IS_IN_SET(event.Tickets, error_message='please select the appropriate ticket'))
+	if event.Tickets:
+		db.Reservations.Ticket.requires=IS_IN_SET(event.Tickets, zero='please select the appropriate ticket')
+		if len(event.Tickets)==1:
+			db.Reservations.Ticket.default = event.Tickets[0]
 	else:
 		db.Reservations.Ticket.writable = db.Reservations.Ticket.readable = False
 	
@@ -946,7 +948,6 @@ Moving member on/off waitlist will also affect all guests."))
 			db.Reservations.Host.default=False
 			db.Reservations.Firstname.writable=True
 			db.Reservations.Lastname.writable=True
-			db.Reservations.Ticket.default = event.Tickets[0]
 		else:
 			#creating or revising the host reservation
 			db.Reservations.Title.default = member.Title
@@ -959,7 +960,6 @@ Moving member on/off waitlist will also affect all guests."))
 				db.Reservations.Checkout.writable=db.Reservations.Checkout.readable=True
 			db.Reservations.Firstname.readable=db.Reservations.Lastname.readable=False
 			if event.Tickets:
-				db.Reservations.Ticket.default = event.Tickets[0]
 				for t in event.Tickets:
 					if is_good_standing:
 						if t.lower().startswith(membership.lower()):
@@ -985,7 +985,7 @@ Moving member on/off waitlist will also affect all guests."))
 	def validate(form):
 		if form.vars.get('Waitlist') and form.vars.get('Provisional'):
 			form.errors['Waitlist'] = "Waitlist and Provisional should not both be set"
-		if ismember=='Y' and form.vars.get('Ticket') != db.Reservations.Ticket.default and db.Reservations.Ticket.writable==True:
+		if ismember=='Y' and form.vars.get('Ticket') != (db.Reservations.Ticket.default or event.Tickets[0]) and db.Reservations.Ticket.writable==True:
 			if form.vars.get('Ticket'):
 				if host_reservation and form.vars.get('Ticket').endswith('$0'):
 					form.errors['Ticket'] = "Freshers should please register themselves individually."
@@ -1626,11 +1626,11 @@ def transactions(path=None):
 		new_amount = decimal.Decimal(form.vars.get('Amount'))
 		fee = transaction.Fee
 		if new_amount!=transaction.Amount:	#new split
-			if transaction.Fee:
-				fee = (transaction.Fee*new_amount/transaction.Amount).quantize(decimal.Decimal('0.01'))
+			if fee:
+				fee = (fee*new_amount/transaction.Amount).quantize(decimal.Decimal('0.01'))
 			db.AccTrans.insert(Timestamp=transaction.Timestamp, Bank=transaction.Bank,
 								Account=transaction.Account, Event=transaction.Event,
-								Amount=transaction.Amount-new_amount, Fee=transaction.Fee - fee,
+								Amount=transaction.Amount-new_amount, Fee=transaction.Fee - fee if fee else None,
 								CheckNumber=transaction.CheckNumber, Accrual=transaction.Accrual,
 								 Reference=transaction.Reference,Notes=form.vars.get('Notes'))	#the residual piece
 			db.AccTrans[form.vars.get('id')].update_record(Fee=fee)

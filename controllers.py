@@ -997,10 +997,10 @@ Moving member on/off waitlist will also affect all guests."))
 			flash.set("Error(s) in form, please check")
 			return
 		if (form.vars.get('id')):
-			if int(form.vars.get('id')) == host_reservation.id and form.vars.get('Waitlist') != host_reservation.Waitlist:
+			if int(form.vars.get('id')) == host_reservation.id and (form.vars.get('Waitlist') != host_reservation.Waitlist or form.vars.get('Provisional') != host_reservation.Provisional):
 				for row in all_guests:
 					if row.id != host_reservation.id and not row.Provisional:
-						row.update_record(Waitlist = form.vars.get('Waitlist'))
+						row.update_record(Waitlist = form.vars.get('Waitlist'), Provisional = form.vars.get('Provisional'))
 
 	grid = Grid(path, (db.Reservations.Member==member.id)&(db.Reservations.Event==event.id),
 			orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname,

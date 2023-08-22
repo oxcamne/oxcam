@@ -537,7 +537,7 @@ To change your mailing list subscritions, use the <b>Edit</b> button."))
 		header = CAT(header, email.Email)
 		fields = []
 		for list in db(db.Email_Lists.id>0).select():
-			fields.append(Field(list.Listname.replace(' ', '_'), 'boolean', default=list.id in email.Mailings))
+			fields.append(Field(list.Listname.replace(' ', '_'), 'boolean', default=list.id in (email.Mailings or [])))
 		form = Form(fields)
 		if form.accepted:
 			mailings = []

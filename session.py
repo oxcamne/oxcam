@@ -66,7 +66,7 @@ you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _h
 @action.uses("gridform.html", session, db)
 def send_email_confirmation():
 	access = None	#for layout.html
-	email = request.query.get('email').lower()
+	email = (request.query.get('email') or '').lower()
 	if not email:	#shouldn't happen, but can be generated perhaps by safelink mechanisms?
 		redirect(URL('login'))
 	user = db(db.users.email==email).select().first()

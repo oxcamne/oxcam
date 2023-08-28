@@ -33,6 +33,7 @@ STRIPE_EVENT = "product_code"
 SOCIETY_NAME = 'Oxford & Cambridge Society of New England'
 SOCIETY_DOMAIN = 'OxCamNE'
 SERVER_URL = "https://oxcamne.pythonanywhere.com/oxcam" #use production server, gmail can't handle local server
+DB_URL = "http://127.0.0.1:8000/oxcam"  #local server, for use in constructing registration link
 SUPPORT_EMAIL = 'dgmanns@gmail.com'
 HOME_URL = 'https://www.oxcamne.org'
 VISIT_WEBSITE_INSTRUCTIONS = "<br><br>Visit us at www.oxcamne.org or https://www.instagram.com/oxcamne/ or www.facebook.com/oxcamne"

@@ -236,7 +236,7 @@ def event_confirm(event_id, member_id, justpaid=0, event_only=False):
 		body += '**Net amount due**|||**$%6.2f**\n'%(tbcdues-justpaid)
 	body += '------------------------\n'
 	if tbcdues>justpaid:
-		body += f"To pay online please visit {DB_URL}/{event_id}"
+		body += f"To pay online please visit {DB_URL}/registration/{event_id}"
 						#scheme=True doesn't pick up the domain in the email_daemon!
 	elif event.Notes and not resvtns[0].Waitlist and not resvtns[0].Provisional:
 		body += '\n\n%s\n'%event.Notes

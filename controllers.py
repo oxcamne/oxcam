@@ -2206,7 +2206,7 @@ def checkout():
 	
 	mode = 'payment'
 	items = []
-	params = {}	#for checkout_success
+	params = dict(member_id=member.id)	#for checkout_success
 	event = None
 	
 	if member.Stripe_id:
@@ -2262,7 +2262,7 @@ def checkout_success():
 	subject = 'Registration Confirmation' if tickets_tbc>0 else 'Thank you for your membership payment'
 	message = f"{msg_header(member, subject)}<br><b>Received: ${dues+tickets_tbc}</b><br>"
 	
-	if dues:
+	if dues>0:
 		next = None
 		if stripe_session.subscription:
 			subscription = stripe.Subscription.retrieve(stripe_session.subscription)
@@ -2271,7 +2271,7 @@ def checkout_success():
 			Stripe_subscription=stripe_session.subscription, Stripe_next=next, Charged=dues)
 		message += 'Thank you, your membership is now current.</b><br>'
 		
-	if tickets_tbc:
+	if tickets_tbc>0:
 		host_reservation = db((db.Reservations.Event==request.query.get('event_id'))&(db.Reservations.Member == member.id)\
 					&(db.Reservations.Host == True)).select().first()
 		message += '<br><b>Your registration is now confirmed:</b><br>'

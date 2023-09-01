@@ -138,7 +138,7 @@ def members(path=None):
 		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/members-page?authuser=1"
 	elif path:
 		caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev']).group(1)
-		if caller!='members' and caller not in ['composemail', 'affiliations', 'emails', 'dues', 'member_reservations']:
+		if caller!='members' and caller not in ['composemail', 'affiliations', 'emails', 'dues', 'member_reservations', 'cancel_subscription']:
 			session['back'].append(session['url_prev'])
 		if len(session['back'])>0 and re.match(f'.*/{request.app_name}/([a-z_]*).*', session['back'][-1]).group(1)!='members':
 			back = session['back'][-1]
@@ -146,6 +146,7 @@ def members(path=None):
 		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/members-page/member-record?authuser=1"
 		if path.startswith('edit') or path.startswith('details'):
 			member_id = path[path.find('/')+1:]
+			member = db.Members[member_id]
 			header= CAT(header, 
 	       			A('Member reservations', _href=URL(f'member_reservations/{member_id}/select')), XML('<br>'),
 					A('OxCam affiliation(s)', _href=URL(f'affiliations/N/{member_id}/select')), XML('<br>'),
@@ -154,6 +155,10 @@ def members(path=None):
 					A('Send Email to Member', _href=URL('composemail',
 					 	vars=dict(query=f"db.Members.id=={member_id}", left='',
 		 					qdesc=member_name(member_id)))))
+			
+			if member_good_standing(member):
+				header = CAT(header, XML('<br>'),
+					A('Cancel Membership', _href=URL(f"cancel_subscription/{member_id}")))
 	else:
 		session['filter'] = None
 		session['back'] = []
@@ -2151,20 +2156,28 @@ def update_card():
 	return locals()
 	
 @action('cancel_subscription', method=['GET', 'POST'])
+@action('cancel_subscription/<member_id:int>', method=['POST', 'GET'])
 @action.uses("gridform.html", db, session, flash)
 @checkaccess(None)
-def cancel_subscription():
+def cancel_subscription(member_id=None):
 	access = session['access']	#for layout.html
 	stripe.api_key = STRIPE_SKEY
 	
 	if not session.get('member_id'):
 		redirect(URL('index'))
-	member = db.Members[session['member_id']]
+
+	if member_id:	#check user has write access to database
+		if not session['access'] or ACCESS_LEVELS.index(session['access']) < ACCESS_LEVELS.index('write'):
+			redirect(URL('accessdenied'))
+
+	member = db.Members[member_id or session['member_id']]
 	if not (member and member_good_standing(member, (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)-datetime.timedelta(days=45)).date())):
 		raise Exception("perhaps Back button or mobile auto re-request?")
 	
-	header = CAT(H5('Membership Cancellation'),
-	      XML(f"We are very sorry to lose you as a member. If you must leave, please click the button to confirm!.<br><br>"))
+	header = CAT(A('back', _href=session['url_prev']), XML('<br>'),
+			H5('Membership Cancellation'),
+			H6(member_name(member.id)),
+			XML(f"{'Provided the member has requested cancellation' if member_id else 'We are very sorry to lose you as a member. If you must leave'}, please click the button to confirm!.<br><br>"))
 	
 	form = Form([], submit_value='Cancel Subscription')
 	
@@ -2182,8 +2195,8 @@ def cancel_subscription():
 
 		effective = max(member.Paiddate or datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date(), datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()).strftime('%m/%d/%Y')
 		notification(member, 'Membership Cancelled', f'Your membership is cancelled effective {effective}.')
-		flash.set(f'Your membership is cancelled effective {effective}.')
-		redirect(URL('index'))
+		flash.set(f"{member_name(member.id) if member_id else 'your'} membership is cancelled effective {effective}.")
+		redirect(URL('members/select' if member_id else 'index'))
 	return locals()
 
 @action('checkout', method=['GET'])

@@ -133,7 +133,6 @@ def emailparse(body, subject, query=None):
 #	(text, function)
 #	where function will build html format from the results of the query,
 #	text (or {{html_content}}) will be inserted directly into the output
-	body = body.replace('\n', '{{<br>}}').replace('\r', '')
 	m = re.match(r"^(.*)\{\{(.*)\}\}(.*)$", body, flags=re.DOTALL)
 	if m:			#{{html content}} is simply stored. it will be sanitized later with XML()
 		bodyparts = [(m.group(2), None)]
@@ -163,7 +162,7 @@ def emailparse(body, subject, query=None):
 		if m.group(3)!='':
 			bodyparts = bodyparts+emailparse(m.group(3), subject, query)
 		return bodyparts
-	return [(body, None)]
+	return [(markmin.markmin2html(body), None)]
 	
 #display member profile
 def member_profile(member):

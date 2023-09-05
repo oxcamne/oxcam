@@ -994,7 +994,7 @@ Moving member on/off waitlist will also affect all guests."))
 			if form.vars.get('Ticket'):
 				if host_reservation and form.vars.get('Ticket').endswith('$0'):
 					form.errors['Ticket'] = "Freshers should please register themselves individually."
-				elif not form.vars.get('Notes'):
+				elif not form.vars.get('Notes') or form.vars.get('notes').strip()=='':
 					form.errors['Ticket']='Please note below how this guest qualifies for the ticket discount.'
 			else:
 				form.errors['Ticket'] = "Please select the appropriate ticket type."
@@ -1959,7 +1959,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 		if event and event.Members_only and not form.vars.get('join_or_renew'):
 			form.errors['join_or_renew'] = 'This event is for members only, please join/renew to attend'
 		if not event and not request.query.get('mail_lists') and form.vars.get('membership')!=MEMBER_CATEGORIES[0]:
-			if not form.vars.get('notes'):
+			if not form.vars.get('notes') or form.vars.get('notes').strip()=='':
 				form.errors['notes'] = 'Please note how you qualify for '+form.vars.get('membership')+' status'
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")

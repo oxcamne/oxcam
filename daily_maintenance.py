@@ -20,10 +20,9 @@ import os
 from pathlib import Path
 from .common import db, auth, logger
 from .settings_private import SOCIETY_DOMAIN, STRIPE_SKEY, IS_PRODUCTION, SUPPORT_EMAIL,\
-	LETTERHEAD, SOCIETY_NAME
+	LETTERHEAD, SOCIETY_NAME, DB_URL
 from .utilities import member_greeting
 from .models import primary_email
-from py4web import URL
 from yatl.helpers import HTML, XML
 import stripe
 
@@ -59,7 +58,7 @@ def daily_maintenance():
 		if (m.Paiddate - datetime.date.today()).days % interval == 0:
 			text = f"{LETTERHEAD.replace('&lt;subject&gt;', 'Renewal Reminder')}{member_greeting(m)}"
 			text += f"<p>This is a friendly reminder that your {SOCIETY_NAME} membership expiration \
-date is/was {m.Paiddate.strftime('%m/%d/%Y')}. Please renew by <a href={URL('index', scheme=True)}> logging in</a> \
+date is/was {m.Paiddate.strftime('%m/%d/%Y')}. Please renew by <a href={DB_URL}> logging in</a> \
 and selecting join/renew from the menu of choices, \
 or cancel membership to receive no futher reminders.</p><p>\
 We are very grateful for your membership support and hope that you will renew!</p>\
@@ -81,7 +80,7 @@ If you have any questions, please contact {SUPPORT_EMAIL}"
 			text = f"{LETTERHEAD.replace('&lt;subject&gt;', 'Membership Renewal Failure')}{member_greeting(m)}"
 			text += f"<p>The renewal payment for your membership has failed as your \
 card details on file no longer worked, and as a result your membership has been cancelled. </p><p>\
-We hope you will <a href={URL('index', scheme=True)}> reinstate your membership</a>, \
+We hope you will <a href={DB_URL}> reinstate your membership</a>, \
 but in any case we are grateful for your past support!</p>\
 If you have any questions, please contact {SUPPORT_EMAIL}"
 			auth.sender.send(to=to, bcc=bcc, sender=SUPPORT_EMAIL, subject='Membership Renewal Failure', body=HTML(XML(text)))

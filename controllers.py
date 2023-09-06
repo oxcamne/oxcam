@@ -994,7 +994,7 @@ Moving member on/off waitlist will also affect all guests."))
 			if form.vars.get('Ticket'):
 				if host_reservation and form.vars.get('Ticket').endswith('$0'):
 					form.errors['Ticket'] = "Freshers should please register themselves individually."
-				elif not form.vars.get('Notes') or form.vars.get('notes').strip()=='':
+				elif not form.vars.get('Notes') or form.vars.get('Notes').strip()=='':
 					form.errors['Ticket']='Please note below how this guest qualifies for the ticket discount.'
 			else:
 				form.errors['Ticket'] = "Please select the appropriate ticket type."
@@ -2026,7 +2026,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 				#new/reinstated member, gather additional profile information
 				flash.set("Next, please review/complete your directory profile")
 				redirect(URL('profile')) #gather profile info
-			if session.vars.get('event_id'):
+			if session.get('event_id'):
 				redirect(URL(f'reservation/Y/{member_id}/{event_id}/new'))	#go create this member's reservation
 			redirect(URL('checkout'))
 	return locals()

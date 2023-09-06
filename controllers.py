@@ -2027,7 +2027,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 				flash.set("Next, please review/complete your directory profile")
 				redirect(URL('profile')) #gather profile info
 			if session.get('event_id'):
-				redirect(URL(f'reservation/Y/{member_id}/{event_id}/new'))	#go create this member's reservation
+				redirect(URL(f"reservation/Y/{member_id}/{session.get('event_id')}/new"))	#go create this member's reservation
 			redirect(URL('checkout'))
 	return locals()
 	

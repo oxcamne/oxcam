@@ -930,9 +930,12 @@ Moving member on/off waitlist will also affect all guests."))
 		db.Reservations.Selection.writable = db.Reservations.Selection.readable = False
 		
 	if event.Tickets:
-		db.Reservations.Ticket.requires=IS_IN_SET(event.Tickets, zero='please select the appropriate ticket')
-		if len(event.Tickets)==1:
-			db.Reservations.Ticket.default = event.Tickets[0]
+		if ismember!='Y':
+			db.Reservations.Ticket.requires=IS_EMPTY_OR(IS_IN_SET(event.Tickets))
+		else:
+			db.Reservations.Ticket.requires=IS_IN_SET(event.Tickets, zero='please select the appropriate ticket')
+			if len(event.Tickets)==1:
+				db.Reservations.Ticket.default = event.Tickets[0]
 	else:
 		db.Reservations.Ticket.writable = db.Reservations.Ticket.readable = False
 	
@@ -958,13 +961,13 @@ Moving member on/off waitlist will also affect all guests."))
 			db.Reservations.Title.default = member.Title
 			db.Reservations.Firstname.default = member.Firstname
 			db.Reservations.Lastname.default = member.Lastname
+			db.Reservations.Firstname.readable=db.Reservations.Lastname.readable=False
 			db.Reservations.Suffix.default = member.Suffix
 			if ismember!='Y':
 				db.Reservations.Paid.writable=db.Reservations.Paid.readable=True
 				db.Reservations.Charged.writable=db.Reservations.Charged.readable=True
 				db.Reservations.Checkout.writable=db.Reservations.Checkout.readable=True
-			db.Reservations.Firstname.readable=db.Reservations.Lastname.readable=False
-			if event.Tickets:
+			elif event.Tickets:
 				for t in event.Tickets:
 					if is_good_standing:
 						if t.lower().startswith(membership.lower()):

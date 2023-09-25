@@ -22,7 +22,7 @@ import time, markmin, os, random, pickle
 from pathlib import Path
 from .common import db, auth,logger
 from .settings_private import VISIT_WEBSITE_INSTRUCTIONS
-from .utilities import member_profile, event_confirm, member_greeting
+from .utilities import member_profile, event_confirm, member_greeting, emailparse
 from .models import primary_email
 from py4web import URL
 from yatl.helpers import HTML, XML
@@ -36,7 +36,7 @@ def email_daemon():
 	while True:
 		notice = db(db.emailqueue.id > 0).select().first()
 		if notice:
-			bodyparts = eval(notice.bodyparts)
+			bodyparts = emailparse(notice.body, notice.subject, notice.query)
 			attachment = pickle.loads(notice.attachment) if notice.attachment else None
 			select_fields = [db.Members.id]
 			if 'Reservations.Member' in notice.query:	#refers to Reservation

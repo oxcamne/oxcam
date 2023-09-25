@@ -60,7 +60,7 @@ def index():
 	member = db.Members[session['member_id']] if session.get('member_id') else None
 	access = session['access']	#for layout.html
 
-	if not member or not member_good_standing(member):
+	if not member or not member_good_standing(member, (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)+datetime.timedelta(days=GRACE_PERIOD)).date()):
 		message = CAT(message, A("Join or Renew your Membership", _href=URL('registration')), XML('<br>'))
 	else:
 		message = CAT(message, A("Update your member profile or contact information", _href=URL('registration')), XML('<br>'))
@@ -930,7 +930,7 @@ Moving member on/off waitlist will also affect all guests."))
 		db.Reservations.Selection.writable = db.Reservations.Selection.readable = False
 		
 	if event.Tickets:
-		if ismember!='Y':
+		if ismember!='Y':	#empty for comps
 			db.Reservations.Ticket.requires=IS_EMPTY_OR(IS_IN_SET(event.Tickets))
 		else:
 			db.Reservations.Ticket.requires=IS_IN_SET(event.Tickets, zero='please select the appropriate ticket')
@@ -1746,7 +1746,7 @@ def composemail():
 
 		if bodyparts:
 			if query:
-				db.emailqueue.insert(subject=form2.vars['subject'], bodyparts=str(bodyparts), sender=sender,
+				db.emailqueue.insert(subject=form2.vars['subject'], body=form2.vars['body'], sender=sender,
 			 		attachment=pickle.dumps(attachment), 
 					bcc=bcc, query=query, left=left, qdesc=qdesc,
 					scheme=URL('index', scheme=True).replace('index', ''))

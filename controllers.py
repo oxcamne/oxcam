@@ -1376,20 +1376,26 @@ def tax_statement():
 @checkaccess('accounting')
 def accounting(path=None):
 	access = session['access']	#for layout.html
+	header = H5('Banks')
 
 	if not path:
 		session['back'] = []	#stack or return addresses for controllers with multiple routes to reach them
 		session['query'] = None	#query stored by transactions controller
 		session['left'] = None	#accompanies query
 	elif path=='select':
-		header = CAT(H5('Banks'),
+		header = CAT(header,
 	       		A('Financial Statement', _href=URL('get_date_range', vars=dict(
 					function='financial_statement', title='Financial Statement'))), XML('<br>'),
 	       		A('Tax Statement', _href=URL('get_date_range', vars=dict(
 					function='tax_statement', title='Tax Statement', range='taxyear'))), XML('<br>'),
 				"Use Upload to load a file you've downloaded from bank/payment processor into accounting")
+	elif path.startswith('edit') or path.startswith('details'):
+		bank_id = path[path.find('/')+1:]
+		header = CAT(A('back', _href=URL('accounting')), XML('<br>'),
+			   		A('transaction rules', _href=URL(f"bank_rules/{bank_id}")),
+			   		header)
 	else:
-		header = CAT(A('back', _href=URL('accounting')) , H5('Banks'))
+		header = CAT(A('back', _href=URL('accounting')), header)
 	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/accounts?authuser=1"
 
 	grid = Grid(path, db.Bank_Accounts.id>0,
@@ -1406,6 +1412,40 @@ def accounting(path=None):
 				formstyle=form_style,
 	)		
 	return locals()
+	
+@action('bank_rules/<bank_id:int>', method=['POST', 'GET'])
+@action('bank_rules/<bank_id:int>/<path:path>', method=['POST', 'GET'])
+@action.uses("gridform.html", db, session, flash)
+@checkaccess('read')
+def bank_rules(bank_id, path=None):
+# .../bank_rules/bank_id/...
+	access = session['access']	#for layout.html
+	session['url']=session['url_prev']	#preserve back link
+	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
+	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/members-page/member-dues?authuser=1"
+	db.bank_rules.bank.default=bank_id
+
+	bank=db.Bank_Accounts[bank_id]
+	db.bank_rules.bank.default=bank.id
+	db.bank_rules.csv_column.requires = [IS_NOT_EMPTY(), IS_IN_SET(bank.Csvheaders.split(','))]
+
+	header = CAT(A('back', _href=session['url_prev']),
+	      		H5('Bank Transaction Rules'),
+	      		H6(bank.Name))
+
+	def rules_validated(form):
+		if len(form.errors)>0:
+			flash.set("Error(s) in form, please check")
+			return
+
+	grid = Grid(path, db.bank_rules.bank==bank_id,
+			columns=[db.bank_rules.csv_column, db.bank_rules.pattern, db.bank_rules.account],
+			details=not write, editable=write, create=write, deletable=write,
+			validation=rules_validated,
+			grid_class_style=grid_style,
+			formstyle=form_style,
+			)
+	return locals()
 
 @action('bank_file/<bank_id:int>', method=['POST', 'GET'])
 @action.uses("gridform.html", db, session, flash)
@@ -1415,6 +1455,7 @@ def bank_file(bank_id):
 #	.../bank_id		bank_id is reference to bank in Bank Accounts
 	access = session['access']	#for layout.html
 	bank = db.Bank_Accounts[bank_id]
+	rules = db(db.bank_rules.bank==bank.id).select()
 	bkrecent = db((db.AccTrans.Bank==bank.id)&(db.AccTrans.Accrual!=True)).select(orderby=~db.AccTrans.Timestamp, limitby=(0,1)).first()
 	unalloc = db(db.CoA.Name == 'Unallocated').select().first()
 	acdues = db(db.CoA.Name == "Membership Dues").select().first()
@@ -1510,11 +1551,10 @@ def bank_file(bank_id):
 			account=unalloc.id
 
 			#process the special rules for this processor
-			for r in bank.Rules:
-				rule = eval(r)
-				value = row[rule[0]]
-				if value and re.compile(rule[1]).match(value):	#rule applies
-					account = db(db.CoA.Name == rule[2]).select().first().id
+			for r in rules:
+				value = row[r.csv_column]
+				if value and r.pattern in value:	#rule applies
+					account = r.account
 			
 			stored = stored + 1
 			bank.update_record(Balance = (bank.Balance or 0) + amount + fee)

@@ -304,12 +304,18 @@ db.define_table('Bank_Accounts',
 	Field('Type', 'string', comment=" Column name containing transaction type (Stripe)"),
 	Field('Source', 'string', comment=" Column name containing transaction source (Stripe)"),	
 	Field('Notes', 'string', comment=" List of column names to be recorded in Notes of AccTrans record"),
-	Field('Rules', 'list:string', length=2048,
-			comment=" Each rule: ('column_name', 'contents (pattern)', 'account_name' or None (ignore trans)"),
 	Field('HowTo', 'text', comment=CAT(" Instructions for downloading file, in ", A("Markmin", _href='http://www.web2py.com/examples/static/markmin.html', _target='markmin'), " format")),
 	singular="Bank_Account", plural="Banks", format='%(Name)s')
 db.Bank_Accounts.Name.requires = [IS_NOT_EMPTY(), IS_NOT_IN_DB(db, 'Bank_Accounts.Name')]
-	
+
+db.define_table('bank_rules',
+	Field('bank', 'reference Bank_Accounts', writable=False),
+	Field('csv_column', 'string', comment='select column to test'),
+	Field('pattern', 'string', comment='string to match within column content'),
+	Field('account', 'reference CoA', comment='select account to assign',
+	   			requires=IS_IN_DB(db, 'CoA.id', '%(Name)s'))
+)
+
 db.define_table('AccTrans',
 	Field('Timestamp', 'datetime', default=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),
 	Field('Bank', 'reference Bank_Accounts', writable=False,
@@ -327,14 +333,5 @@ db.define_table('AccTrans',
 	Field('Notes', 'text'),
 	singular='Transaction', plural='Transaction_List')
 db.AccTrans.CheckNumber.requires=IS_EMPTY_OR(IS_NOT_IN_DB(db, 'AccTrans.CheckNumber'))
-
-#OxCamNE load commonly used metadata. This is no longer used in py4web
-db.define_table('Metadata',
-	Field('Name', 'string'),
-	Field('Code', 'text'),
-	Field('Notes', 'text'),
-	Field('Modified', 'datetime', writable=False),
-	format='%(Name)s')
-db.Metadata.Name.requires=[IS_NOT_EMPTY(), IS_NOT_IN_DB(db, 'Metadata.Name')]
 
 db.commit()

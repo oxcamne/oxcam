@@ -182,7 +182,7 @@ def members(path=None):
 		if not search_form.vars.get('field'):
 			errors = 'Please specify which field to search'
 		elif field == 'Affiliation':
-			query.append(f'db.Colleges.Name.ilike("%{value}%")&(db.Affiliations.College==db.Colleges.id)&(db.Members.id==db.Affiliations.Member)')
+			query.append(f'(db.Colleges.Name.ilike("%{value}%")&(db.Affiliations.College==db.Colleges.id)&(db.Members.id==db.Affiliations.Member))')
 			qdesc += f" with affiliation matching '{value}'."
 		elif field == 'Email':
 			query.append(f"(db.Members.id==db.Emails.Member)&db.Emails.Email.ilike('%{value}%')")

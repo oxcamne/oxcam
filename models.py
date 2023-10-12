@@ -166,17 +166,53 @@ db.define_table('Events',
 	Field('Venue', 'string', requires=IS_NOT_EMPTY()),
 	Field('Capacity', 'integer'),
 	Field('Speaker', 'string'),
-	Field('Tickets', 'list:string',
-       comment="empty for free events, or list ticket types (full member price first). Example ticket types are: 	'$45.00', 'Student $35.00', 'Fresher $0.00', 'Non-Member $55', ..."),
-	Field('Selections', 'list:string',
-       comment="if selection required, list one choice per line"), #e.g. Menuchoices
+	Field('Tickets', 'list:string', readable=False, writable=False),	#obselete next version
+	Field('Selections', 'list:string', readable=False, writable=False), 	#obselete next version
 	Field('Notes', 'text', comment="included on registration confirmation"),
-	Field('Survey', 'list:string',
-		comment="multiple choice question at Checkout. First row is the question, the rest are possible selections"),
+	Field('Survey', 'list:string', readable=False, writable=False),	#obselete next version
 	Field('Comment', 'string', comment="open ended question at Checkout."),
 	Field('Modified', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None),
        			update=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),
 	singular="Event", plural="Events", format='%(Description)s')
+
+def tickets_sold(event_id, ticket, member_id=None):
+	return db((db.Reservations.Event==event_id)&(db.Reservations.Ticket==ticket)&\
+		   	((db.Reservations.Provisional==False)|(db.Reservations.Member==member_id))&\
+			(db.Reservations.Waitlist==False)).count()
+
+db.define_table('tickets',
+	Field('event', 'reference Events', writable=False),
+	Field('ticket', requires=IS_NOT_EMPTY(),
+	   comment="can specify membership, e.g. full/student/non-member"),
+	Field('short_name', comment="short name for doorlist"),	#short name for use in doorlist
+	Field('price', 'decimal(5,2)', requires=IS_DECIMAL_IN_RANGE(0)),
+	Field('count', 'integer', requires=IS_EMPTY_OR(IS_INT_IN_RANGE(0)),
+	   comment="to limit number of tickets at this price"),
+	Field('qualify',
+	   comment="use if qualification required in notes"),
+	Field('allow_as_guest', 'boolean', default=True,
+	   comment="clear if ticket can't apply to a guest")
+)
+
+def selections_made(event_id, selection):
+	return db((db.Reservations.Event==event_id)&(db.Reservations.Selection==selection)&\
+		   	(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).count()
+
+db.define_table('selections',
+	Field('event', 'reference Events', writable=False),
+	Field('selection', requires=IS_NOT_EMPTY(), comment="for form dropdown"),
+	Field('short_name', requires=IS_NOT_EMPTY(), comment="for doorlist")
+)
+
+def survey_choices(event_id, choice):
+	return db((db.Reservations.Event==event_id)&(db.Reservations.Survey==choice)&\
+		   	(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).count()
+
+db.define_table('survey',
+	Field('event', 'reference Events', writable=False),
+	Field('item', requires=IS_NOT_EMPTY(),
+	   comment="first is question, remainder answer choices"),
+)
 
 db.define_table('Affiliations',
 	Field('Member', 'reference Members', writable=False),

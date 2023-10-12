@@ -34,7 +34,8 @@ from .settings import SOCIETY_DOMAIN, STRIPE_PKEY, STRIPE_SKEY, LETTERHEAD,\
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
 	primary_matriculation, dues_type, event_revenue, event_unpaid, res_tbc, res_status,\
-	res_conf, res_totalcost, res_wait, res_prov, bank_accrual
+	res_conf, res_totalcost, res_wait, res_prov, bank_accrual, tickets_sold,\
+	selections_made, survey_choices
 from pydal.validators import IS_LIST_OF_EMAILS, IS_EMPTY_OR, IS_IN_DB, IS_IN_SET,\
 	IS_NOT_EMPTY, IS_DATE, IS_DECIMAL_IN_RANGE, IS_INT_IN_RANGE
 from .utilities import member_good_standing, ageband, update_Stripe_email, newpaiddate,\
@@ -665,15 +666,16 @@ def events(path=None):
 		_help = "https://sites.google.com/oxcamne.org/help-new/how-to/set-up-a-new-event?authuser=1"
 	else:
 		url = URL('registration', path[path.find('/')+1:], scheme=True)
+		event_id = path[path.find('/')+1:]
 		header = CAT(A('back', _href=back), H5('Event Record'),
 	       			"Booking link is ", A(url, _href=url), XML('<br>'),
+			   		A('Ticket Types', _href=URL(f'tickets/{event_id}')), XML('<br>'),
+			   		A('Selections', _href=URL(f'selections/{event_id}')), XML('<br>'),
+			   		A('Survey', _href=URL(f'survey/{event_id}')), XML('<br>'),
 	       			A('Make a Copy of This Event', _href=URL('event_copy', path[path.find('/')+1:])))
-		_help = "https://sites.google.com/oxcamne.org/help-new/how-to/set-up-a-new-event?authuser=1"
-	       		
-	def checktickets(form):
-		for t in form.vars['Tickets']:
-			if t!='' and not re.match(r'[^\$]*\$[0-9]+\.?[0-9]{0,2}$', t):
-				form.errors['Tickets'] = f"{t} is not a good ticket definition"
+		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/events-page/event-record?authuser=1"
+
+	def validation(form):
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
@@ -693,10 +695,154 @@ def events(path=None):
 						    ["Speaker", lambda value: db.Events.Speaker.ilike(f'%{value}%')]],
 			details=not write, editable=write, create=write,
 			deletable=lambda r: write and db(db.Reservations.Event == r['id']).count() == 0 and db(db.AccTrans.Event == r['id']).count() == 0,
-			validation=checktickets,
+			validation=validation,
 			grid_class_style=grid_style,
 			formstyle=form_style,
 			)
+	return locals()
+	
+@action('tickets/<event_id:int>', method=['POST', 'GET'])
+@action('tickets/<event_id:int>/<path:path>', method=['POST', 'GET'])
+@action.uses("gridform.html", db, session, flash)
+@checkaccess('read')
+def tickets(event_id, path=None):
+# .../tickets/event_id/...
+	access = session['access']	#for layout.html
+	session['url']=session['url_prev']	#preserve back link
+	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
+	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/events-page/event-record/tickets-page?authuser=1"
+
+	event=db.Events[event_id]
+	db.tickets.event.default=event_id
+
+	header = CAT(A('back', _href=session['url_prev']),
+	      		H5('Event Tickets'),
+	      		H6(event.Description),
+				"Note, changes made here are not reflected in any existing reservations!")
+
+	def validation(form):
+		if not form.vars.get('id'):	#new ticket type
+			if db((db.tickets.event==event_id)&(db.tickets.ticket==form.vars.get('ticket'))).count()>0:
+				form.errors['ticket']="ticket type already exists"
+			if db((db.tickets.event==event_id)&\
+		 		(db.tickets.short_name==form.vars.get('short_name'))).count()>0:
+				form.errors['short_name']="short_name already exists"
+		if len(form.errors)>0:
+			flash.set("Error(s) in form, please check")
+			return
+
+	grid = Grid(path, db.tickets.event==event_id,
+			columns=[db.tickets.ticket, db.tickets.price, db.tickets.count,
+				Column('Sold', lambda t: tickets_sold(event_id, t.ticket))],
+			details=not write, create=write, editable=write, deletable=write,
+			validation=validation,
+			grid_class_style=grid_style,
+			formstyle=form_style,
+			)
+	return locals()
+	
+@action('selections/<event_id:int>', method=['POST', 'GET'])
+@action('selections/<event_id:int>/<path:path>', method=['POST', 'GET'])
+@action.uses("gridform.html", db, session, flash)
+@checkaccess('read')
+def selections(event_id, path=None):
+# .../selections/event_id/...
+	access = session['access']	#for layout.html
+	session['url']=session['url_prev']	#preserve back link
+	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
+	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/events-page/event-record/selections-page?authuser=1"
+
+	event=db.Events[event_id]
+	db.selections.event.default=event_id
+
+	header = CAT(A('back', _href=session['url_prev']),
+	      		H5('Event Selections'),
+	      		H6(event.Description),
+				"Note, changes made here are not reflected in any existing reservations!")
+
+	def validation(form):
+		if not form.vars.get('id'):	#new selection
+			if db((db.selections.event==event_id)&\
+		 		(db.selections.selection==form.vars.get('selection'))).count()>0:
+				form.errors['selection']="selection already exists"
+			if db((db.selections.event==event_id)&\
+		 		(db.selections.short_name==form.vars.get('short_name'))).count()>0:
+				form.errors['short_name']="short_name already exists"
+		if len(form.errors)>0:
+			flash.set("Error(s) in form, please check")
+			return
+
+	grid = Grid(path, db.selections.event==event_id,
+			columns=[db.selections.selection,
+				Column('selected', lambda t: selections_made(event_id, t.selection))],
+			details=not write, create=write, editable=write, deletable=write,
+			validation=validation,
+			grid_class_style=grid_style,
+			formstyle=form_style,
+			)
+	return locals()
+	
+@action('survey/<event_id:int>', method=['POST', 'GET'])
+@action('survey/<event_id:int>/<path:path>', method=['POST', 'GET'])
+@action.uses("gridform.html", db, session, flash)
+@checkaccess('read')
+def survey(event_id, path=None):
+# .../survey/event_id/...
+	access = session['access']	#for layout.html
+	session['url']=session['url_prev']	#preserve back link
+	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
+	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/events-page/event-record/survey-page?authuser=1"
+
+	event=db.Events[event_id]
+	db.survey.event.default=event_id
+
+	header = CAT(A('back', _href=session['url_prev']),
+	      		H5('Event Survey'),
+	      		H6(event.Description),
+				"Note, changes made here are not reflected in any existing reservations!")
+
+	def validation(form):
+		if not form.vars.get('id'):	#new selection
+			if db((db.survey.event==event_id)&\
+		 		(db.survey.item==form.vars.get('item'))).count()>0:
+				form.errors['item']="survey item already exists"
+		if len(form.errors)>0:
+			flash.set("Error(s) in form, please check")
+			return
+
+	grid = Grid(path, db.survey.event==event_id,
+			columns=[db.survey.item,
+				Column('chosen', lambda t: survey_choices(event_id, t.item) if survey_choices(event_id, t.item)>0 else '')],
+			details=not write, create=write, editable=write, deletable=write,
+			validation=validation,
+			grid_class_style=grid_style,
+			formstyle=form_style,
+			)
+	return locals()
+
+#temporary conversion controller
+@action('setup_events', method=['GET'])
+@action.uses("message.html", db, session, flash)
+@checkaccess('admin')
+def setup_events():
+	access = session['access']	#for layout.html
+	message = "new style event tickets/selections/survey now setup"
+
+	for event in db(db.Events.id>0).select():
+		db(db.tickets.event==event.id).delete()
+		if event.Tickets:
+			for ticket in event.Tickets:
+				db.tickets.insert(event=event.id, ticket=ticket, short_name=ticket,
+					price=decimal.Decimal(re.match('.*[^0-9.]([0-9]+\.?[0-9]{0,2})$',  ticket).group(1)))
+		db(db.selections.event==event.id).delete()
+		if event.Selections:
+			for selection in event.Selections:
+				db.selections.insert(event=event.id, selection=selection, short_name=selection) 
+		db(db.survey.event==event.id).delete()
+		if event.Survey:
+			for item in event.Survey:
+				db.survey.insert(event=event.id, item=item) 
+
 	return locals()
 
 @action('event_analytics', method=['GET'])
@@ -823,6 +969,16 @@ def reservation(ismember, member_id, event_id, path=None):
 	db.Reservations.Created.default = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
 	member = db.Members[member_id]
 	event = db.Events[event_id]
+	tickets = db(db.tickets.event==event_id).select()
+	event_tickets = [t.ticket for t in tickets if not t.count or tickets_sold(event_id, t.ticket, member_id)<t.count]
+	tickets_available = {}
+	for t in tickets:
+		if t.count:
+			tickets_available[t.ticket] = t.count - tickets_sold(event_id, t.ticket)
+	selections = db(db.selections.event==event_id).select()
+	event_selections = [s.selection for s in selections]
+	survey = db(db.survey.event==event_id).select()
+	event_survey = [s.item for s in survey]
 	session['event_id'] = event_id
 	is_good_standing = member_good_standing(member, event.DateTime.date())
 	if is_good_standing:
@@ -840,12 +996,15 @@ def reservation(ismember, member_id, event_id, path=None):
 	confirmed = 0
 	for row in all_guests:
 		if row.Ticket:
-			row.update_record(Unitcost=decimal.Decimal(re.match('.*[^0-9.]([0-9]+\.?[0-9]{0,2})$', row.Ticket).group(1)),
-		     			Modified=row.Modified)	#preserve Modified, else update changes it
+			t = tickets.find(lambda t: t.ticket==row.Ticket).first()
+			row.update_record(Unitcost=t.price, Modified=row.Modified)
+							#preserve Modified, else update changes it
 		if not row.Waitlist:
 			if row.Provisional:
 				adding += 1
 				provisional_ticket_cost += row.Unitcost or 0
+				if row.Ticket in tickets_available:
+					tickets_available[row.Ticket] -= 1
 			else:
 				confirmed += 1
 				confirmed_ticket_cost += row.Unitcost or 0
@@ -889,13 +1048,13 @@ def reservation(ismember, member_id, event_id, path=None):
 				header = CAT(header, XML(f"Your place(s) are confirmed when your payment of ${payment}{dues_tbc} is received.<br>"))
 
 			fields = []
-			if event.Survey:
-				fields.append(Field('survey', requires=IS_IN_SET(event.Survey[1:], zero=event.Survey[0],
+			if survey:
+				fields.append(Field('survey', requires=IS_IN_SET(event_survey[1:], zero=event_survey[0],
 									error_message='Please make a selection'),
-									default = host_reservation.Survey if host_reservation else None))
+									default = host_reservation.Survey))
 			if event.Comment:
 				fields.append(Field('comment', 'string', comment=event.Comment,
-									default = host_reservation.Comment if host_reservation else None))
+									default = host_reservation.Comment))
 			if host_reservation:
 				host_reservation.update_record(Checkout=str(dict(membership=session.get('membership'),
 						     dues=session.get('dues'))).replace('Decimal','decimal.Decimal'),
@@ -924,18 +1083,18 @@ Moving member on/off waitlist will also affect all guests."))
 					Lastname=member.Lastname, Suffix=member.Suffix,
 					Modified=host_reservation.Modified) 
 			
-	if len(event.Selections)>0:
-		db.Reservations.Selection.requires=IS_IN_SET(event.Selections, error_message='please make a selection')
+	if selections:
+		db.Reservations.Selection.requires=IS_IN_SET(event_selections, zero='please make a selection')
 	else:
 		db.Reservations.Selection.writable = db.Reservations.Selection.readable = False
 		
-	if event.Tickets:
+	if tickets:
 		if ismember!='Y':	#empty for comps
-			db.Reservations.Ticket.requires=IS_EMPTY_OR(IS_IN_SET(event.Tickets))
+			db.Reservations.Ticket.requires=IS_EMPTY_OR(IS_IN_SET(event_tickets))
 		else:
-			db.Reservations.Ticket.requires=IS_IN_SET(event.Tickets, zero='please select the appropriate ticket')
-			if len(event.Tickets)==1:
-				db.Reservations.Ticket.default = event.Tickets[0]
+			db.Reservations.Ticket.requires=IS_IN_SET(event_tickets, zero='please select the appropriate ticket')
+			if len(event_tickets)==1:
+				db.Reservations.Ticket.default = event_tickets[0]
 	else:
 		db.Reservations.Ticket.writable = db.Reservations.Ticket.readable = False
 	
@@ -967,8 +1126,8 @@ Moving member on/off waitlist will also affect all guests."))
 				db.Reservations.Paid.writable=db.Reservations.Paid.readable=True
 				db.Reservations.Charged.writable=db.Reservations.Charged.readable=True
 				db.Reservations.Checkout.writable=db.Reservations.Checkout.readable=True
-			elif event.Tickets:
-				for t in event.Tickets:
+			elif tickets:
+				for t in event_tickets:
 					if is_good_standing:
 						if t.lower().startswith(membership.lower()):
 							db.Reservations.Ticket.default = t
@@ -982,8 +1141,8 @@ Moving member on/off waitlist will also affect all guests."))
 				db.Reservations.Affiliation.default = affinity.College
 				db.Reservations.Affiliation.writable = False
 
-			if ismember=='Y' and path=='new' and not event.Selections and \
-				(not event.Tickets or len(event.Tickets)==1 or db.Reservations.Ticket.writable==False):
+			if ismember=='Y' and path=='new' and not selections and \
+				(len(event_tickets)<=1 or db.Reservations.Ticket.writable==False):
 				#no choices needed, create the Host reservation and display checkout screen
 				db.Reservations.insert(Member=member_id, Event=event_id, Host=True,
 			   		Firstname=member.Firstname, Lastname=member.Lastname, Affiliation=affinity.College if affinity else None,
@@ -993,14 +1152,12 @@ Moving member on/off waitlist will also affect all guests."))
 	def validate(form):
 		if form.vars.get('Waitlist') and form.vars.get('Provisional'):
 			form.errors['Waitlist'] = "Waitlist and Provisional should not both be set"
-		if ismember=='Y' and form.vars.get('Ticket') != (db.Reservations.Ticket.default or event.Tickets[0]) and db.Reservations.Ticket.writable==True:
-			if form.vars.get('Ticket'):
-				if host_reservation and form.vars.get('Ticket').endswith('$0'):
-					form.errors['Ticket'] = "Freshers should please register themselves individually."
-				elif not form.vars.get('Notes') or form.vars.get('Notes').strip()=='':
-					form.errors['Ticket']='Please note below how this guest qualifies for the ticket discount.'
-			else:
-				form.errors['Ticket'] = "Please select the appropriate ticket type."
+		if ismember=='Y' and form.vars.get('Ticket') != (db.Reservations.Ticket.default or event_tickets[0]) and db.Reservations.Ticket.writable==True:
+			t = tickets.find(lambda t: t.ticket==form.vars.get('Ticket')).first()
+			if not form.vars.get('Notes') or form.vars.get('Notes').strip()=='':
+				form.errors['Notes']=t.qualify or "Please note how this guest qualifies for the ticket discount"
+			if not t.allow_as_guest and host_reservation and (path=='new' or host_reservation.id!=int(path[path.find('/')+1:])):
+				form.errors['Ticket']="Please register seperately for this ticket type."
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
@@ -1029,7 +1186,12 @@ Moving member on/off waitlist will also affect all guests."))
 		elif adding==0 and payment==0:
 			form2 = ''	#don't need the Checkout form
 		elif form2.accepted:
-			#Checkout logic
+			#Checkout logic, first check required tickets are available
+			for t in tickets_available.keys():
+				if tickets_available[t]<0:
+					flash.set(f"There are not enough {t} tickets available, please make another choice")
+					redirect(URL(f'reservation/Y/{member_id}/{event_id}/select'))
+
 			host_reservation.update_record(Survey=form2.vars.get('survey'), Comment=form2.vars.get('comment'))
 			for row in all_guests.find(lambda row: row.Provisional==True):
 				row.update_record(Provisional=False, Waitlist=waitlist)
@@ -1070,10 +1232,14 @@ def doorlist_export(event_id):
 				orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname)
 				
 			for guest in guests:
+				selection = db((db.selections.event==event_id)&(db.selections.selection==guest.Selection)).select().first()
+				selection_short = selection.short_name if selection else guest.Selection or ''
+				ticket = db((db.tickets.event==event_id)&(db.tickets.ticket==guest.Ticket)).select().first()
+				ticket_short = ticket.short_name if ticket else guest.Ticket or ''
 				writer.writerow([host.Reservations.Lastname, host.Reservations.Firstname, guest.Notes or '',
 									guest.Lastname, guest.Firstname, guest.Affiliation.Name if guest.Affiliation else '',
 									primary_matriculation(guest.Member) or '' if host.Reservations.id==guest.id else '',
-									guest.Selection or '', '', guest.Ticket or '',
+									selection_short, '', ticket_short,
 									primary_email(guest.Member) if host.Reservations.id==guest.id else '',
 									host.Members.Cellphone if host.Reservations.id==guest.id else '',
 									guest.Survey or '', guest.Comment or ''])
@@ -1087,11 +1253,20 @@ def doorlist_export(event_id):
 @checkaccess('write')
 def event_copy(event_id):
 	event = db.Events[event_id]
-	db.Events.insert(Page=event.Page, Description='Copy of '+event.Description, DateTime=event.DateTime,
+	tickets = db(db.tickets.event==event_id).select()
+	selections = db(db.selections.event==event_id).select()
+	survey = db(db.survey.event==event_id).select()
+	new_event_id = db.Events.insert(Page=event.Page, Description='Copy of '+event.Description, DateTime=event.DateTime,
 				Booking_Closed=event.Booking_Closed, Members_only=event.Members_only, Allow_join=event.Allow_join,
 				Guest=event.Guests, Sponsors=event.Sponsors, Venue=event.Venue, Capacity=event.Capacity,
-				Speaker=event.Speaker, Tickets=event.Tickets, Selections=event.Selections,
-				Notes=event.Notes, Survey=event.Survey, Comment=event.Comment)
+				Speaker=event.Speaker, Notes=event.Notes, Comment=event.Comment)
+	for t in tickets:
+		db.tickets.insert(event=new_event_id, ticket=t.ticket, price=t.price, count=t.count,
+					quality=t.qualify, allow_as_guest=t.allow_as_guest, short_name=t.short_name)
+	for s in selections:
+		db.selections.insert(event=new_event_id, selection=s.selection, short_name=s.short_name)
+	for s in survey:
+		db.survey.insert(event=new_event_id, item=s.item)
 	redirect(URL('events/select'))
 
 @action('events_export', method=['GET'])
@@ -1377,6 +1552,7 @@ def tax_statement():
 def accounting(path=None):
 	access = session['access']	#for layout.html
 	header = H5('Banks')
+	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/accounts?authuser=1"
 
 	if not path:
 		session['back'] = []	#stack or return addresses for controllers with multiple routes to reach them
@@ -1394,9 +1570,9 @@ def accounting(path=None):
 		header = CAT(A('back', _href=URL('accounting')), XML('<br>'),
 			   		A('transaction rules', _href=URL(f"bank_rules/{bank_id}")),
 			   		header)
+		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/accounts/bank-record?authuser=1"
 	else:
 		header = CAT(A('back', _href=URL('accounting')), header)
-	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/accounts?authuser=1"
 
 	grid = Grid(path, db.Bank_Accounts.id>0,
 				orderby=db.Bank_Accounts.Name,
@@ -1422,8 +1598,7 @@ def bank_rules(bank_id, path=None):
 	access = session['access']	#for layout.html
 	session['url']=session['url_prev']	#preserve back link
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
-	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/members-page/member-dues?authuser=1"
-	db.bank_rules.bank.default=bank_id
+	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/accounts/bank-record/transaction-rules?authuser=1"
 
 	bank=db.Bank_Accounts[bank_id]
 	db.bank_rules.bank.default=bank.id

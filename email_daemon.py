@@ -39,7 +39,7 @@ def email_daemon():
 			bodyparts = emailparse(notice.body, notice.subject, notice.query)
 			attachment = pickle.loads(notice.attachment) if notice.attachment else None
 			select_fields = [db.Members.id]
-			if 'Reservations.Member' in notice.query:	#refers to Reservation
+			if 'Reservations.Event' in notice.query:	#refers to Reservation
 				select_fields.append(db.Reservations.Event)
 			if 'Mailings.contains'in notice.query:		#using a mailing list
 				select_fields.append(db.Emails.Email)

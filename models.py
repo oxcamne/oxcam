@@ -166,10 +166,7 @@ db.define_table('Events',
 	Field('Venue', 'string', requires=IS_NOT_EMPTY()),
 	Field('Capacity', 'integer'),
 	Field('Speaker', 'string'),
-	Field('Tickets', 'list:string', readable=False, writable=False),	#obselete next version
-	Field('Selections', 'list:string', readable=False, writable=False), 	#obselete next version
 	Field('Notes', 'text', comment="included on registration confirmation"),
-	Field('Survey', 'list:string', readable=False, writable=False),	#obselete next version
 	Field('Comment', 'string', comment="open ended question at Checkout."),
 	Field('Modified', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None),
        			update=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),

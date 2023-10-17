@@ -3,7 +3,8 @@ This file contains functions shared by multiple controllers
 """
 from py4web import URL
 from .common import db, auth
-from .settings import *	#include all for <name> in emailparse
+from .settings import TIME_ZONE, SUPPORT_EMAIL, LETTERHEAD, GRACE_PERIOD,\
+	DB_URL, SOCIETY_DOMAIN
 from .models import primary_email, res_tbc, res_totalcost, res_status, member_name
 from yatl.helpers import A, TABLE, TH, THEAD, H6, TR, TD, CAT, HTML, XML
 import datetime, re, markmin

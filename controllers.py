@@ -33,9 +33,8 @@ form_style = FormStyleBulma
 from py4web import action, request, response, redirect, URL, Field
 from yatl.helpers import H5, H6, XML, HTML, TABLE, TH, TD, THEAD, TR
 from .common import db, session, auth, flash
-from .settings import SOCIETY_DOMAIN, STRIPE_PKEY, STRIPE_SKEY, LETTERHEAD,\
-	SUPPORT_EMAIL, GRACE_PERIOD, SOCIETY_NAME, MEMBERSHIP, STRIPE_EVENT,\
-	MEMBER_CATEGORIES, MAIL_LISTS, STRIPE_FULL, STRIPE_STUDENT, TIME_ZONE,\
+from .settings import SOCIETY_DOMAIN, SUPPORT_EMAIL, GRACE_PERIOD,\
+	SOCIETY_NAME, MEMBERSHIP, MEMBER_CATEGORIES, MAIL_LISTS, TIME_ZONE,\
 	PAYMENT_PROCESSOR
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
@@ -49,10 +48,9 @@ from .utilities import member_good_standing, ageband, newpaiddate,\
 	society_emails, emailparse, notification, notify_support, member_profile
 from .session import checkaccess
 from .stripe_interface import stripe_update_email, stripe_update_card, stripe_switched_card,\
-	stripe_get_dues, stripe_process_charge
+	stripe_get_dues, stripe_process_charge, stripe_cancel_subscription
 from py4web.utils.factories import Inject
-import datetime, re, markmin, stripe, csv, decimal, io, pickle
-from pathlib import Path
+import datetime, re, markmin, csv, decimal, io, pickle
 from io import StringIO
 from py4web.utils.mailer import Mailer
 
@@ -471,6 +469,7 @@ is used on name badges etc."
 #switch user's primary email to newly validated email
 @action('switch_email', method=['GET'])
 @action.uses("gridform.html", session, db, flash)
+@checkaccess(None)
 def switch_email():
 	member_id = request.query.get('member_id')
 	member = db.Members[member_id]
@@ -509,7 +508,7 @@ def emails(ismember, member_id, path=None):
 		if ismember=='Y':
 			db.Emails.Mailings.readable=db.Emails.Mailings.writable=False
 	elif path=='select':
-		exec(f"{PAYMENT_PROCESSOR}_update_email(db.Members[member_id])")
+		eval(f"{PAYMENT_PROCESSOR}_update_email(db.Members[member_id])")
 
 	header = CAT(A('back', _href=session['url_prev']),
 	      		H5('Member Emails'),
@@ -823,31 +822,6 @@ def survey(event_id, path=None):
 			)
 	return locals()
 
-#temporary conversion controller
-@action('setup_events', method=['GET'])
-@action.uses("message.html", db, session, flash)
-@checkaccess('admin')
-def setup_events():
-	access = session['access']	#for layout.html
-	message = "new style event tickets/selections/survey now setup"
-
-	for event in db(db.Events.id>0).select():
-		db(db.tickets.event==event.id).delete()
-		if event.Tickets:
-			for ticket in event.Tickets:
-				db.tickets.insert(event=event.id, ticket=ticket, short_name=ticket,
-					price=decimal.Decimal(re.match('.*[^0-9.]([0-9]+\.?[0-9]{0,2})$',  ticket).group(1)))
-		db(db.selections.event==event.id).delete()
-		if event.Selections:
-			for selection in event.Selections:
-				db.selections.insert(event=event.id, selection=selection, short_name=selection) 
-		db(db.survey.event==event.id).delete()
-		if event.Survey:
-			for item in event.Survey:
-				db.survey.insert(event=event.id, item=item) 
-
-	return locals()
-
 @action('event_analytics', method=['GET'])
 @action('event_analytics/<path:path>', method=['GET'])
 @action.uses("download.html", db, session, flash, Inject(response=response))
@@ -1096,8 +1070,7 @@ Moving member on/off waitlist will also affect all guests."))
 			db.Reservations.Ticket.requires=IS_EMPTY_OR(IS_IN_SET(event_tickets))
 		else:
 			db.Reservations.Ticket.requires=IS_IN_SET(event_tickets, zero='please select the appropriate ticket')
-			if len(event_tickets)==1:
-				db.Reservations.Ticket.default = event_tickets[0]
+			db.Reservations.Ticket.default = event_tickets[0]
 	else:
 		db.Reservations.Ticket.writable = db.Reservations.Ticket.readable = False
 	
@@ -1212,7 +1185,7 @@ Moving member on/off waitlist will also affect all guests."))
 					msg_send(member, subject, message)
 					flash.set('Thank you. Confirmation has been sent by email.')
 				redirect(back)
-			redirect(URL('checkout'))
+			redirect(URL(f'{PAYMENT_PROCESSOR}_checkout'))
 	return locals()
 
 @action('doorlist_export/<event_id:int>', method=['GET'])
@@ -1648,7 +1621,8 @@ def bank_file(bank_id):
 	
 	footer = f"Current Balance = {'$%8.2f'%(bank.Balance)}"
 	
-	form = Form([Field('downloaded_file', 'upload', uploadfield = False)],
+	form = Form([Field('downloaded_file', 'upload', uploadfield = False),
+				Field('override', 'boolean', comment = ' tick to accept new transactions unconditionally, e.g. for new bank')],
 				submit_button = 'Import')
 	
 	if not form.accepted:
@@ -1707,7 +1681,7 @@ def bank_file(bank_id):
 			else:
 				file_transactions.insert(0,row) #reverse order so we process chronologically
 			
-		if overlap == False:
+		if overlap == False and not form.vars.get('override'):
 			raise Exception('file should start on or before '+bkrecent.Timestamp.date().strftime(bank.Datefmt))
 
 		#now process the new transactions.				
@@ -2194,7 +2168,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 		if request.query.get('join_or_renew') or not event:	#collecting dues with event registration, or joining/renewing
 			#membership dues payment
 			#get the subscription plan id (Full membership) or 1-year price (Student) from Stripe Products
-			exec(f"{PAYMENT_PROCESSOR}_get_dues(form.vars.get('membership'))")
+			eval(f"{PAYMENT_PROCESSOR}_get_dues(form.vars.get('membership'))")
 			#ensure the default mailing list subscriptions are in place in the primary email
 			email = db(db.Emails.Member==member.id).select(orderby=~db.Emails.Modified).first()
 			mailings = email.Mailings or []
@@ -2212,7 +2186,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 				redirect(URL('profile')) #gather profile info
 			if session.get('event_id'):
 				redirect(URL(f"reservation/Y/{member_id}/{session.get('event_id')}/new"))	#go create this member's reservation
-			redirect(URL('checkout'))
+			redirect(URL(f'{PAYMENT_PROCESSOR}_checkout'))
 	return locals()
 	
 ######################################## Join/Renew/Profile Update ######################################
@@ -2264,7 +2238,7 @@ reached by using the join/renew link on our home page).<br>\
 		if session.get('dues'):
 			if session.get('event_id'):
 				redirect(URL(f"reservation/Y/{member.id}/{session['event_id']}/new"))	#go create this member's reservation
-			redirect(URL('checkout'))
+			redirect(URL(f'{PAYMENT_PROCESSOR}_checkout'))
 		flash.set('Thank you for updating your profile information.')
 		notify_support(member, 'Member Profile Updated', member_profile(member))
 	
@@ -2276,7 +2250,6 @@ reached by using the join/renew link on our home page).<br>\
 @checkaccess(None)
 def cancel_subscription(member_id=None):
 	access = session['access']	#for layout.html
-	stripe.api_key = STRIPE_SKEY
 	
 	if not session.get('member_id'):
 		redirect(URL('index'))
@@ -2297,11 +2270,7 @@ def cancel_subscription(member_id=None):
 	form = Form([], submit_value='Cancel Subscription')
 	
 	if form.accepted:
-		if member.Stripe_subscription:	#delete Stripe subscription if applicable
-			try:
-				stripe.Subscription.delete(member.Stripe_subscription)
-			except Exception as e:
-				pass
+		eval(f"{PAYMENT_PROCESSOR}_cancel_subscription(member.Stripe_subscription)")
 		
 		member.update_record(Stripe_subscription = 'Cancelled', Stripe_next=None)
 		#if we simply cleared Stripe_subscription then the daily backup daemon might issue membership reminders!
@@ -2313,112 +2282,3 @@ def cancel_subscription(member_id=None):
 		flash.set(f"{member_name(member.id) if member_id else 'your'} membership is cancelled effective {effective}.")
 		redirect(URL('members/select' if member_id else 'index'))
 	return locals()
-
-@action('checkout', method=['GET'])
-@action.uses("stripe_checkout.html", db, session, flash)
-@checkaccess(None)
-def checkout():
-	access = session['access']	#for layout.html
-	if (not session.get('membership') and not session.get('event_id')) or not session.get('member_id'):
-		redirect(URL('index'))	#protect against regurgitated old requests
-		
-	pk = STRIPE_PKEY	#use the public key on the client side	
-	stripe.api_key = STRIPE_SKEY
-
-	member = db.Members[session.get('member_id')]
-	if member.Stripe_id:	#check customer still exists on Stripe
-		try:
-			customer = stripe.Customer.retrieve(member.Stripe_id)
-		except Exception as e:
-			member.update_record(Stripe_id=None, Stripe_subscription=None)
-	
-	mode = 'payment'
-	items = []
-	params = dict(member_id=member.id)	#for checkout_success
-	event = None
-	
-	if member.Stripe_id:
-		stripe.Customer.modify(member.Stripe_id, email=primary_email(member.id))	#in case has changed
-	else:
-		customer = stripe.Customer.create(email=primary_email(member.id))
-		member.update_record(Stripe_id=customer.id)
-	
-	if session.get('membership'):	#this includes a membership subscription
-		#get the subscription plan id (Full membership) or 1-year price (Student) from Stripe Products
-		price_id = eval(f"STRIPE_{session.get('membership')}".upper())
-		price = stripe.Price.retrieve(price_id)
-		params['dues'] = session.get('dues')
-		params['membership'] = session.get('membership')
-		if price.recurring:
-			mode = 'subscription'
-		items.append(dict(price = price_id, quantity = 1))
-		
-	if session.get('event_id'):			#event registration
-		event = db.Events[session.get('event_id')]
-		tickets_tbc = res_tbc(member.id, event.id)
-		if tickets_tbc:
-			params['event_id'] = event.id
-			params['tickets_tbc'] = tickets_tbc
-			items.append(dict(price_data = dict(currency='usd', unit_amount=int(tickets_tbc*100),
-						product=STRIPE_EVENT), description = event.Description, quantity=1))
-		 
-	stripe_session = stripe.checkout.Session.create(
-	  customer=member.Stripe_id,
-	  payment_method_types=['card'], line_items=items, mode=mode,
-	  success_url=URL('checkout_success', vars=params, scheme=True),
-	  cancel_url=session.get('url_prev')
-	)
-	stripe_session_id = stripe_session.stripe_id		#for use in template
-	session['stripe_session_id'] = stripe_session.stripe_id
-	stripe_pkey = STRIPE_PKEY
-	return locals()
-
-@action('checkout_success', method=['GET'])
-@action.uses("message.html", db, session, flash)
-@checkaccess(None)
-def checkout_success():
-	member = db.Members[session.get('member_id')]
-	dues = decimal.Decimal(request.query.get('dues') or 0)
-	tickets_tbc = decimal.Decimal(request.query.get('tickets_tbc') or 0)
-	stripe.api_key = STRIPE_SKEY
-	stripe_session = stripe.checkout.Session.retrieve(session.get('stripe_session_id'))
-
-	if not stripe_session or decimal.Decimal(stripe_session.amount_total)/100 != tickets_tbc + dues:
-		raise Exception(f"Unexpected checkout_success callback received from Stripe, member {member.id}, event {session.get('event_id')}")
-		redirect(URL('index'))
-
-	subject = 'Registration Confirmation' if tickets_tbc>0 else 'Thank you for your membership payment'
-	message = f"{msg_header(member, subject)}<br><b>Received: ${dues+tickets_tbc}</b><br>"
-	
-	if dues>0:
-		next = None
-		if stripe_session.subscription:
-			subscription = stripe.Subscription.retrieve(stripe_session.subscription)
-			next = datetime.datetime.fromtimestamp(subscription.current_period_end).date()
-		member.update_record(Membership=request.query.get('membership'),
-			Stripe_subscription=stripe_session.subscription, Stripe_next=next, Charged=dues)
-		message += 'Thank you, your membership is now current.</b><br>'
-		
-	if tickets_tbc>0:
-		host_reservation = db((db.Reservations.Event==request.query.get('event_id'))&(db.Reservations.Member == member.id)\
-					&(db.Reservations.Host == True)).select().first()
-		message += '<br><b>Your registration is now confirmed:</b><br>'
-		message +=event_confirm(request.query.get('event_id'), member.id, dues+tickets_tbc)
-		host_reservation.update_record(Charged = (host_reservation.Charged or 0) + tickets_tbc, Checkout = None)
-
-	msg_send(member,subject, message)
-	
-	flash.set('Thank you for your payment. Confirmation has been sent by email!')
-	session['membership'] = None
-	session['dues'] = None
-	session['event_id'] = None
-	session['stripe_session_id'] = None
-	if dues:
-		flash.set('Confirmation has been sent by email. Please review your mailing list subscriptions.')
-		session['url'] = URL('index')
-		redirect(URL(f"emails/Y/{member.id}/select"))
-		#it would be nice to go right to edit the subscription of the primary email,
-		#but a side effect of Stripe Checkout seems to be that the first 'submit' doesn't work
-		#I think this is CSRF protection at work.
-		#redirect(URL(f"emails/Y/{member.id}/edit/{db(db.Emails.Member == member.id).select(orderby=~db.Emails.Modified).first().id}"))
-	redirect(URL('index'))

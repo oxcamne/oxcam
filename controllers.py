@@ -24,13 +24,19 @@ The path follows the bottlepy syntax.
 session, db, T, auth, and tempates are examples of Fixtures.
 Warning: Fixtures MUST be declared with @action.uses({fixtures}) else your app will result in undefined behavior
 """
+from py4web.utils.grid import Grid, GridClassStyleBulma, Column
+from py4web.utils.form import Form, FormStyleBulma
+
+grid_style = GridClassStyleBulma
+form_style = FormStyleBulma
+
 from py4web import action, request, response, redirect, URL, Field
 from yatl.helpers import H5, H6, XML, HTML, TABLE, TH, TD, THEAD, TR
 from .common import db, session, auth, flash
 from .settings import SOCIETY_DOMAIN, STRIPE_PKEY, STRIPE_SKEY, LETTERHEAD,\
 	SUPPORT_EMAIL, GRACE_PERIOD, SOCIETY_NAME, MEMBERSHIP, STRIPE_EVENT,\
 	MEMBER_CATEGORIES, MAIL_LISTS, STRIPE_FULL, STRIPE_STUDENT, TIME_ZONE,\
-	UPLOAD_FOLDER
+	PAYMENT_PROCESSOR
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
 	primary_matriculation, dues_type, event_revenue, event_unpaid, res_tbc, res_status,\
@@ -38,20 +44,17 @@ from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name
 	selections_made, survey_choices
 from pydal.validators import IS_LIST_OF_EMAILS, IS_EMPTY_OR, IS_IN_DB, IS_IN_SET,\
 	IS_NOT_EMPTY, IS_DATE, IS_DECIMAL_IN_RANGE, IS_INT_IN_RANGE
-from .utilities import member_good_standing, ageband, update_Stripe_email, newpaiddate,\
+from .utilities import member_good_standing, ageband, newpaiddate,\
 	collegelist, tdnum, get_banks, financial_content, event_confirm, msg_header, msg_send,\
 	society_emails, emailparse, notification, notify_support, member_profile
 from .session import checkaccess
-from py4web.utils.grid import Grid, GridClassStyleBulma, Column
-from py4web.utils.form import Form, FormStyleBulma
+from .stripe_interface import stripe_update_email, stripe_update_card, stripe_switched_card,\
+	stripe_get_dues, stripe_process_charge
 from py4web.utils.factories import Inject
 import datetime, re, markmin, stripe, csv, decimal, io, pickle
 from pathlib import Path
 from io import StringIO
 from py4web.utils.mailer import Mailer
-
-grid_style = GridClassStyleBulma
-form_style = FormStyleBulma
 
 @action('index')
 @action.uses('message.html', db, session, flash)
@@ -506,7 +509,7 @@ def emails(ismember, member_id, path=None):
 		if ismember=='Y':
 			db.Emails.Mailings.readable=db.Emails.Mailings.writable=False
 	elif path=='select':
-		update_Stripe_email(db.Members[member_id])
+		exec(f"{PAYMENT_PROCESSOR}_update_email(db.Members[member_id])")
 
 	header = CAT(A('back', _href=session['url_prev']),
 	      		H5('Member Emails'),
@@ -1644,7 +1647,6 @@ def bank_file(bank_id):
 				XML(f"{markmin.markmin2html(bank.HowTo)}"))
 	
 	footer = f"Current Balance = {'$%8.2f'%(bank.Balance)}"
-	stripe.api_key = STRIPE_SKEY
 	
 	form = Form([Field('downloaded_file', 'upload', uploadfield = False)],
 				submit_button = 'Import')
@@ -1742,42 +1744,11 @@ def bank_file(bank_id):
 					for trans in rows:
 						trans.update_record(Accrual=False, Timestamp=timestamp, Reference=reference)
 					continue	#on to next transaction
-			elif bank.Name=='Stripe':	#try to identify charges
+			elif bank.Name==PAYMENT_PROCESSOR.capitalize():	#try to identify charges
 				try:
-					charge = stripe.Charge.retrieve(row[bank.Source])
-					member = db(db.Members.Stripe_id==charge.customer).select().first()
-					notes = f"{member_name(member.id)} {primary_email(member.id)}"
-					if row[bank.Type]=='charge':
-						if charge.description=='Subscription update' or (member.Charged and amount>=member.Charged):
-							#dues paid, charge may also cover an event (auto renewal or manual)
-							if (charge.description or '').startswith('Subscription'):
-								customer = stripe.Customer.retrieve(charge.customer)
-								notes += ' Subscription: '+ customer.subscriptions.data[0].id
-								member.update_record(Stripe_next=datetime.datetime.fromtimestamp(customer.subscriptions.data[0].current_period_end).date())
-							duesprice = stripe.Price.retrieve(eval(f'STRIPE_{member.Membership.upper()}'))
-							duesamount = decimal.Decimal(duesprice.unit_amount)/100
-							duesfee = (duesamount * fee)/amount	#prorate fee
-							nowpaid = newpaiddate(member.Paiddate, timestamp=timestamp)
-							db.Dues.insert(Member=member.id, Amount=duesamount, Date=timestamp.date(),
-								Notes='Stripe', Prevpaid=member.Paiddate, Nowpaid=nowpaid, Status=member.Membership)
-							member.update_record(Paiddate=nowpaid, Charged=None)
-							db.AccTrans.insert(Bank = bank.id, Account = acdues.id, Amount = duesamount,
-									Fee = duesfee, Accrual = False, Timestamp = timestamp,
-									Reference = reference, Notes = notes)
-							fee -= duesfee
-							amount -= duesamount
-						if amount==0:
-							continue	#done with this row
-							
-						resvtn=db((db.Reservations.Member==member.id)&(db.Reservations.Charged>=amount)).select(
-								orderby=db.Reservations.Modified).first()
-						if resvtn:
-							db.AccTrans.insert(Bank = bank.id, Account = actkts.id, Amount = amount, Fee = fee,
-								Timestamp = timestamp, Event = resvtn.Event, Reference = reference, Accrual = False, Notes = notes)
-							resvtn.update_record(Paid=(resvtn.Paid or 0) + amount, Charged = resvtn.Charged - amount, Checkout=None)
-							continue
-							
-						#if paid reservation not found, store unallocated
+					amount = eval(f"{PAYMENT_PROCESSOR}_process_charge(row, bank, reference, timestamp, amount, fee)")
+					if amount<=0:
+						continue
 				except Exception as e:
 					pass	#if fails, leave unallocated
 				
@@ -2223,12 +2194,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 		if request.query.get('join_or_renew') or not event:	#collecting dues with event registration, or joining/renewing
 			#membership dues payment
 			#get the subscription plan id (Full membership) or 1-year price (Student) from Stripe Products
-			stripe.api_key = STRIPE_SKEY
-			price_id = eval(f"STRIPE_{form.vars.get('membership')}".upper())
-			price = stripe.Price.retrieve(price_id)
-			session['membership'] = form.vars.get('membership')
-			session['dues'] = str(decimal.Decimal(price.unit_amount)/100)
-			session['subscription'] = True if price.recurring else False
+			exec(f"{PAYMENT_PROCESSOR}_get_dues(form.vars.get('membership'))")
 			#ensure the default mailing list subscriptions are in place in the primary email
 			email = db(db.Emails.Member==member.id).select(orderby=~db.Emails.Modified).first()
 			mailings = email.Mailings or []
@@ -2304,75 +2270,6 @@ reached by using the join/renew link on our home page).<br>\
 	
 	return locals()
 	
-@action('stripe_update_card', method=['GET'])
-@action.uses("checkout.html", session)
-@checkaccess(None)
-def stripe_update_card():
-	access = session['access']	#for layout.html
-	stripe_session_id = request.query.get('stripe_session_id')
-	stripe_pkey = STRIPE_PKEY
-	return locals()
-	
-@action('stripe_switched_card', method=['GET'])
-@action.uses("checkout.html", session, db, flash)
-@checkaccess(None)
-def stripe_switched_card():
-	access = session['access']	#for layout.html
-	stripe.api_key = STRIPE_SKEY
-	if not session.get('member_id'):
-		redirect(URL('index'))
-	member = db.Members[session['member_id']]
-
-	stripe_session = stripe.checkout.Session.retrieve(session['stripe_session_id'], expand=['setup_intent'])
-	stripe.Customer.modify(member.Stripe_id,
-				invoice_settings={'default_payment_method': stripe_session.setup_intent.payment_method})
-	stripe.Subscription.modify(member.Stripe_subscription,
-				default_payment_method=stripe_session.setup_intent.payment_method)
-	flash.set('Thank you for updating your credit card information!')
-	notify_support(member, 'Credit Card Update', 'Credit card updated.')
-	redirect(URL('update_card'))
-
-@action('update_card', method=['GET', 'POST'])
-@action.uses("gridform.html", db, session, flash)
-@checkaccess(None)
-def update_card():
-	access = session['access']	#for layout.html
-	stripe.api_key = STRIPE_SKEY
-
-	if not session.get('member_id'):
-		redirect(URL('index'))
-	member = db.Members[session['member_id']]
-	
-	if member.Stripe_subscription and member.Stripe_subscription!='Cancelled':
-		try:	#check subscription still exists on Stripe
-			subscription = stripe.Subscription.retrieve(member.Stripe_subscription)
-		except Exception as e:
-			member.update_record(Stripe_subscription=None, Stripe_next=None)
-	if not (member.Stripe_subscription and member.Stripe_subscription!='Cancelled'):
-		redirect(URL('index'))	#Stripe subscription doesn't exist
-		
-	paymentmethod = stripe.PaymentMethod.retrieve(subscription.default_payment_method)
-	renewaldate = member.Stripe_next.strftime('%b %d, %Y')
-	duesamount = decimal.Decimal(subscription.plan.amount)/100
-	header = CAT(H5('Membership Subscription'),
-	      XML(f"Your next renewal payment of ${duesamount} will be charged to {paymentmethod.card.brand.capitalize()} \
-....{paymentmethod.card.last4} exp {paymentmethod.card.exp_month}/{paymentmethod.card.exp_year} on {renewaldate}.<br><br>"))
-	
-	form = Form([], submit_value='Update Card on File')
-
-	if form.accepted:
-		stripe_session = stripe.checkout.Session.create(
-		  payment_method_types=['card'],
-		  mode='setup',
-		  customer=member.Stripe_id,
-		  setup_intent_data={},
-		  success_url=URL('stripe_switched_card', scheme=True),
-		  cancel_url=URL('index', scheme=True)
-		)
-		session['stripe_session_id'] = stripe_session.stripe_id
-		redirect(URL('stripe_update_card', vars=dict(stripe_session_id=stripe_session.id)))
-	return locals()
-	
 @action('cancel_subscription', method=['GET', 'POST'])
 @action('cancel_subscription/<member_id:int>', method=['POST', 'GET'])
 @action.uses("gridform.html", db, session, flash)
@@ -2418,7 +2315,7 @@ def cancel_subscription(member_id=None):
 	return locals()
 
 @action('checkout', method=['GET'])
-@action.uses("checkout.html", db, session, flash)
+@action.uses("stripe_checkout.html", db, session, flash)
 @checkaccess(None)
 def checkout():
 	access = session['access']	#for layout.html

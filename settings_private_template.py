@@ -17,6 +17,7 @@ SMTP_SENDER = "descriptive_name <reply_to_email>"
 SMTP_LOGIN = "sending_email_address:password"
 SMTP_TLS = True
 
+PAYMENT_PROCESSOR='stripe'
 #Stripe settings development keys and id's
 STRIPE_PKEY = "public_key"
 STRIPE_SKEY = "secret_key"

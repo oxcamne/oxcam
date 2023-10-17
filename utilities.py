@@ -6,7 +6,7 @@ from .common import db, auth
 from .settings import *	#include all for <name> in emailparse
 from .models import primary_email, res_tbc, res_totalcost, res_status, member_name
 from yatl.helpers import A, TABLE, TH, THEAD, H6, TR, TD, CAT, HTML, XML
-import stripe, datetime, re, markmin
+import datetime, re, markmin
 
 #check if member is in good standing at a particular date
 def member_good_standing(member, date=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()):
@@ -31,17 +31,6 @@ def ageband(year, matr):
 	else:
 		ageband = 'unknown'
 	return ageband
-	
-#update Stripe Customer Record with current primary email
-def update_Stripe_email(member):
-	if member.Stripe_id:
-		pk = STRIPE_PKEY	#use the public key on the client side	
-		stripe.api_key = STRIPE_SKEY
-		try:	#check customer still exists on Stripe
-			cus = stripe.Customer.retrieve(member.Stripe_id)
-			stripe.Customer.modify(member.Stripe_id, email=primary_email(member.id))
-		except Exception as e:
-			member.update_record(Stripe_id=None, Stripe_subscription=None, Stripe_next=None)
 
 def notify_support(member, subject, body):
 	message = f"{member_name(member.id)} id {member.id}<br>{body}"

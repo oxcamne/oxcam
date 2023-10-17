@@ -10,35 +10,12 @@ or developers. They are accessed using the URL, not via menus
 from py4web import action, response, redirect, Field
 from py4web.utils.factories import Inject
 from .common import db, session, flash
-from .controllers import checkaccess, form_style, grid_style
+from .controllers import checkaccess, form_style
 from py4web.utils.form import Form, FormStyleDefault
 from py4web.utils.grid import Grid, GridClassStyle
-from .settings import STRIPE_SKEY, SOCIETY_DOMAIN
-from yatl.helpers import H5, BEAUTIFY
-import stripe, io
+from .settings import SOCIETY_DOMAIN
+import io
 from io import StringIO
-
-# stripe_tool (diagnostic tool)
-@action('stripe_tool', method=['GET', 'POST'])
-@action.uses("gridform.html", db, session, flash)
-@checkaccess('accounting')
-def stripe_tool():
-	access = session['access']	#for layout.html
-	form = Form([Field('object_type', comment="e.g. 'Customer', 'Subscription'"),
-	      		Field('object_id')],
-				keep_values=True, formstyle=form_style)
-	stripe.api_key = STRIPE_SKEY
-	header = H5('Stripe_Tool - inspect Stripe Objects')
-	footer = ""
-	object={}
-
-	if form.accepted:
-		try:
-			object = eval(f"stripe.{form.vars.get('object_type')}.retrieve(\'{form.vars.get('object_id')}\')")
-			footer = BEAUTIFY(object)
-		except Exception as e:
-			flash.set(str(e))
-	return locals()
 
 @action('db_tool', method=['POST', 'GET'])
 @action('db_tool/<path:path>', method=['POST', 'GET'])

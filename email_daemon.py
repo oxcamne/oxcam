@@ -15,7 +15,7 @@ from .models import primary_email
 from .daily_maintenance import daily_maintenance
 from py4web import URL
 from yatl.helpers import HTML, XML
-from threading import Thread
+#from threading import Thread
 
 def email_daemon():
 
@@ -31,8 +31,8 @@ def email_daemon():
 		if old_now and now.date()!=old_now.date(): # or\
 			# (not daily_maintenance_thread and now.strftime('%H:%M')=='11:03'):
 			#run the daily backup and maintenance job in its own thread
-			daily_maintenance_thread = Thread(target=daily_maintenance)
-			daily_maintenance_thread.start()
+#			daily_maintenance_thread = Thread(target=daily_maintenance)
+#			daily_maintenance_thread.start()
 
 		notice = db(db.emailqueue.id > 0).select().first()
 		if notice:

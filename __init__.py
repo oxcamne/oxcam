@@ -16,6 +16,6 @@ __author__ = "dgmanns@gmail.com"
 __license__ = "BSDv3"
 
 #email daemon in it's own thread
-from threading import Thread
-t = Thread(target=email_daemon, daemon=True)
-t.start()
+#from threading import Thread
+#t = Thread(target=email_daemon, daemon=True)
+#t.start()

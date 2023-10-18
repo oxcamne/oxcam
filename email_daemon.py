@@ -28,11 +28,12 @@ def email_daemon():
 	while True:
 		now = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
 
-		if old_now and now.date()!=old_now.date(): # or\
+#		if old_now and now.date()!=old_now.date(): # or\
 			# (not daily_maintenance_thread and now.strftime('%H:%M')=='11:03'):
 			#run the daily backup and maintenance job in its own thread
 #			daily_maintenance_thread = Thread(target=daily_maintenance)
 #			daily_maintenance_thread.start()
+	
 
 		notice = db(db.emailqueue.id > 0).select().first()
 		if notice:

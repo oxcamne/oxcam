@@ -1,39 +1,39 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-this is used in PythonAnywhere environment, where it is run as a Pythonanywhere run forever task:
-	py4web/py4web.py call py4web/apps oxcam.email_daemon.email_daemon
-it can be run in vscode using a configuration:
-		{
-			"name": "Python: daily",
-			"type": "python",
-			"request": "launch",
-			"program": "C:/Users/David/SkyDrive/py4web/py4web.py",
-			"args": ["call", "apps", "oxcam.email_daemon.email_daemon"],
-			"console": "integratedTerminal",
-			"justMyCode": false,
-		}
+This is run in it's own thread as a daemon, started by __init__.py
 
-this is used in both test environment on PC, where it is started using email_daemon.cmd,
-and in PythonAnywhere environment, where it is run as a Pythonanywhere 'run forever' task:
-	py4web/py4web.py call py4web/apps oxcam.email_daemon.email_daemon
+It also spawns the daily maintenance and backup thread at midnight local time,
+in a separate thread
 """
-import time, markmin, os, random, pickle
+import time, markmin, os, random, pickle, datetime
 from pathlib import Path
 from .common import db, auth,logger
-from .settings_private import VISIT_WEBSITE_INSTRUCTIONS
+from .settings_private import VISIT_WEBSITE_INSTRUCTIONS, TIME_ZONE
 from .utilities import member_profile, event_confirm, member_greeting, emailparse
 from .models import primary_email
+from .daily_maintenance import daily_maintenance
 from py4web import URL
 from yatl.helpers import HTML, XML
+from threading import Thread
 
 def email_daemon():
 
 	path = Path(__file__).resolve().parent.parent.parent
 	os.chdir(path)		 #working directory py4web
 	print(str(path)+' email_daemon running')
+	old_now = None
+	daily_maintenance_thread = None
 
 	while True:
+		now = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
+
+		if old_now and now.date()!=old_now.date(): # or\
+			# (not daily_maintenance_thread and now.strftime('%H:%M')=='11:03'):
+			#run the daily backup and maintenance job in its own thread
+			daily_maintenance_thread = Thread(target=daily_maintenance)
+			daily_maintenance_thread.start()
+
 		notice = db(db.emailqueue.id > 0).select().first()
 		if notice:
 			bodyparts = emailparse(notice.body, notice.subject, notice.query)
@@ -85,4 +85,5 @@ def email_daemon():
 			db(db.emailqueue.id==notice.id).delete()
 			continue    #until queue empty
 		db.commit()
+		old_now = now
 		time.sleep(5)

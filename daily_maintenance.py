@@ -1,19 +1,22 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-this is used in PythonAnywhere environment, where it is run as a Pythonanywhere scheduled task:
-	py4web/py4web.py call py4web/apps oxcam.daily_maintenance.daily_maintenance
-it can be run in vscode using a configuration:
+this is spawned in it's own thread by the email daemon when local time passes midnight
+
+It can also be run in development using a launch.json configuration:
+
         {
             "name": "Python: daily",
             "type": "python",
             "request": "launch",
-            "program": "C:/Users/David/SkyDrive/py4web/py4web.py",
-            "args": ["call", "apps", "oxcam.daily_maintenance.daily_maintenance"],
+            "program": "py4web.py",
+            "args": [
+                "call", "apps", "oxcam.daily_maintenance.daily_maintenance"
+            ],
             "console": "integratedTerminal",
-            "justMyCode": false,
-        }
-
+            "justMyCode": false
+        },
+ 
 """
 import datetime
 import os

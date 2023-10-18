@@ -946,8 +946,12 @@ def reservation(ismember, member_id, event_id, path=None):
 	db.Reservations.Created.default = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
 	member = db.Members[member_id]
 	event = db.Events[event_id]
+	all_guests = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)).select(orderby=~db.Reservations.Host)
+	host_reservation = all_guests.first()
 	tickets = db(db.tickets.event==event_id).select()
-	event_tickets = [t.ticket for t in tickets if not t.count or tickets_sold(event_id, t.ticket, member_id)<t.count]
+	event_tickets = [t.ticket for t in tickets if \
+				(not t.count or tickets_sold(event_id, t.ticket, member_id)<t.count) and\
+				(not host_reservation or t.allow_as_guest==True)]
 	tickets_available = {}
 	for t in tickets:
 		if t.count:
@@ -965,8 +969,6 @@ def reservation(ismember, member_id, event_id, path=None):
 		if membership:		#joining as part of event registration
 			is_good_standing = True
 
-	all_guests = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)).select(orderby=~db.Reservations.Host)
-	host_reservation = all_guests.first()
 	confirmed_ticket_cost = 0
 	provisional_ticket_cost = 0
 	adding = 0
@@ -1070,7 +1072,7 @@ Moving member on/off waitlist will also affect all guests."))
 			db.Reservations.Ticket.requires=IS_EMPTY_OR(IS_IN_SET(event_tickets))
 		else:
 			db.Reservations.Ticket.requires=IS_IN_SET(event_tickets, zero='please select the appropriate ticket')
-			db.Reservations.Ticket.default = event_tickets[0]
+			db.Reservations.Ticket.default = host_reservation.Ticket if host_reservation and host_reservation.Ticket in event_tickets else event_tickets[0]
 	else:
 		db.Reservations.Ticket.writable = db.Reservations.Ticket.readable = False
 	
@@ -1132,8 +1134,6 @@ Moving member on/off waitlist will also affect all guests."))
 			t = tickets.find(lambda t: t.ticket==form.vars.get('Ticket')).first()
 			if not form.vars.get('Notes') or form.vars.get('Notes').strip()=='':
 				form.errors['Notes']=t.qualify or "Please note how this guest qualifies for the ticket discount"
-			if not t.allow_as_guest and host_reservation and (path=='new' or host_reservation.id!=int(path[path.find('/')+1:])):
-				form.errors['Ticket']="Please register seperately for this ticket type."
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return

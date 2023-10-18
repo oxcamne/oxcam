@@ -734,7 +734,7 @@ def tickets(event_id, path=None):
 			return
 
 	grid = Grid(path, db.tickets.event==event_id,
-			columns=[db.tickets.ticket, db.tickets.price, db.tickets.count,
+			columns=[db.tickets.ticket, db.tickets.price, db.tickets.qualify, db.tickets.count,
 				Column('Sold', lambda t: tickets_sold(event_id, t.ticket))],
 			details=not write, create=write, editable=write, deletable=write,
 			validation=validation,
@@ -1130,10 +1130,10 @@ Moving member on/off waitlist will also affect all guests."))
 	def validate(form):
 		if form.vars.get('Waitlist') and form.vars.get('Provisional'):
 			form.errors['Waitlist'] = "Waitlist and Provisional should not both be set"
-		if ismember=='Y' and form.vars.get('Ticket') != (db.Reservations.Ticket.default or event_tickets[0]) and db.Reservations.Ticket.writable==True:
+		if ismember=='Y' and db.Reservations.Ticket.writable==True and form.vars.get('Ticket') != db.Reservations.Ticket.default:
 			t = tickets.find(lambda t: t.ticket==form.vars.get('Ticket')).first()
-			if not form.vars.get('Notes') or form.vars.get('Notes').strip()=='':
-				form.errors['Notes']=t.qualify or "Please note how this guest qualifies for the ticket discount"
+			if t.qualify and (not form.vars.get('Notes') or form.vars.get('Notes').strip()==''):
+				form.errors['Notes']=t.qualify	#documentation required
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return

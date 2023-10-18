@@ -16,6 +16,7 @@ __author__ = "dgmanns@gmail.com"
 __license__ = "BSDv3"
 
 #email daemon in it's own thread
+#disabled for now as Pythonanywhere doesn't support threading
 #from threading import Thread
 #t = Thread(target=email_daemon, daemon=True)
 #t.start()

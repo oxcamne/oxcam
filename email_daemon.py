@@ -1,9 +1,25 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-This is run in it's own thread as a daemon, started by __init__.py
+FOR Pythonanywhere THIS RUNS AS AN ALWAYS ON TASK
+In development, it can be run using this configuration in launch.json:
 
-It also spawns the daily maintenance and backup thread at midnight local time,
+        {
+            "name": "Python: email",
+            "type": "python",
+            "request": "launch",
+            "program": "py4web.py",
+            "args": [
+                "call", "apps", "oxcam.email_daemon.email_daemon"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        }
+  
+IDEALLY:
+This would run in it's own thread as a daemon, started by __init__.py
+
+It would also spawns the daily maintenance and backup thread at midnight local time,
 in a separate thread
 """
 import time, markmin, os, random, pickle, datetime
@@ -15,7 +31,6 @@ from .models import primary_email
 from .daily_maintenance import daily_maintenance
 from py4web import URL
 from yatl.helpers import HTML, XML
-#from threading import Thread
 
 def email_daemon():
 
@@ -28,13 +43,15 @@ def email_daemon():
 	while True:
 		now = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
 
+#	THIS IS DISABLED AS Pythonanywhere does not support threads
+#	instead we use PA's scheduled task
 #		if old_now and now.date()!=old_now.date(): # or\
 			# (not daily_maintenance_thread and now.strftime('%H:%M')=='11:03'):
 			#run the daily backup and maintenance job in its own thread
+#			from threading import Thread
 #			daily_maintenance_thread = Thread(target=daily_maintenance)
 #			daily_maintenance_thread.start()
 	
-
 		notice = db(db.emailqueue.id > 0).select().first()
 		if notice:
 			bodyparts = emailparse(notice.body, notice.subject, notice.query)

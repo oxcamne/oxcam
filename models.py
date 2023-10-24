@@ -82,9 +82,13 @@ db.define_table('Members',
 	Field('Suffix', 'string'),
 	Field('Membership', 'string', requires=IS_EMPTY_OR(IS_IN_SET(MEMBER_CATEGORIES))),
 	Field('Paiddate', 'date', requires = IS_EMPTY_OR(IS_DATE())),
-	Field('Stripe_id', 'string'),
-	Field('Stripe_subscription', 'string'),	#Stripe subscription id or 'Cancelled' to end at Paiddate
-	Field('Stripe_next', 'date',),	#Stripe subscription next payment date
+	Field('Pay_source'),	#payments source, e.g. 'stripe'
+	Field('Pay_cust'),	#Customer id on payment system
+	Field('Pay_subs'),	#Subscription id or 'Cancelled'
+	Field('Pay_next', 'date'),	#Next subscription payment date
+	Field('Stripe_id', 'string', readable=False, writable=False),	#obselete
+	Field('Stripe_subscription', 'string', readable=False, writable=False),	#obselete
+	Field('Stripe_next', 'date', readable=False, writable=False),	#obsolete
 	Field('Charged', 'decimal(6,2)'),	#initial payment made, not yet downloaded from Stripe
 	Field('Privacy', 'boolean', default=False, comment=' Exclude email address from member directory'),
 	Field('Access', 'string', requires = IS_EMPTY_OR(IS_IN_SET(ACCESS_LEVELS)), comment=' Set for advisory committee'),
@@ -191,6 +195,20 @@ db.define_table('tickets',
 	   comment="clear if ticket can't apply to a guest")
 )
 
+db.define_table('Tickets',
+	Field('Event', 'reference Events', writable=False),
+	Field('Ticket', requires=IS_NOT_EMPTY(),
+	   comment="can specify membership, e.g. full/student/non-member"),
+	Field('Short_name', comment="short name for doorlist"),	#short name for use in doorlist
+	Field('Price', 'decimal(5,2)', requires=IS_DECIMAL_IN_RANGE(0)),
+	Field('Count', 'integer', requires=IS_EMPTY_OR(IS_INT_IN_RANGE(0)),
+	   comment="to limit number of tickets at this price"),
+	Field('Qualify',
+	   comment="use if qualification required in notes"),
+	Field('Allow_as_guest', 'boolean', default=True,
+	   comment="clear if ticket can't apply to a guest")
+)
+
 def selections_made(event_id, selection):
 	return db((db.Reservations.Event==event_id)&(db.Reservations.Selection==selection)&\
 		   	(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).count()
@@ -201,6 +219,12 @@ db.define_table('selections',
 	Field('short_name', requires=IS_NOT_EMPTY(), comment="for doorlist")
 )
 
+db.define_table('Selections',
+	Field('Event', 'reference Events', writable=False),
+	Field('Selection', requires=IS_NOT_EMPTY(), comment="for form dropdown"),
+	Field('Short_name', requires=IS_NOT_EMPTY(), comment="for doorlist")
+)
+
 def survey_choices(event_id, choice):
 	return db((db.Reservations.Event==event_id)&(db.Reservations.Survey==choice)&\
 		   	(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).count()
@@ -208,6 +232,12 @@ def survey_choices(event_id, choice):
 db.define_table('survey',
 	Field('event', 'reference Events', writable=False),
 	Field('item', requires=IS_NOT_EMPTY(),
+	   comment="first is question, remainder answer choices"),
+)
+
+db.define_table('Survey',
+	Field('Event', 'reference Events', writable=False),
+	Field('Item', requires=IS_NOT_EMPTY(),
 	   comment="first is question, remainder answer choices"),
 )
 

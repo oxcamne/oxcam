@@ -17,13 +17,13 @@ SMTP_SENDER = "descriptive_name <reply_to_email>"
 SMTP_LOGIN = "sending_email_address:password"
 SMTP_TLS = True
 
-PAYMENT_PROCESSOR='stripe'
+PAYMENT_PROCESSOR='stripe'  #default processor new members
 #Stripe settings development keys and id's
 STRIPE_PKEY = "public_key"
 STRIPE_SKEY = "secret_key"
 #the following will depend on defined membership classes
-STRIPE_FULL = "price_code"  #in our case, an auto-renewing subscription
-STRIPE_STUDENT = "price_code"
+STRIPE_PROD_FULL = "product_code"   #subscription
+STRIPE_PROD_STUDENT = "product_code"    #non-recurring, re-validate each year
 #Stripe Product for charging event tickets (price variable)
 STRIPE_EVENT = "product_code"
 

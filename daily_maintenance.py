@@ -25,11 +25,9 @@ from .common import db, auth, logger
 from .settings_private import SOCIETY_DOMAIN, STRIPE_SKEY, IS_PRODUCTION, SUPPORT_EMAIL,\
 	LETTERHEAD, SOCIETY_NAME, DB_URL
 from .utilities import member_greeting
+from .stripe_interface import stripe_subscription_maintenance
 from .models import primary_email
 from yatl.helpers import HTML, XML
-import stripe
-
-stripe.api_key = STRIPE_SKEY
 
 def daily_maintenance():
 	os.chdir(Path(__file__).resolve().parent.parent.parent) #working directory py4web
@@ -53,7 +51,7 @@ def daily_maintenance():
 	last_date = datetime.date.today() + datetime.timedelta(days=interval)
 
 	members = db((db.Members.Paiddate>=first_date)&(db.Members.Paiddate<=last_date)&(db.Members.Membership!=None)&\
-				(db.Members.Stripe_subscription==None)&(db.Members.Charged==None)).select()
+				(db.Members.Pay_subs==None)&(db.Members.Charged==None)).select()
 	for m in members:
 		to = primary_email(m.id) if IS_PRODUCTION else SUPPORT_EMAIL
 		bcc = SUPPORT_EMAIL if IS_PRODUCTION else None
@@ -70,26 +68,19 @@ If you have any questions, please contact {SUPPORT_EMAIL}"
 				auth.sender.send(to=primary_email(m.id), sender=SUPPORT_EMAIL, subject='Renewal Reminder', body=HTML(XML(text)))
 			logger.info(f"Renewal Reminder sent to {primary_email(m.id)}")
 
-	subs = db((db.Members.Stripe_subscription!=None)&(db.Members.Stripe_subscription!='Cancelled')&(db.Members.Stripe_next<datetime.date.today())).select()
+	subs = db((db.Members.Pay_subs!=None)&(db.Members.Pay_subs!='Cancelled')).select()
 	for m in subs:
-		to = primary_email(m.id) if IS_PRODUCTION else SUPPORT_EMAIL
-		bcc = SUPPORT_EMAIL if IS_PRODUCTION else None
-
-		try:	#check subscription still exists on Stripe
-			subscription = stripe.Subscription.retrieve(m.Stripe_subscription)
-			if not subscription.canceled_at:
-				continue		#canceled_at set when last payment 	attempt fails
-			#note after auto-pay fails and cancels the subsription, it can no longer be deleted from Stripe
-			text = f"{LETTERHEAD.replace('&lt;subject&gt;', 'Membership Renewal Failure')}{member_greeting(m)}"
-			text += f"<p>The renewal payment for your membership has failed as your \
-card details on file no longer worked, and as a result your membership has been cancelled. </p><p>\
-We hope you will <a href={DB_URL}> reinstate your membership</a>, \
-but in any case we are grateful for your past support!</p>\
-If you have any questions, please contact {SUPPORT_EMAIL}"
-			auth.sender.send(to=to, bcc=bcc, sender=SUPPORT_EMAIL, subject='Membership Renewal Failure', body=HTML(XML(text)))
-		except Exception as e:	#assume payment has failed
-			pass
+		if eval(f"{m.Pay_source}_subscription_maintenance(m)"):	#subscription no longer operational
+			if IS_PRODUCTION:
+				to = primary_email(m.id) if IS_PRODUCTION else SUPPORT_EMAIL
+				bcc = SUPPORT_EMAIL if IS_PRODUCTION else None
+				text = f"{LETTERHEAD.replace('&lt;subject&gt;', 'Membership Renewal Failure')}{member_greeting(m)}"
+				text += f"<p>We have been unable to process your auto-renewal and as a result your membership has been cancelled. </p><p>\
+	We hope you will <a href={DB_URL}> reinstate your membership</a>, \
+	but in any case we are grateful for your past support!</p>\
+	If you have any questions, please contact {SUPPORT_EMAIL}"
+				auth.sender.send(to=primary_email(m.id), bcc=SUPPORT_EMAIL, sender=SUPPORT_EMAIL, subject='Membership Renewal Failure', body=HTML(XML(text)))
+			logger.info(f"Membership Subscription Cancelled {primary_email(m.id)}")
+			m.update_record(Pay_subs = 'Cancelled', Pay_next=None, Modified=datetime.datetime.now())
 				
-		logger.info(f"Membership Subscription Cancelled {primary_email(m.id)}")
-		m.update_record(Stripe_subscription = 'Cancelled', Stripe_next=None, Modified=datetime.datetime.now())
 	db.commit()

@@ -72,9 +72,9 @@ def index():
 	else:
 		message = CAT(message, A("Join our mailing list(s)", _href=URL("registration", vars=dict(mail_lists='Y'))), XML('<br>'))
 
-	if member and member.Stripe_subscription!='Cancelled' and member_good_standing(member, (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)-datetime.timedelta(days=45)).date()):
-		if member.Stripe_subscription:
-			message = CAT(message, A("View membership subscription/Update credit card", _href=URL('update_card')), XML('<br>'))
+	if member and member.Pay_subs!='Cancelled' and member_good_standing(member, (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)-datetime.timedelta(days=45)).date()):
+		if member.Pay_subs:
+			message = CAT(message, A("View membership subscription/Update credit card", _href=URL(f'{member.Pay_source}_view_card')), XML('<br>'))
 		message = CAT(message, A("Cancel your membership", _href=URL('cancel_subscription')), XML('<br>'))
 
 	message = CAT(message, XML('<br>'),
@@ -176,7 +176,7 @@ def members(path=None):
 			query.append(f"(db.Members.id==db.Reservations.Member)&(db.Reservations.Event=={search_form.vars.get('event')})&(db.Reservations.Host==True)&(db.Reservations.Provisional!=True)&(db.Reservations.Waitlist!=True)")
 		qdesc += f"{'excluding ' if search_form.vars.get('mailing_list') else ''}{db.Events[search_form.vars.get('event')].Description[0:25]} attendees, "
 	if search_form.vars.get('good_standing'):
-		query.append("((db.Members.Membership!=None)&(((db.Members.Paiddate==None)|(db.Members.Paiddate>=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()))|(db.Members.Charged!=None)|((db.Members.Stripe_subscription!=None)&(db.Members.Stripe_subscription!=('Cancelled')))))")
+		query.append("((db.Members.Membership!=None)&(((db.Members.Paiddate==None)|(db.Members.Paiddate>=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()))|(db.Members.Charged!=None)|((db.Members.Pay_subs!=None)&(db.Members.Pay_subs!=('Cancelled')))))")
 		qdesc += ' in good standing, '
 	if search_form.vars.get('value'):
 		field = search_form.vars.get('field')
@@ -508,7 +508,8 @@ def emails(ismember, member_id, path=None):
 		if ismember=='Y':
 			db.Emails.Mailings.readable=db.Emails.Mailings.writable=False
 	elif path=='select':
-		eval(f"{PAYMENT_PROCESSOR}_update_email(db.Members[member_id])")
+		member = db.Members[member_id]
+		eval(f"{member.Pay_source or PAYMENT_PROCESSOR}_update_email(db.Members[member_id])")
 
 	header = CAT(A('back', _href=session['url_prev']),
 	      		H5('Member Emails'),
@@ -820,6 +821,24 @@ def survey(event_id, path=None):
 			grid_class_style=grid_style,
 			formstyle=form_style,
 			)
+	return locals()
+	
+@action('migrate_tickets', method=['GET'])
+@action.uses("gridform.html", db, session, flash)
+@checkaccess(None)
+def migrate_tickets():
+	header = "tickets, selections, survey all migrated"
+	access = session['access']	#for layout.html
+
+	for t in db(db.tickets.id>0).select():
+		db.Tickets.insert(Event=t.event, Ticket=t.ticket, Short_name=t.short_name, Price=t.price,
+				Count=t.count, Qualify=t.qualify, Allow_as_guest=t.allow_as_guest)
+
+	for s in db(db.selections.id>0).select():
+		db.Selections.insert(Event=s.event, Selection=s.selection, Short_name=s.short_name)
+
+	for i in db(db.survey.id>0).select():
+		db.Survey.insert(Event=i.event, Item=i.item)
 	return locals()
 
 @action('event_analytics', method=['GET'])
@@ -1185,7 +1204,7 @@ Moving member on/off waitlist will also affect all guests."))
 					msg_send(member, subject, message)
 					flash.set('Thank you. Confirmation has been sent by email.')
 				redirect(back)
-			redirect(URL(f'{PAYMENT_PROCESSOR}_checkout'))
+			redirect(URL(f'{member.Pay_source or PAYMENT_PROCESSOR}_checkout'))
 	return locals()
 
 @action('doorlist_export/<event_id:int>', method=['GET'])
@@ -1718,9 +1737,9 @@ def bank_file(bank_id):
 					for trans in rows:
 						trans.update_record(Accrual=False, Timestamp=timestamp, Reference=reference)
 					continue	#on to next transaction
-			elif bank.Name==PAYMENT_PROCESSOR.capitalize():	#try to identify charges
+			else:	#try to identify charges
 				try:
-					amount = eval(f"{PAYMENT_PROCESSOR}_process_charge(row, bank, reference, timestamp, amount, fee)")
+					amount = eval(f"{bank.Name.lower()}_process_charge(row, bank, reference, timestamp, amount, fee)")
 					if amount<=0:
 						continue
 				except Exception as e:
@@ -2066,8 +2085,8 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 			if not session.get('membership') and \
 					member_good_standing(member, (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)+datetime.timedelta(days=GRACE_PERIOD)).date()):
 				redirect(URL('profile')) #edit profile if good standing for at least grace period
-			if member.Stripe_subscription == 'Cancelled':
-				member.update_record(Stripe_subscription = None, Stripe_next = None)
+			if member.Pay_subs == 'Cancelled':
+				member.update_record(Pay_subs = None, Pay_next = None)
 	else:
 		member = None
 		
@@ -2186,7 +2205,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 				redirect(URL('profile')) #gather profile info
 			if session.get('event_id'):
 				redirect(URL(f"reservation/Y/{member_id}/{session.get('event_id')}/new"))	#go create this member's reservation
-			redirect(URL(f'{PAYMENT_PROCESSOR}_checkout'))
+			redirect(URL(f'{member.Pay_source or PAYMENT_PROCESSOR}_checkout'))
 	return locals()
 	
 ######################################## Join/Renew/Profile Update ######################################
@@ -2205,8 +2224,8 @@ def profile():
 	if member.Paiddate:
 		header = CAT(header,
 	       XML(f"Your membership {'expired' if member.Paiddate < datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date() else 'expires'} on {member.Paiddate.strftime('%m/%d/%Y')}"))
-	if member.Stripe_next:
-		header = CAT(header, XML(f" Renewal payment will be charged on {member.Stripe_next.strftime('%m/%d/%Y')}."))
+	if member.Pay_next:
+		header = CAT(header, XML(f" Renewal payment will be charged on {member.Pay_next.strftime('%m/%d/%Y')}."))
 	header = CAT(header,
 	      XML(f"{'<br><br>' if member.Paiddate else ''}The information on this form, except as noted, is included \
 in our online Member Directory which is available through our home page to \
@@ -2216,14 +2235,15 @@ reached by using the join/renew link on our home page).<br>\
 {A('Review or Edit your college affiliation(s)', _href=URL(f'affiliations/Y/{member.id}'))}<br>\
 {A('Manage your email address(es) and mailing list subscriptions', _href=URL(f'emails/Y/{member.id}'))}<br>"))
 	
-	db.Members.Membership.readable = db.Members.Paiddate.readable = db.Members.Stripe_id.readable = False
-	db.Members.Stripe_subscription.readable = db.Members.Stripe_next.readable = db.Members.Charged.readable = False
+	db.Members.Membership.readable = db.Members.Paiddate.readable = db.Members.Pay_cust.readable = False
+	db.Members.Pay_subs.readable = db.Members.Pay_next.readable = db.Members.Charged.readable = False
 	db.Members.Access.readable = db.Members.Committees.readable = db.Members.President.readable = False
 	db.Members.Notes.readable = db.Members.Created.readable = db.Members.Modified.readable = False
-	db.Members.Membership.writable = db.Members.Paiddate.writable = db.Members.Stripe_id.writable = False
-	db.Members.Stripe_subscription.writable = db.Members.Stripe_next.writable = db.Members.Charged.writable = False
+	db.Members.Membership.writable = db.Members.Paiddate.writable = db.Members.Pay_cust.writable = False
+	db.Members.Pay_subs.writable = db.Members.Pay_next.writable = db.Members.Charged.writable = False
 	db.Members.Access.writable = db.Members.Committees.writable = db.Members.President.writable = False
 	db.Members.Notes.writable = db.Members.Created.writable = db.Members.Modified.writable = False
+	db.Members.Pay_source.writable = db.Members.Pay_source.readable = False
 
 	def validate(form):
 		if len(form.errors)>0:
@@ -2238,7 +2258,7 @@ reached by using the join/renew link on our home page).<br>\
 		if session.get('dues'):
 			if session.get('event_id'):
 				redirect(URL(f"reservation/Y/{member.id}/{session['event_id']}/new"))	#go create this member's reservation
-			redirect(URL(f'{PAYMENT_PROCESSOR}_checkout'))
+			redirect(URL(f'{member.Pay_source or PAYMENT_PROCESSOR}_checkout'))
 		flash.set('Thank you for updating your profile information.')
 		notify_support(member, 'Member Profile Updated', member_profile(member))
 	
@@ -2270,10 +2290,10 @@ def cancel_subscription(member_id=None):
 	form = Form([], submit_value='Cancel Subscription')
 	
 	if form.accepted:
-		eval(f"{PAYMENT_PROCESSOR}_cancel_subscription(member.Stripe_subscription)")
+		eval(f"{member.Pay_source or PAYMENT_PROCESSOR}_cancel_subscription(member)")
 		
-		member.update_record(Stripe_subscription = 'Cancelled', Stripe_next=None)
-		#if we simply cleared Stripe_subscription then the daily backup daemon might issue membership reminders!
+		member.update_record(Pay_subs = 'Cancelled', Pay_next=None)
+		#if we simply cleared Pay_subs then the daily backup daemon might issue membership reminders!
 		if not member.Paiddate:	#just joined but changed their mind?
 			member.update_record(Membership=None, Charged=None)
 

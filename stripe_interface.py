@@ -13,7 +13,7 @@ from .models import primary_email, member_name, res_tbc
 from .controllers import checkaccess, form_style
 from .utilities import notify_support, newpaiddate, msg_header, msg_send, event_confirm
 from py4web.utils.form import Form
-from .settings import STRIPE_SKEY, STRIPE_PKEY, SOCIETY_DOMAIN, STRIPE_FULL, STRIPE_STUDENT, STRIPE_EVENT
+from .settings import STRIPE_SKEY, STRIPE_PKEY, SOCIETY_DOMAIN, STRIPE_EVENT, STRIPE_PROD_FULL, STRIPE_PROD_STUDENT
 from yatl.helpers import H5, BEAUTIFY, CAT, XML
 import stripe, decimal, datetime
 
@@ -42,28 +42,27 @@ def stripe_tool():
 
 #get dues details for membership type
 def stripe_get_dues(membership):
-	price_id = eval(f"STRIPE_{membership.upper()}")
-	price = stripe.Price.retrieve(price_id)
+	product = stripe.Product.retrieve(eval(f"STRIPE_PROD_{membership.upper()}"))
+	price = stripe.Price.retrieve(product.default_price)
 	session['membership'] = membership
 	session['dues'] = str(decimal.Decimal(price.unit_amount)/100)
 	session['subscription'] = True if price.recurring else False
 	
 #update Stripe Customer Record with current primary email
 def stripe_update_email(member):
-	if member.Stripe_id:
-		pk = STRIPE_PKEY	#use the public key on the client side	
+	if member.Pay_cust:
 		try:	#check customer still exists on Stripe
-			cus = stripe.Customer.retrieve(member.Stripe_id)
-			stripe.Customer.modify(member.Stripe_id, email=primary_email(member.id))
+			cus = stripe.Customer.retrieve(member.Pay_cust)
+			stripe.Customer.modify(member.Pay_cust, email=primary_email(member.id))
 		except Exception as e:
-			member.update_record(Stripe_id=None, Stripe_subscription=None, Stripe_next=None)
+			member.update_record(Pay_cust=None, Pay_subs=None, Pay_next=None)
 
 #process a Stripe transaction
 def stripe_process_charge(dict_csv, bank, reference, timestamp, amount, fee):
 	acdues = db(db.CoA.Name == "Membership Dues").select().first()
 	actkts = db(db.CoA.Name == "Ticket sales").select().first()
 	charge = stripe.Charge.retrieve(dict_csv['Source'])
-	member = db(db.Members.Stripe_id==charge.customer).select().first()
+	member = db(db.Members.Pay_cust==charge.customer).select().first()
 	notes = f"{member_name(member.id)} {primary_email(member.id)}"
 	if dict_csv['Type']=='charge':
 		if charge.description=='Subscription update' or (member.Charged and amount>=member.Charged):
@@ -71,8 +70,9 @@ def stripe_process_charge(dict_csv, bank, reference, timestamp, amount, fee):
 			if (charge.description or '').startswith('Subscription'):
 				customer = stripe.Customer.retrieve(charge.customer)
 				notes += ' Subscription: '+ customer.subscriptions.data[0].id
-				member.update_record(Stripe_next=datetime.datetime.fromtimestamp(customer.subscriptions.data[0].current_period_end).date())
-			duesprice = stripe.Price.retrieve(eval(f'STRIPE_{member.Membership.upper()}'))
+				member.update_record(Pay_next=datetime.datetime.fromtimestamp(customer.subscriptions.data[0].current_period_end).date())
+			product = stripe.Product.retrieve(eval(f"STRIPE_PAID_{member.Membership.upper()}"))
+			duesprice = stripe.Price.retrieve(product.default_price)
 			duesamount = decimal.Decimal(duesprice.unit_amount)/100
 			duesfee = (duesamount * fee)/amount	#prorate fee
 			nowpaid = newpaiddate(member.Paiddate, timestamp=timestamp)
@@ -94,7 +94,8 @@ def stripe_process_charge(dict_csv, bank, reference, timestamp, amount, fee):
 				resvtn.update_record(Paid=(resvtn.Paid or 0) + amount, Charged = resvtn.Charged - amount, Checkout=None)
 				amount = 0
 	return amount	#if not zero will be stored as unallocated
-			
+
+#display Stripe Checkout form to enter new card credentials
 @action('stripe_update_card', method=['GET'])
 @action.uses("stripe_checkout.html", session)
 @checkaccess(None)
@@ -103,7 +104,8 @@ def stripe_update_card():
 	stripe_session_id = request.query.get('stripe_session_id')
 	stripe_pkey = STRIPE_PKEY
 	return locals()
-	
+
+#new card successfully registered using checkout
 @action('stripe_switched_card', method=['GET'])
 @action.uses("stripe_checkout.html", session, db, flash)
 @checkaccess(None)
@@ -114,34 +116,34 @@ def stripe_switched_card():
 	member = db.Members[session['member_id']]
 
 	stripe_session = stripe.checkout.Session.retrieve(session['stripe_session_id'], expand=['setup_intent'])
-	stripe.Customer.modify(member.Stripe_id,
+	stripe.Customer.modify(member.Pay_cust,
 				invoice_settings={'default_payment_method': stripe_session.setup_intent.payment_method})
-	stripe.Subscription.modify(member.Stripe_subscription,
+	stripe.Subscription.modify(member.Pay_subs,
 				default_payment_method=stripe_session.setup_intent.payment_method)
 	flash.set('Thank you for updating your credit card information!')
 	notify_support(member, 'Credit Card Update', 'Credit card updated.')
-	redirect(URL('update_card'))
+	redirect(URL('stripe_view_card'))
 
-@action('update_card', method=['GET', 'POST'])
+@action('stripe_view_card', method=['GET', 'POST'])
 @action.uses("gridform.html", db, session, flash)
 @checkaccess(None)
-def update_card():
+def stripe_view_card():
 	access = session['access']	#for layout.html
 
 	if not session.get('member_id'):
 		redirect(URL('index'))
 	member = db.Members[session['member_id']]
 	
-	if member.Stripe_subscription and member.Stripe_subscription!='Cancelled':
+	if member.Pay_subs and member.Pay_subs!='Cancelled':
 		try:	#check subscription still exists on Stripe
-			subscription = stripe.Subscription.retrieve(member.Stripe_subscription)
+			subscription = stripe.Subscription.retrieve(member.Pay_subs)
 		except Exception as e:
-			member.update_record(Stripe_subscription=None, Stripe_next=None)
-	if not (member.Stripe_subscription and member.Stripe_subscription!='Cancelled'):
+			member.update_record(Pay_subs=None, Pay_next=None)
+	if not (member.Pay_subs and member.Pay_subs!='Cancelled'):
 		redirect(URL('index'))	#Stripe subscription doesn't exist
 		
 	paymentmethod = stripe.PaymentMethod.retrieve(subscription.default_payment_method)
-	renewaldate = member.Stripe_next.strftime('%b %d, %Y')
+	renewaldate = member.Pay_next.strftime('%b %d, %Y')
 	duesamount = decimal.Decimal(subscription.plan.amount)/100
 	header = CAT(H5('Membership Subscription'),
 	      XML(f"Your next renewal payment of ${duesamount} will be charged to {paymentmethod.card.brand.capitalize()} \
@@ -153,7 +155,7 @@ def update_card():
 		stripe_session = stripe.checkout.Session.create(
 		  payment_method_types=['card'],
 		  mode='setup',
-		  customer=member.Stripe_id,
+		  customer=member.Pay_cust,
 		  setup_intent_data={},
 		  success_url=URL('stripe_switched_card', scheme=True),
 		  cancel_url=URL('index', scheme=True)
@@ -162,12 +164,31 @@ def update_card():
 		redirect(URL('stripe_update_card', vars=dict(stripe_session_id=stripe_session.id)))
 	return locals()
 
-def stripe_cancel_subscription(subscription):
-	if subscription:	#delete Stripe subscription if applicable
+def stripe_cancel_subscription(member):
+	if member.Pay_subs:	#delete Stripe subscription if applicable
 		try:
-			stripe.Subscription.delete(subscription)
+			stripe.Subscription.delete(member.Pay_subs)
 		except Exception as e:
 			pass
+	return False
+
+#daily maintence for subscriptions
+def stripe_subscription_maintenance(member):	#return True if subscription no longer current
+	product = stripe.Product.retrieve(eval(f"STRIPE_PROD_{member.Membership.upper()}"))
+	if member.Pay_subs:	#delete Stripe subscription if applicable
+		try:
+			subscription = stripe.Subscription.retrieve(member.Pay_subs)
+
+			if subscription.plan.id!=product.default_price:
+				#dues payment to change with next renewal but not retroactively
+				stripe.SubscriptionItem.modify(subscription['items'].data[0].id, price=product.default_price, proration_behavior='none')
+
+			if not subscription.canceled_at:
+				return False		#canceled_at set when last payment 	attempt fails
+			#note after auto-pay fails and cancels the subsription, it can no longer be deleted from Stripe
+		except Exception as e:
+			pass
+	return True		#can't retrieve subscription
 
 @action('stripe_checkout', method=['GET'])
 @action.uses("stripe_checkout.html", db, session, flash)
@@ -176,36 +197,34 @@ def stripe_checkout():
 	access = session['access']	#for layout.html
 	if (not session.get('membership') and not session.get('event_id')) or not session.get('member_id'):
 		redirect(URL('index'))	#protect against regurgitated old requests
-		
-	pk = STRIPE_PKEY	#use the public key on the client side	
 
 	member = db.Members[session.get('member_id')]
-	if member.Stripe_id:	#check customer still exists on Stripe
+	if member.Pay_cust:	#check customer still exists on Stripe
 		try:
-			customer = stripe.Customer.retrieve(member.Stripe_id)
+			customer = stripe.Customer.retrieve(member.Pay_cust)
 		except Exception as e:
-			member.update_record(Stripe_id=None, Stripe_subscription=None)
+			member.update_record(Pay_cust=None, Pay_subs=None, Pay_source=None)
 	
 	mode = 'payment'
 	items = []
 	params = dict(member_id=member.id)	#for checkout_success
 	event = None
 	
-	if member.Stripe_id:
-		stripe.Customer.modify(member.Stripe_id, email=primary_email(member.id))	#in case has changed
+	if member.Pay_cust:
+		stripe.Customer.modify(member.Pay_cust, email=primary_email(member.id))	#in case has changed
 	else:
 		customer = stripe.Customer.create(email=primary_email(member.id))
-		member.update_record(Stripe_id=customer.id)
+		member.update_record(Pay_cust=customer.id, Pay_source='stripe')
 	
 	if session.get('membership'):	#this includes a membership subscription
 		#get the subscription plan id (Full membership) or 1-year price (Student) from Stripe Products
-		price_id = eval(f"STRIPE_{session.get('membership')}".upper())
-		price = stripe.Price.retrieve(price_id)
+		product = stripe.Product.retrieve(eval(f"STRIPE_PROD_{session.get('membership').upper()}"))
+		price = stripe.Price.retrieve(product.default_price)
 		params['dues'] = session.get('dues')
 		params['membership'] = session.get('membership')
 		if price.recurring:
 			mode = 'subscription'
-		items.append(dict(price = price_id, quantity = 1))
+		items.append(dict(price = product.default_price, quantity = 1))
 		
 	if session.get('event_id'):			#event registration
 		event = db.Events[session.get('event_id')]
@@ -217,7 +236,7 @@ def stripe_checkout():
 						product=STRIPE_EVENT), description = event.Description, quantity=1))
 		 
 	stripe_session = stripe.checkout.Session.create(
-	  customer=member.Stripe_id,
+	  customer=member.Pay_cust,
 	  payment_method_types=['card'], line_items=items, mode=mode,
 	  success_url=URL('stripe_checkout_success', vars=params, scheme=True),
 	  cancel_url=session.get('url_prev')
@@ -249,7 +268,7 @@ def stripe_checkout_success():
 			subscription = stripe.Subscription.retrieve(stripe_session.subscription)
 			next = datetime.datetime.fromtimestamp(subscription.current_period_end).date()
 		member.update_record(Membership=request.query.get('membership'),
-			Stripe_subscription=stripe_session.subscription, Stripe_next=next, Charged=dues)
+			Pay_subs=stripe_session.subscription, Pay_next=next, Charged=dues)
 		message += 'Thank you, your membership is now current.</b><br>'
 		
 	if tickets_tbc>0:

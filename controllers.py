@@ -831,14 +831,14 @@ def migrate_tickets():
 	access = session['access']	#for layout.html
 
 	for t in db(db.tickets.id>0).select():
-		db.Tickets.insert(Event=t.event, Ticket=t.ticket, Short_name=t.short_name, Price=t.price,
+		db.Event_Tickets.insert(Event=t.event, Ticket=t.ticket, Short_name=t.short_name, Price=t.price,
 				Count=t.count, Qualify=t.qualify, Allow_as_guest=t.allow_as_guest)
 
 	for s in db(db.selections.id>0).select():
-		db.Selections.insert(Event=s.event, Selection=s.selection, Short_name=s.short_name)
+		db.Event_Selections.insert(Event=s.event, Selection=s.selection, Short_name=s.short_name)
 
 	for i in db(db.survey.id>0).select():
-		db.Survey.insert(Event=i.event, Item=i.item)
+		db.Event_Survey.insert(Event=i.event, Item=i.item)
 	return locals()
 
 @action('event_analytics', method=['GET'])

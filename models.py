@@ -195,7 +195,7 @@ db.define_table('tickets',
 	   comment="clear if ticket can't apply to a guest")
 )
 
-db.define_table('Tickets',
+db.define_table('Event_Tickets',
 	Field('Event', 'reference Events', writable=False),
 	Field('Ticket', requires=IS_NOT_EMPTY(),
 	   comment="can specify membership, e.g. full/student/non-member"),
@@ -219,7 +219,7 @@ db.define_table('selections',
 	Field('short_name', requires=IS_NOT_EMPTY(), comment="for doorlist")
 )
 
-db.define_table('Selections',
+db.define_table('Event_Selections',
 	Field('Event', 'reference Events', writable=False),
 	Field('Selection', requires=IS_NOT_EMPTY(), comment="for form dropdown"),
 	Field('Short_name', requires=IS_NOT_EMPTY(), comment="for doorlist")
@@ -235,7 +235,7 @@ db.define_table('survey',
 	   comment="first is question, remainder answer choices"),
 )
 
-db.define_table('Survey',
+db.define_table('Event_Survey',
 	Field('Event', 'reference Events', writable=False),
 	Field('Item', requires=IS_NOT_EMPTY(),
 	   comment="first is question, remainder answer choices"),

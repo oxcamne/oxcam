@@ -86,9 +86,6 @@ db.define_table('Members',
 	Field('Pay_cust'),	#Customer id on payment system
 	Field('Pay_subs'),	#Subscription id or 'Cancelled'
 	Field('Pay_next', 'date'),	#Next subscription payment date
-	Field('Stripe_id', 'string', readable=False, writable=False),	#obselete
-	Field('Stripe_subscription', 'string', readable=False, writable=False),	#obselete
-	Field('Stripe_next', 'date', readable=False, writable=False),	#obsolete
 	Field('Charged', 'decimal(6,2)'),	#initial payment made, not yet downloaded from Stripe
 	Field('Privacy', 'boolean', default=False, comment=' Exclude email address from member directory'),
 	Field('Access', 'string', requires = IS_EMPTY_OR(IS_IN_SET(ACCESS_LEVELS)), comment=' Set for advisory committee'),
@@ -181,20 +178,6 @@ def tickets_sold(event_id, ticket, member_id=None):
 		   	((db.Reservations.Provisional==False)|(db.Reservations.Member==member_id))&\
 			(db.Reservations.Waitlist==False)).count()
 
-db.define_table('tickets',
-	Field('event', 'reference Events', writable=False),
-	Field('ticket', requires=IS_NOT_EMPTY(),
-	   comment="can specify membership, e.g. full/student/non-member"),
-	Field('short_name', comment="short name for doorlist"),	#short name for use in doorlist
-	Field('price', 'decimal(5,2)', requires=IS_DECIMAL_IN_RANGE(0)),
-	Field('count', 'integer', requires=IS_EMPTY_OR(IS_INT_IN_RANGE(0)),
-	   comment="to limit number of tickets at this price"),
-	Field('qualify',
-	   comment="use if qualification required in notes"),
-	Field('allow_as_guest', 'boolean', default=True,
-	   comment="clear if ticket can't apply to a guest")
-)
-
 db.define_table('Event_Tickets',
 	Field('Event', 'reference Events', writable=False),
 	Field('Ticket', requires=IS_NOT_EMPTY(),
@@ -213,12 +196,6 @@ def selections_made(event_id, selection):
 	return db((db.Reservations.Event==event_id)&(db.Reservations.Selection==selection)&\
 		   	(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).count()
 
-db.define_table('selections',
-	Field('event', 'reference Events', writable=False),
-	Field('selection', requires=IS_NOT_EMPTY(), comment="for form dropdown"),
-	Field('short_name', requires=IS_NOT_EMPTY(), comment="for doorlist")
-)
-
 db.define_table('Event_Selections',
 	Field('Event', 'reference Events', writable=False),
 	Field('Selection', requires=IS_NOT_EMPTY(), comment="for form dropdown"),
@@ -228,12 +205,6 @@ db.define_table('Event_Selections',
 def survey_choices(event_id, choice):
 	return db((db.Reservations.Event==event_id)&(db.Reservations.Survey==choice)&\
 		   	(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).count()
-
-db.define_table('survey',
-	Field('event', 'reference Events', writable=False),
-	Field('item', requires=IS_NOT_EMPTY(),
-	   comment="first is question, remainder answer choices"),
-)
 
 db.define_table('Event_Survey',
 	Field('Event', 'reference Events', writable=False),
@@ -326,16 +297,16 @@ db.define_table('EMProtos',
 	Field('Modified', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None),
        			update=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False))
 
-db.define_table('emailqueue',	#used for notices or messages targetted via membership database
-	Field('subject'),
-	Field('body', 'text'),			#unexpanded body
-	Field('attachment', 'blob'),	#pickled Mailer.Attachment
-	Field('sender'),
-	Field('bcc'),
-	Field('query', 'text'),	#query used to locate targets
-	Field('left'),	#goes with query
-	Field('qdesc'),	#description of target list
-	Field('scheme'),	#base url 
+db.define_table('Email_Queue',	#used for notices or messages targetted via membership database
+	Field('Subject'),
+	Field('Body', 'text'),			#unexpanded body
+	Field('Attachment', 'blob'),	#pickled Mailer.Attachment
+	Field('Sender'),
+	Field('Bcc'),
+	Field('Query', 'text'),	#query used to locate targets
+	Field('Left'),	#goes with query
+	Field('Qdesc'),	#description of target list
+	Field('Scheme'),	#base url 
 	Field('Modified', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None),
        			update=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False))
 	

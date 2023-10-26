@@ -716,7 +716,7 @@ def tickets(event_id, path=None):
 	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/events-page/event-record/tickets-page?authuser=1"
 
 	event=db.Events[event_id]
-	db.tickets.event.default=event_id
+	db.Event_Tickets.Event.default=event_id
 
 	header = CAT(A('back', _href=session['url_prev']),
 	      		H5('Event Tickets'),
@@ -725,18 +725,18 @@ def tickets(event_id, path=None):
 
 	def validation(form):
 		if not form.vars.get('id'):	#new ticket type
-			if db((db.tickets.event==event_id)&(db.tickets.ticket==form.vars.get('ticket'))).count()>0:
+			if db((db.Event_Tickets.Event==event_id)&(db.Event_Tickets.Ticket==form.vars.get('ticket'))).count()>0:
 				form.errors['ticket']="ticket type already exists"
-			if db((db.tickets.event==event_id)&\
-		 		(db.tickets.short_name==form.vars.get('short_name'))).count()>0:
+			if db((db.Event_Tickets.Event==event_id)&\
+		 		(db.Event_Tickets.Short_name==form.vars.get('short_name'))).count()>0:
 				form.errors['short_name']="short_name already exists"
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
 
-	grid = Grid(path, db.tickets.event==event_id,
-			columns=[db.tickets.ticket, db.tickets.price, db.tickets.qualify, db.tickets.count,
-				Column('Sold', lambda t: tickets_sold(event_id, t.ticket))],
+	grid = Grid(path, db.Event_Tickets.Event==event_id,
+			columns=[db.Event_Tickets.Ticket, db.Event_Tickets.Price, db.Event_Tickets.Qualify, db.Event_Tickets.Count,
+				Column('Sold', lambda t: tickets_sold(event_id, t.Ticket))],
 			details=not write, create=write, editable=write, deletable=write,
 			validation=validation,
 			grid_class_style=grid_style,
@@ -756,7 +756,7 @@ def selections(event_id, path=None):
 	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/events-page/event-record/selections-page?authuser=1"
 
 	event=db.Events[event_id]
-	db.selections.event.default=event_id
+	db.Event_Selections.Event.default=event_id
 
 	header = CAT(A('back', _href=session['url_prev']),
 	      		H5('Event Selections'),
@@ -765,19 +765,19 @@ def selections(event_id, path=None):
 
 	def validation(form):
 		if not form.vars.get('id'):	#new selection
-			if db((db.selections.event==event_id)&\
-		 		(db.selections.selection==form.vars.get('selection'))).count()>0:
+			if db((db.Event_Selections.Event==event_id)&\
+		 		(db.Event_Selections.Selection==form.vars.get('selection'))).count()>0:
 				form.errors['selection']="selection already exists"
-			if db((db.selections.event==event_id)&\
-		 		(db.selections.short_name==form.vars.get('short_name'))).count()>0:
+			if db((db.Event_Selections.Event==event_id)&\
+		 		(db.Event_Selections.Short_name==form.vars.get('short_name'))).count()>0:
 				form.errors['short_name']="short_name already exists"
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
 
-	grid = Grid(path, db.selections.event==event_id,
-			columns=[db.selections.selection,
-				Column('selected', lambda t: selections_made(event_id, t.selection))],
+	grid = Grid(path, db.Event_Selections.Event==event_id,
+			columns=[db.Event_Selections.Selection,
+				Column('selected', lambda t: selections_made(event_id, t.Selection))],
 			details=not write, create=write, editable=write, deletable=write,
 			validation=validation,
 			grid_class_style=grid_style,
@@ -797,7 +797,7 @@ def survey(event_id, path=None):
 	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/events-page/event-record/survey-page?authuser=1"
 
 	event=db.Events[event_id]
-	db.survey.event.default=event_id
+	db.Event_Survey.Event.default=event_id
 
 	header = CAT(A('back', _href=session['url_prev']),
 	      		H5('Event Survey'),
@@ -806,39 +806,21 @@ def survey(event_id, path=None):
 
 	def validation(form):
 		if not form.vars.get('id'):	#new selection
-			if db((db.survey.event==event_id)&\
-		 		(db.survey.item==form.vars.get('item'))).count()>0:
+			if db((db.Event_Survey.Event==event_id)&\
+		 		(db.Event_Survey.Item==form.vars.get('item'))).count()>0:
 				form.errors['item']="survey item already exists"
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
 
-	grid = Grid(path, db.survey.event==event_id,
-			columns=[db.survey.item,
-				Column('chosen', lambda t: survey_choices(event_id, t.item) if survey_choices(event_id, t.item)>0 else '')],
+	grid = Grid(path, db.Event_Survey.Event==event_id,
+			columns=[db.Event_Survey.Item,
+				Column('chosen', lambda t: survey_choices(event_id, t.Item) if survey_choices(event_id, t.Item)>0 else '')],
 			details=not write, create=write, editable=write, deletable=write,
 			validation=validation,
 			grid_class_style=grid_style,
 			formstyle=form_style,
 			)
-	return locals()
-	
-@action('migrate_tickets', method=['GET'])
-@action.uses("gridform.html", db, session, flash)
-@checkaccess(None)
-def migrate_tickets():
-	header = "tickets, selections, survey all migrated"
-	access = session['access']	#for layout.html
-
-	for t in db(db.tickets.id>0).select():
-		db.Event_Tickets.insert(Event=t.event, Ticket=t.ticket, Short_name=t.short_name, Price=t.price,
-				Count=t.count, Qualify=t.qualify, Allow_as_guest=t.allow_as_guest)
-
-	for s in db(db.selections.id>0).select():
-		db.Event_Selections.insert(Event=s.event, Selection=s.selection, Short_name=s.short_name)
-
-	for i in db(db.survey.id>0).select():
-		db.Event_Survey.insert(Event=i.event, Item=i.item)
 	return locals()
 
 @action('event_analytics', method=['GET'])
@@ -967,18 +949,18 @@ def reservation(ismember, member_id, event_id, path=None):
 	event = db.Events[event_id]
 	all_guests = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)).select(orderby=~db.Reservations.Host)
 	host_reservation = all_guests.first()
-	tickets = db(db.tickets.event==event_id).select()
-	event_tickets = [t.ticket for t in tickets if \
-				(not t.count or tickets_sold(event_id, t.ticket, member_id)<t.count) and\
-				(not host_reservation or t.allow_as_guest==True)]
+	tickets = db(db.Event_Tickets.Event==event_id).select()
+	event_tickets = [t.Ticket for t in tickets if \
+				(not t.Count or tickets_sold(event_id, t.Ticket, member_id)<t.Count) and\
+				(not host_reservation or t.Allow_as_guest==True)]
 	tickets_available = {}
 	for t in tickets:
-		if t.count:
-			tickets_available[t.ticket] = t.count - tickets_sold(event_id, t.ticket)
-	selections = db(db.selections.event==event_id).select()
-	event_selections = [s.selection for s in selections]
-	survey = db(db.survey.event==event_id).select()
-	event_survey = [s.item for s in survey]
+		if t.Count:
+			tickets_available[t.Ticket] = t.Count - tickets_sold(event_id, t.Ticket)
+	selections = db(db.Event_Selections.Event==event_id).select()
+	event_selections = [s.Selection for s in selections]
+	survey = db(db.Event_Survey.Event==event_id).select()
+	event_survey = [s.Item for s in survey]
 	session['event_id'] = event_id
 	is_good_standing = member_good_standing(member, event.DateTime.date())
 	if is_good_standing:
@@ -994,8 +976,8 @@ def reservation(ismember, member_id, event_id, path=None):
 	confirmed = 0
 	for row in all_guests:
 		if row.Ticket:
-			t = tickets.find(lambda t: t.ticket==row.Ticket).first()
-			row.update_record(Unitcost=t.price, Modified=row.Modified)
+			t = tickets.find(lambda t: t.Ticket==row.Ticket).first()
+			row.update_record(Unitcost=t.Price, Modified=row.Modified)
 							#preserve Modified, else update changes it
 		if not row.Waitlist:
 			if row.Provisional:
@@ -1150,9 +1132,9 @@ Moving member on/off waitlist will also affect all guests."))
 		if form.vars.get('Waitlist') and form.vars.get('Provisional'):
 			form.errors['Waitlist'] = "Waitlist and Provisional should not both be set"
 		if ismember=='Y' and db.Reservations.Ticket.writable==True and form.vars.get('Ticket') != db.Reservations.Ticket.default:
-			t = tickets.find(lambda t: t.ticket==form.vars.get('Ticket')).first()
-			if t.qualify and (not form.vars.get('Notes') or form.vars.get('Notes').strip()==''):
-				form.errors['Notes']=t.qualify	#documentation required
+			t = tickets.find(lambda t: t.Ticket==form.vars.get('Ticket')).first()
+			if t.Qualify and (not form.vars.get('Notes') or form.vars.get('Notes').strip()==''):
+				form.errors['Notes']=t.Qualify	#documentation required
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
@@ -1227,10 +1209,10 @@ def doorlist_export(event_id):
 				orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname)
 				
 			for guest in guests:
-				selection = db((db.selections.event==event_id)&(db.selections.selection==guest.Selection)).select().first()
-				selection_short = selection.short_name if selection else guest.Selection or ''
-				ticket = db((db.tickets.event==event_id)&(db.tickets.ticket==guest.Ticket)).select().first()
-				ticket_short = ticket.short_name if ticket else guest.Ticket or ''
+				selection = db((db.Event_Selections.Event==event_id)&(db.Event_Selections.Selection==guest.Selection)).select().first()
+				selection_short = selection.Short_name if selection else guest.Selection or ''
+				ticket = db((db.Event_Tickets.Event==event_id)&(db.Event_Tickets.Ticket==guest.Ticket)).select().first()
+				ticket_short = ticket.Short_name if ticket else guest.Ticket or ''
 				writer.writerow([host.Reservations.Lastname, host.Reservations.Firstname, guest.Notes or '',
 									guest.Lastname, guest.Firstname, guest.Affiliation.Name if guest.Affiliation else '',
 									primary_matriculation(guest.Member) or '' if host.Reservations.id==guest.id else '',
@@ -1248,20 +1230,20 @@ def doorlist_export(event_id):
 @checkaccess('write')
 def event_copy(event_id):
 	event = db.Events[event_id]
-	tickets = db(db.tickets.event==event_id).select()
-	selections = db(db.selections.event==event_id).select()
-	survey = db(db.survey.event==event_id).select()
+	tickets = db(db.Event_Tickets.Event==event_id).select()
+	selections = db(db.Event_Selections.Event==event_id).select()
+	survey = db(db.Event_Survey.Event==event_id).select()
 	new_event_id = db.Events.insert(Page=event.Page, Description='Copy of '+event.Description, DateTime=event.DateTime,
 				Booking_Closed=event.Booking_Closed, Members_only=event.Members_only, Allow_join=event.Allow_join,
 				Guest=event.Guests, Sponsors=event.Sponsors, Venue=event.Venue, Capacity=event.Capacity,
 				Speaker=event.Speaker, Notes=event.Notes, Comment=event.Comment)
 	for t in tickets:
-		db.tickets.insert(event=new_event_id, ticket=t.ticket, price=t.price, count=t.count,
-					quality=t.qualify, allow_as_guest=t.allow_as_guest, short_name=t.short_name)
+		db.Event_Tickets.insert(Event=new_event_id, Ticket=t.Ticket, Price=t.Price, Count=t.Count,
+					Qualify=t.Qualify, Allow_as_guest=t.Allow_as_guest, Short_name=t.Short_name)
 	for s in selections:
-		db.selections.insert(event=new_event_id, selection=s.selection, short_name=s.short_name)
+		db.Event_Selections.insert(Event=new_event_id, Selection=s.Selection, Short_name=s.Short_name)
 	for s in survey:
-		db.survey.insert(event=new_event_id, item=s.item)
+		db.Event_Survey.insert(Event=new_event_id, Item=s.Item)
 	redirect(URL('events/select'))
 
 @action('events_export', method=['GET'])
@@ -1925,10 +1907,10 @@ def composemail():
 
 		if bodyparts:
 			if query:
-				db.emailqueue.insert(subject=form2.vars['subject'], body=form2.vars['body'], sender=sender,
-			 		attachment=pickle.dumps(attachment), 
-					bcc=bcc, query=query, left=left, qdesc=qdesc,
-					scheme=URL('index', scheme=True).replace('index', ''))
+				db.Email_Queue.insert(Subject=form2.vars['subject'], Body=form2.vars['body'], Sender=sender,
+			 		Attachment=pickle.dumps(attachment), 
+					Bcc=bcc, Query=query, Left=left, Qdesc=qdesc,
+					Scheme=URL('index', scheme=True).replace('index', ''))
 				flash.set(f"email notice sent to '{qdesc}'")
 			else:
 				to = re.compile('[^,;\s]+').findall(form2.vars['to'])

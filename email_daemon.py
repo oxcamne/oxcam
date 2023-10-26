@@ -52,19 +52,19 @@ def email_daemon():
 #			daily_maintenance_thread = Thread(target=daily_maintenance)
 #			daily_maintenance_thread.start()
 	
-		notice = db(db.emailqueue.id > 0).select().first()
+		notice = db(db.Email_Queue.id > 0).select().first()
 		if notice:
-			bodyparts = emailparse(notice.body, notice.subject, notice.query)
-			attachment = pickle.loads(notice.attachment) if notice.attachment else None
+			bodyparts = emailparse(notice.Body, notice.Subject, notice.Query)
+			attachment = pickle.loads(notice.Attachment) if notice.Attachment else None
 			select_fields = [db.Members.id]
-			if 'Reservations.Event' in notice.query:	#refers to Reservation
+			if 'Reservations.Event' in notice.Query:	#refers to Reservation
 				select_fields.append(db.Reservations.Event)
-			if 'Mailings.contains'in notice.query:		#using a mailing list
+			if 'Mailings.contains'in notice.Query:		#using a mailing list
 				select_fields.append(db.Emails.Email)
 				select_fields.append(db.Emails.id)
 				bodyparts.append((VISIT_WEBSITE_INSTRUCTIONS, None))
 				bodyparts.append((None, 'unsubscribe'))
-			rows = db(eval(notice.query)).select(*select_fields, left=eval(notice.left) if notice.left!='' else None, distinct=True)
+			rows = db(eval(notice.Query)).select(*select_fields, left=eval(notice.Left) if notice.Left!='' else None, distinct=True)
 			#because sending may take several minutes, for fairness send in random order
 			dispatch = random.sample(range(len(rows)), len(rows))
 			for i in dispatch:
@@ -86,12 +86,12 @@ def email_daemon():
 					elif part[1] == 'reservation':
 						body += event_confirm(row.get(db.Reservations.Event), member.id)
 					elif part[1] == 'unsubscribe':
-						body += markmin.markmin2html(f"\n\nThis message addressed to {notice.qdesc} [[unsubscribe {notice.scheme}{f'emails/Y/{member.id}/select'}]]")
+						body += markmin.markmin2html(f"\n\nThis message addressed to {notice.Qdesc} [[unsubscribe {notice.Scheme}{f'emails/Y/{member.id}/select'}]]")
 				retry_seconds = 2
 				while True:
 					try:
-						auth.sender.send(to=to, subject=notice.subject, sender=notice.sender, reply_to=notice.sender,
-		       				bcc=eval(notice.bcc) if notice.bcc else None, body=HTML(XML(body)), attachments=attachment)
+						auth.sender.send(to=to, subject=notice.Subject, sender=notice.Sender, reply_to=notice.Sender,
+		       				bcc=eval(notice.Bcc) if notice.Bcc else None, body=HTML(XML(body)), attachments=attachment)
 						break
 					except Exception as e:
 						if retry_seconds==14:
@@ -100,7 +100,7 @@ def email_daemon():
 						retry_seconds += 2
 						if retry_seconds==20:	#give up after about 3 minutes
 							raise RuntimeError("send failure") from e
-			db(db.emailqueue.id==notice.id).delete()
+			db(db.Email_Queue.id==notice.id).delete()
 			continue    #until queue empty
 		db.commit()
 		old_now = now

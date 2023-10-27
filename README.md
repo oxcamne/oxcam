@@ -24,4 +24,4 @@ Python 3.8+ must be installed.
 
 ## License
 
-This software is released under the [BSD-3-Clause License]()
+This software is released under the [BSD-3-Clause License](https://github.com/oxcamne-secretary/oxcam/tree/main#LICENSE)

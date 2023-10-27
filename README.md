@@ -19,9 +19,18 @@ comprehensive accounts.
 
 ## Prerequisites
 
-Python 3.8+ must be installed.
-[Py4web](https://py4web.com/_documentation) must also be installed.
+- Python 3.8+ must be installed
+- [Py4web](https://py4web.com/_documentation) must also be installed.
+- You will need to use the Py4web Dashboard for certain operations, so will need that password, set up
+during Py4web installation.
+- git must be installed; you will use it in a terminal session to 'pull' this software from the github repositary. (Git is preinstalled on PythonAnywhere)
 
 ## License
 
 This software is released under the [BSD-3-Clause License](LICENSE)
+
+## Installation
+
+To install OxCam once the prerequisites have been satisfied:
+
+1.

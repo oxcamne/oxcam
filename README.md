@@ -33,5 +33,8 @@ This software is released under the [BSD-3-Clause License](LICENSE)
 
 To install OxCam once the prerequisites have been satisfied:
 
-1. In a bash or other terminal session at the py4web 'apps' directory, issue the command
-`git clone https://github.com/oxcamne-secretary/oxcam.git`
+In a bash or other terminal session at the py4web 'apps' directory, issue the command<br>
+
+```git clone https://github.com/oxcamne-secretary/oxcam.git```
+
+

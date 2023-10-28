@@ -37,4 +37,5 @@ In a bash or other terminal session at the py4web 'apps' directory, issue the co
 
 ```git clone https://github.com/oxcamne-secretary/oxcam.git```
 
-
+This clones the software into a new directory apps/oxcam. You next need to create a 'settings_private.py' in apps/oxcam.
+The kit just cloned contains a template 'settings_private_template.py'

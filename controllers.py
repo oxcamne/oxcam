@@ -1722,7 +1722,7 @@ def bank_file(bank_id):
 			else:	#try to identify charges
 				try:
 					amount = eval(f"{bank.Name.lower()}_process_charge(row, bank, reference, timestamp, amount, fee)")
-					if amount<=0:
+					if amount==0:
 						continue
 				except Exception as e:
 					pass	#if fails, leave unallocated

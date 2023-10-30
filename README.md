@@ -23,7 +23,7 @@ comprehensive accounts.
 - [Py4web](https://py4web.com/_documentation) must also be installed.
 - You will need to use the Py4web Dashboard for certain operations, so will need that password, set up
 during Py4web installation.
-- git must be installed; you will use it in a terminal session to 'pull' this software from the github repositary. (Git is preinstalled on PythonAnywhere)
+- git must be installed; you will use it in a terminal session to clone this software from the github repositary, and to pull future updates. (Git is preinstalled on PythonAnywhere)
 
 ## License
 

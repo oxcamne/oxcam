@@ -3,7 +3,7 @@
 ## Introduction
 
 OxCam is a web based database app designed to support Oxford and/or Cambridge Alumni groups and Societies.
-It can be deployed on low cost cloud services such as PythonAnywhere or Linode (Akamai) at a cost ~$5/month.
+It can be deployed on low cost cloud services such as PythonAnywhere or Linode (Akamai) at very low cost.
 
 At it's simplest it can be used to maintain a mailing list and send out notices.
 

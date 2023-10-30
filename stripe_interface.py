@@ -93,7 +93,7 @@ def stripe_process_charge(dict_csv, bank, reference, timestamp, amount, fee):
 					Timestamp = timestamp, Event = resvtn.Event, Reference = reference, Accrual = False, Notes = notes)
 				resvtn.update_record(Paid=(resvtn.Paid or 0) + amount, Charged = resvtn.Charged - amount, Checkout=None)
 				amount = 0
-	return amount	#if not zero will be stored as unallocated
+	return (amount, notes)	#if amount not zero will be stored as unallocated
 
 #display Stripe Checkout form to enter new card credentials
 @action('stripe_update_card', method=['GET'])

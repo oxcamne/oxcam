@@ -1721,9 +1721,10 @@ def bank_file(bank_id):
 					continue	#on to next transaction
 			else:	#try to identify charges
 				try:
-					amount = eval(f"{bank.Name.lower()}_process_charge(row, bank, reference, timestamp, amount, fee)")
+					amount, details = eval(f"{bank.Name.lower()}_process_charge(row, bank, reference, timestamp, amount, fee)")
 					if amount==0:
 						continue
+					notes = f"{details} {notes}"
 				except Exception as e:
 					pass	#if fails, leave unallocated
 				

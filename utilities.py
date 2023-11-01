@@ -12,7 +12,7 @@ import datetime, re, markmin
 #check if member is in good standing at a particular date
 def member_good_standing(member, date=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()):
 	return member and member.Membership and ((not member.Paiddate or member.Paiddate>=date)\
-			or member.Charged or (member.Stripe_subscription and member.Stripe_subscription != 'Cancelled'))
+			or member.Charged or (member.Pay_subs and member.Pay_subs != 'Cancelled'))
 
 def ageband(year, matr):
 	if matr:

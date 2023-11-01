@@ -35,7 +35,7 @@ from yatl.helpers import H5, H6, XML, HTML, TABLE, TH, TD, THEAD, TR
 from .common import db, session, auth, flash
 from .settings import SOCIETY_DOMAIN, SUPPORT_EMAIL, GRACE_PERIOD,\
 	SOCIETY_NAME, MEMBERSHIP, MEMBER_CATEGORIES, MAIL_LISTS, TIME_ZONE,\
-	PAYMENT_PROCESSOR
+	PAYMENT_PROCESSOR, PAGE_BANNER, HOME_URL
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
 	primary_matriculation, dues_type, event_revenue, event_unpaid, res_tbc, res_status,\
@@ -54,30 +54,32 @@ import datetime, re, markmin, csv, decimal, io, pickle
 from io import StringIO
 from py4web.utils.mailer import Mailer
 
+preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL))
+
 @action('index')
-@action.uses('message.html', db, session, flash)
+@preferred
 @checkaccess(None)
 def index():
-	message = H6("Please select one of the following:")
+	header = H6("Please select one of the following:")
 	member = db.Members[session['member_id']] if session.get('member_id') else None
 	access = session['access']	#for layout.html
 
 	if not member or not member_good_standing(member, (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)+datetime.timedelta(days=GRACE_PERIOD)).date()):
-		message = CAT(message, A("Join or Renew your Membership", _href=URL('registration')), XML('<br>'))
+		header = CAT(header, A("Join or Renew your Membership", _href=URL('registration')), XML('<br>'))
 	else:
-		message = CAT(message, A("Update your member profile or contact information", _href=URL('registration')), XML('<br>'))
+		header = CAT(header, A("Update your member profile or contact information", _href=URL('registration')), XML('<br>'))
 
 	if member:
-		message = CAT(message, A("Update your email address and/or mailing list subscriptions", _href=URL(f"emails/Y/{session.get('member_id')}")), XML('<br>'))
+		header = CAT(header, A("Update your email address and/or mailing list subscriptions", _href=URL(f"emails/Y/{session.get('member_id')}")), XML('<br>'))
 	else:
-		message = CAT(message, A("Join our mailing list(s)", _href=URL("registration", vars=dict(mail_lists='Y'))), XML('<br>'))
+		header = CAT(header, A("Join our mailing list(s)", _href=URL("registration", vars=dict(mail_lists='Y'))), XML('<br>'))
 
 	if member and member.Pay_subs!='Cancelled' and member_good_standing(member, (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)-datetime.timedelta(days=45)).date()):
 		if member.Pay_subs:
-			message = CAT(message, A("View membership subscription/Update credit card", _href=URL(f'{member.Pay_source}_view_card')), XML('<br>'))
-		message = CAT(message, A("Cancel your membership", _href=URL('cancel_subscription')), XML('<br>'))
+			header = CAT(header, A("View membership subscription/Update credit card", _href=URL(f'{member.Pay_source}_view_card')), XML('<br>'))
+		header = CAT(header, A("Cancel your membership", _href=URL('cancel_subscription')), XML('<br>'))
 
-	message = CAT(message, XML('<br>'),
+	header = CAT(header, XML('<br>'),
 	       H6(XML(f"To register for events use links below or visit {A(f'www.{SOCIETY_DOMAIN}.org', _href=f'https://www.{SOCIETY_DOMAIN}.org')}:")),
 	       XML('<br>'))
 	events = db(db.Events.DateTime>=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)).select(orderby = db.Events.DateTime)
@@ -89,13 +91,13 @@ def index():
 		elif event_wait(event.id) or (event.Capacity and (event_attend(event.id) or 0) >= event.Capacity):
 			waitlist = ' *Sold Out, waitlisting*'
 		pass
-		message = CAT(message, event.DateTime.strftime('%A, %B %d '), 
+		header = CAT(header, event.DateTime.strftime('%A, %B %d '), 
 			A(f"{event.Description}", _href=URL(f'registration/{event.id}')), waitlist, XML('<br>'))
 	return locals()
 
 @action('members', method=['POST', 'GET'])
 @action('members/<path:path>', method=['POST', 'GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess('read')
 def members(path=None):
 	access = session['access']	#for layout.html
@@ -378,7 +380,7 @@ def member_analytics(path=None):
 
 @action('member_reservations/<member_id:int>', method=['POST', 'GET'])
 @action('member_reservations/<member_id:int>/<path:path>', method=['POST', 'GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess('read')
 def member_reservations(member_id, path=None):
 # .../member_reservations/member_id/...
@@ -407,7 +409,7 @@ def member_reservations(member_id, path=None):
 	return locals()
 	
 @action('add_member_reservation/<member_id:int>', method=['POST', 'GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess('write')
 def add_member_reservation(member_id):
 	access = session['access']	#for layout.html
@@ -427,7 +429,7 @@ def add_member_reservation(member_id):
 
 @action('affiliations/<ismember>/<member_id:int>', method=['POST', 'GET'])
 @action('affiliations/<ismember>/<member_id:int>/<path:path>', method=['POST', 'GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess(None)
 def affiliations(ismember, member_id, path=None):
 	access = session['access']	#for layout.html
@@ -468,7 +470,7 @@ is used on name badges etc."
 
 #switch user's primary email to newly validated email
 @action('switch_email', method=['GET'])
-@action.uses("gridform.html", session, db, flash)
+@preferred
 @checkaccess(None)
 def switch_email():
 	member_id = request.query.get('member_id')
@@ -484,7 +486,7 @@ def switch_email():
 
 @action('emails/<ismember>/<member_id:int>', method=['POST', 'GET'])
 @action('emails/<ismember>/<member_id:int>/<path:path>', method=['POST', 'GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess(None)
 def emails(ismember, member_id, path=None):
 	access = session['access']	#for layout.html
@@ -562,7 +564,7 @@ To change your mailing list subscritions, use the <b>Edit</b> button."))
 	
 @action('dues/<member_id:int>', method=['POST', 'GET'])
 @action('dues/<member_id:int>/<path:path>', method=['POST', 'GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess('read')
 def dues(member_id, path=None):
 # .../dues/member_id/...
@@ -602,7 +604,7 @@ def dues(member_id, path=None):
 	
 @action('dues_payments', method=['GET'])
 @action('dues_payments/<path:path>', method=['GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess('read')
 def dues_payments(path=None):
 	access = session['access']	#for layout.html
@@ -649,7 +651,7 @@ def dues_export():
 	
 @action('events', method=['POST', 'GET'])
 @action('events/<path:path>', method=['POST', 'GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess('read')
 def events(path=None):
 	access = session['access']	#for layout.html
@@ -706,7 +708,7 @@ def events(path=None):
 	
 @action('tickets/<event_id:int>', method=['POST', 'GET'])
 @action('tickets/<event_id:int>/<path:path>', method=['POST', 'GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess('read')
 def tickets(event_id, path=None):
 # .../tickets/event_id/...
@@ -746,7 +748,7 @@ def tickets(event_id, path=None):
 	
 @action('selections/<event_id:int>', method=['POST', 'GET'])
 @action('selections/<event_id:int>/<path:path>', method=['POST', 'GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess('read')
 def selections(event_id, path=None):
 # .../selections/event_id/...
@@ -787,7 +789,7 @@ def selections(event_id, path=None):
 	
 @action('survey/<event_id:int>', method=['POST', 'GET'])
 @action('survey/<event_id:int>/<path:path>', method=['POST', 'GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess('read')
 def survey(event_id, path=None):
 # .../survey/event_id/...
@@ -868,7 +870,7 @@ def event_analytics():
 		
 @action('event_reservations/<event_id:int>', method=['POST', 'GET'])
 @action('event_reservations/<event_id:int>/<path:path>', method=['POST', 'GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess('read')
 def event_reservations(event_id, path=None):
 # ...event_reservatins/event_id/...
@@ -924,7 +926,7 @@ select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 	
 @action('reservation/<ismember>/<member_id:int>/<event_id:int>', method=['POST', 'GET'])
 @action('reservation/<ismember>/<member_id:int>/<event_id:int>/<path:path>', method=['POST', 'GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess(None)
 def reservation(ismember, member_id, event_id, path=None):
 #this controller is for dealing with the addition/modification of an expanded reservation
@@ -1226,7 +1228,7 @@ def doorlist_export(event_id):
 	return locals()
 	
 @action('event_copy/<event_id:int>', method=['GET'])
-@action.uses(db, session, flash)
+@preferred
 @checkaccess('write')
 def event_copy(event_id):
 	event = db.Events[event_id]
@@ -1268,7 +1270,7 @@ def events_export():
 	return locals()
 	
 @action('get_date_range', method=['POST', 'GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess('read')
 def get_date_range():
 # vars:	function: controller to be given the date range
@@ -1302,7 +1304,7 @@ def get_date_range():
 	return locals()
 
 @action('financial_detail/<event:int>', method=['GET'])
-@action.uses("message.html", db, session, flash)
+@preferred
 @checkaccess('accounting')
 def financial_detail(event, title=''):
 	access = session['access']	#for layout.html
@@ -1313,12 +1315,12 @@ def financial_detail(event, title=''):
 		session['back'].append(session['url_prev'])
 	session['url_prev'] = None #no longer needed, save cookie space
 
-	message = CAT(A('back', _href=session['back'][-1]), H5(f'{title}'),
+	header = CAT(A('back', _href=session['back'][-1]), H5(f'{title}'),
 			financial_content(event if event!=0 else None, request.query.get('query'), request.query.get('left')))
 	return locals()
 	
 @action('financial_statement', method=['GET'])
-@action.uses("message.html", db, session, flash)
+@preferred
 @checkaccess('accounting')
 def financial_statement():
 	access = session['access']	#for layout.html
@@ -1333,7 +1335,7 @@ def financial_statement():
 	if not start or not end:
 		redirect(URL('get_date_range', vars=dict(function='financial_statement',title='Financial Statement')))
 		
-	message = CAT(H5(title), H6('Assets'))
+	header = CAT(H5(title), H6('Assets'))
 	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/accounts/financial-statement?authuser=1"
 
 	sumamt = db.AccTrans.Amount.sum()
@@ -1385,7 +1387,7 @@ def financial_statement():
 			totals[0] += assets[a][0][0]
 			totals[1] += assets[a][1][0]
 	rows.append(THEAD(TR(TH('Total'), tdnum(totals[0], th=True), tdnum(totals[1], th=True), tdnum(totals[1]-totals[0], th=True))))
-	message = CAT(message, TABLE(*rows))
+	header = CAT(header, TABLE(*rows))
 
 	rows = [THEAD(TR(TH('Description'), TH(f'{start}'), TH(f'{end}'), TH('Net Change'), TH('Notes')))]
 	ltotals = [0, 0]
@@ -1399,7 +1401,7 @@ def financial_statement():
 	rows.append(TR(TD('Reserve Fund'), tdnum(totals[0]-ltotals[0]), tdnum(totals[1]-ltotals[1]),
 					tdnum(totals[1]-totals[0]-ltotals[1]+ltotals[0]), TD('Uncommitted Funds')))
 	rows.append(THEAD(TR(TH('Total'), tdnum(totals[0], th=True), tdnum(totals[1], th=True), tdnum(totals[1]-totals[0], th=True))))
-	message = CAT(message, H6('\nLiabilities'), TABLE(*rows))
+	header = CAT(header, H6('\nLiabilities'), TABLE(*rows))
 	
 	transfer = db(db.CoA.Name=='Transfer').select().first().id	#ignoretransfertransactions
 	query = f"(((db.AccTrans.Event!=None)&(db.Events.DateTime>='{startdatetime}')&(db.Events.DateTime<'{enddatetime}'))|\
@@ -1430,11 +1432,11 @@ def financial_statement():
 		totexp += exp
 	rows.append(THEAD(TR(TH('Total'), TH(''), tdnum(totrev, th=True),
 		      tdnum(totexp, th=True), tdnum(totrev+totexp, th=True))))
-	message  = CAT(message, H6('\nAdmin & Event Cash Flow'), TABLE(*rows))
+	header  = CAT(header, H6('\nAdmin & Event Cash Flow'), TABLE(*rows))
 	return locals()
 	
 @action('tax_statement', method=['GET'])
-@action.uses("message.html", db, session, flash)
+@preferred
 @checkaccess('accounting')
 def tax_statement():
 	access = session['access']	#for layout.html
@@ -1450,7 +1452,7 @@ def tax_statement():
 	if not start or not end:
 		redirect(URL('get_date_range', vars=dict(function='financial_statement',title='Financial Statement')))
 		
-	message = CAT(H5(title), H6('Account Balances'))
+	header = CAT(H5(title), H6('Account Balances'))
 
 	sumamt = db.AccTrans.Amount.sum()
 	sumfee = db.AccTrans.Fee.sum()
@@ -1472,7 +1474,7 @@ def tax_statement():
 			totals[0] += assets[a][0][0]
 			totals[1] += assets[a][1][0]
 	rows.append(THEAD(TR(TH('Total'), tdnum(totals[0], th=True), tdnum(totals[1], th=True), tdnum(totals[1]-totals[0], th=True))))
-	message = CAT(message, TABLE(*rows))
+	header = CAT(header, TABLE(*rows))
 
 	tottkt = totspon = totrev = totexp = 0
 	allrev = allexp = 0
@@ -1517,14 +1519,14 @@ def tax_statement():
 	rows.append(THEAD(TR(TH('Totals'), tdnum(tottkt, th=True), tdnum(totspon, th=True), tdnum(totrev, th=True), tdnum(totexp, th=True))))
 	rows.append(THEAD(TR(TH('with Other Exp./Rev.'), TH(''), TH(''), tdnum(allrev, th=True), tdnum(allexp, th=True))))
 	rows.append(THEAD(TR(TH('Overall Net Revenue'), TH(''), TH(''), tdnum(allrev+allexp, th=True))))
-	message = CAT(message, H6('Events'), TABLE(*rows))
+	header = CAT(header, H6('Events'), TABLE(*rows))
 
-	message = CAT(message, financial_content(None, query, left))
+	header = CAT(header, financial_content(None, query, left))
 	return locals()
 		
 @action('accounting', method=['POST', 'GET'])
 @action('accounting/<path:path>', method=['POST', 'GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess('accounting')
 def accounting(path=None):
 	access = session['access']	#for layout.html
@@ -1568,7 +1570,7 @@ def accounting(path=None):
 	
 @action('bank_rules/<bank_id:int>', method=['POST', 'GET'])
 @action('bank_rules/<bank_id:int>/<path:path>', method=['POST', 'GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess('read')
 def bank_rules(bank_id, path=None):
 # .../bank_rules/bank_id/...
@@ -1600,7 +1602,7 @@ def bank_rules(bank_id, path=None):
 	return locals()
 
 @action('bank_file/<bank_id:int>', method=['POST', 'GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess('accounting')
 def bank_file(bank_id):
 #upload and process a csv file from a bank or payment processor
@@ -1743,7 +1745,7 @@ def bank_file(bank_id):
 
 @action('transactions', method=['POST', 'GET'])
 @action('transactions/<path:path>', method=['POST', 'GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess('accounting')
 def transactions(path=None):
 	access = session['access']	#for layout.html
@@ -1823,7 +1825,7 @@ def transactions(path=None):
 	return locals()
 
 @action('composemail', method=['POST', 'GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess('write')
 def composemail():
 	access = session['access']	#for layout.html
@@ -1950,7 +1952,7 @@ def bcc_export():
 #######################Member Directory linked from Society web site#########################
 @action('directory', method=['GET'])
 @action('directory/<path:path>', method=['GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess(None)
 def directory(path=None):
 	access = session['access']	#for layout.html
@@ -1978,7 +1980,7 @@ def directory(path=None):
 	return locals()
 	
 @action('contact_details/<member_id:int>', method=['GET'])
-@action.uses("message.html", db, session, flash)
+@preferred
 @checkaccess(None)
 def contact_details(member_id):
 	access = session['access']	#for layout.html
@@ -1986,30 +1988,30 @@ def contact_details(member_id):
 	if not member or not member.Membership:
 		raise Exception("hack attempt?")
 	
-	message = CAT(A('back', _href=session['url_prev']),
+	header = CAT(A('back', _href=session['url_prev']),
 				H5("Member Directory - Contact Details"),
 	       member_name(member_id), XML('<br>'),
 		   member_affiliations(member_id), XML('<br>'))
 	email = primary_email(member_id)
 	if not member.Privacy and email:
-		message = CAT(message, A(email, _href=f"mailto:{email}",_target='email'), XML('<br>'))
+		header = CAT(header, A(email, _href=f"mailto:{email}",_target='email'), XML('<br>'))
 	if member.Homephone:
-		message = CAT(message, f"home phone: {member.Homephone}", XML('<br>'))
+		header = CAT(header, f"home phone: {member.Homephone}", XML('<br>'))
 	if member.Workphone:
-		message = CAT(message, f"work phone: {member.Workphone}", XML('<br>'))
-	message = CAT(message, XML('<br>'))
+		header = CAT(header, f"work phone: {member.Workphone}", XML('<br>'))
+	header = CAT(header, XML('<br>'))
 
 	if member.Address1:
-		message = CAT(message, f"{member.Address1}", XML('<br>'))
+		header = CAT(header, f"{member.Address1}", XML('<br>'))
 	if member.Address2:
-		message = CAT(message, f"{member.Address2}", XML('<br>'))
-	message = CAT(message, f"{member.City or ''}, {member.State or ''} {member.Zip or ''}")
+		header = CAT(header, f"{member.Address2}", XML('<br>'))
+	header = CAT(header, f"{member.City or ''}, {member.State or ''} {member.Zip or ''}")
 	return locals()
 
 ################################# New Event/Membership Registration Process  ################################
 @action('registration', method=['GET', 'POST'])
 @action('registration/<event_id:int>', method=['GET', 'POST'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess(None)
 def registration(event_id=None):	#deal with eligibility, set up member record and affiliation record as necessary
 #used for both event booking and join/renewal
@@ -2193,7 +2195,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 	
 ######################################## Join/Renew/Profile Update ######################################
 @action('profile', method=['GET', 'POST'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess(None)
 def profile():
 	access = session['access']	#for layout.html
@@ -2249,7 +2251,7 @@ reached by using the join/renew link on our home page).<br>\
 	
 @action('cancel_subscription', method=['GET', 'POST'])
 @action('cancel_subscription/<member_id:int>', method=['POST', 'GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess(None)
 def cancel_subscription(member_id=None):
 	access = session['access']	#for layout.html

@@ -13,15 +13,19 @@ from .models import primary_email, member_name, res_tbc
 from .controllers import checkaccess, form_style
 from .utilities import notify_support, newpaiddate, msg_header, msg_send, event_confirm
 from py4web.utils.form import Form
-from .settings import STRIPE_SKEY, STRIPE_PKEY, SOCIETY_DOMAIN, STRIPE_EVENT, STRIPE_PROD_FULL, STRIPE_PROD_STUDENT
+from .settings import STRIPE_SKEY, STRIPE_PKEY, SOCIETY_DOMAIN, STRIPE_EVENT, \
+		STRIPE_PROD_FULL, STRIPE_PROD_STUDENT, PAGE_BANNER
 from yatl.helpers import H5, BEAUTIFY, CAT, XML
+from py4web.utils.factories import Inject
 import stripe, decimal, datetime
 
 stripe.api_key = STRIPE_SKEY
 
+preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER))
+
 # stripe_tool (diagnostic tool)
 @action('stripe_tool', method=['GET', 'POST'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess('accounting')
 def stripe_tool():
 	access = session['access']	#for layout.html
@@ -125,7 +129,7 @@ def stripe_switched_card():
 	redirect(URL('stripe_view_card'))
 
 @action('stripe_view_card', method=['GET', 'POST'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess(None)
 def stripe_view_card():
 	access = session['access']	#for layout.html
@@ -247,7 +251,7 @@ def stripe_checkout():
 	return locals()
 
 @action('stripe_checkout_success', method=['GET'])
-@action.uses("message.html", db, session, flash)
+@preferred
 @checkaccess(None)
 def stripe_checkout_success():
 	member = db.Members[session.get('member_id')]

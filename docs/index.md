@@ -4,6 +4,6 @@
 
 ## [page 2](page_2)
 
-[section 2](https://oxcamne.github.io/oxcam/page_2#section_2)
+embed a section link: [section 2](page_2#section_2) in some text.
 
 ![index](/images/index.png)

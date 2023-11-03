@@ -4,6 +4,6 @@
 
 ## [page 2](page_2)
 
-    [page_2](https://oxcamne.github.io/oxcam/page_2#section_2)
+    [section 2](https://oxcamne.github.io/oxcam/page_2#section_2)
 
 ![index](/images/index.png)

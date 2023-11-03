@@ -4,7 +4,7 @@ This file contains functions shared by multiple controllers
 from py4web import URL
 from .common import db, auth
 from .settings import TIME_ZONE, SUPPORT_EMAIL, LETTERHEAD, GRACE_PERIOD,\
-	DB_URL, SOCIETY_DOMAIN
+	DB_URL, SOCIETY_SHORT_NAME, PUBLIC_URL, SOCIETY_NAME
 from .models import primary_email, res_tbc, res_totalcost, res_status, member_name
 from yatl.helpers import A, TABLE, TH, THEAD, H6, TR, TD, CAT, HTML, XML
 import datetime, re, markmin
@@ -142,17 +142,17 @@ def emailparse(body, subject, query=None):
 				raise Exception(f"<{m.group(2)}> can't be used in this context")
 			func=m.group(2) #will be generated individually for each target later
 		#should be <name> where name is defined in settings_private, for example <letterhead>
-		elif m.group(2).lower() in ['letterhead', 'society_domain', 'society_name', 'home_url', 'support_email']:
+		elif m.group(2)=='letterhead':	#use template and insert subject
 			text = eval(m.group(2).upper()).replace('&lt;subject&gt;', subject)
-		else:
-			raise Exception(f"<{m.group(2)}> is not recognized")
+		else: #assume it an UPPER_CASE defined value from settings_private.py
+			text = eval(m.group(2).upper())
 		bodyparts = [(text, func)]
 		if m.group(1)!='':
 			bodyparts = emailparse(m.group(1), subject, query)+bodyparts
 		if m.group(3)!='':
 			bodyparts = bodyparts+emailparse(m.group(3), subject, query)
 		return bodyparts
-	return [(markmin.markmin2html(body), None)]
+	return [(body.replace('\r\n', '<br>'), None)]
 	
 #display member profile
 def member_profile(member):
@@ -233,7 +233,7 @@ def event_confirm(event_id, member_id, justpaid=0, event_only=False):
 
 def society_emails(member_id):
 	return [row['Email'] for row in db((db.Emails.Member == member_id) & \
-	   (db.Emails.Email.contains(SOCIETY_DOMAIN.lower()))).select(
+	   (db.Emails.Email.contains(SOCIETY_SHORT_NAME.lower()))).select(
 			db.Emails.Email, orderby=~db.Emails.Modified)]
 
 def member_greeting(member):

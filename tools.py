@@ -13,13 +13,16 @@ from .common import db, session, flash
 from .controllers import checkaccess, form_style
 from py4web.utils.form import Form, FormStyleDefault
 from py4web.utils.grid import Grid, GridClassStyle
-from .settings import SOCIETY_DOMAIN
+from .settings import SOCIETY_SHORT_NAME, PAGE_BANNER, HOME_URL
+from py4web.utils.factories import Inject
 import io
 from io import StringIO
 
+preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL))
+
 @action('db_tool', method=['POST', 'GET'])
 @action('db_tool/<path:path>', method=['POST', 'GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess('admin')
 def db_tool(path=None):
 	access = session['access']	#for layout.html
@@ -56,11 +59,11 @@ Use (...)&(...) for AND, (...)|(...) for OR, and ~(...) for NOT to build more co
 	return locals()
 
 @action("db_restore", method=['POST', 'GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 @checkaccess('admin')
 def db_restore():
 	access = session['access']	#for layout.html
-	header = f"Restore {SOCIETY_DOMAIN} database from backup file"
+	header = f"Restore {SOCIETY_SHORT_NAME} database from backup file"
 	
 	form = Form([Field('overwrite_existing_database', 'boolean',
 	       				default=True, comment='clear if new empty database'),
@@ -74,7 +77,7 @@ def db_restore():
 					for tablename in db.tables:	#clear out existing database
 						db(db[tablename]).delete()
 				db.import_from_csv_file(backup_file, id_map={} if form.vars.get('overwrite_existing_database') else None)   #, restore=True won't work in MySQL)
-				flash.set(f"{SOCIETY_DOMAIN} Database Restored from {form.vars.get('backup_file').raw_filename}")
+				flash.set(f"{SOCIETY_SHORT_NAME} Database Restored from {form.vars.get('backup_file').raw_filename}")
 				redirect('login')
 		except Exception as e:
 			flash.set(f"{str(e)}")
@@ -88,7 +91,7 @@ def db_backup():
 	access = session['access']	#for layout.html
 	stream = StringIO()
 	content_type = "text/csv"
-	filename = f'{SOCIETY_DOMAIN}_db_backup.csv'
+	filename = f'{SOCIETY_SHORT_NAME}_db_backup.csv'
 	db.export_to_csv_file(stream)
 	return locals()
 

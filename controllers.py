@@ -33,9 +33,9 @@ form_style = FormStyleBulma
 from py4web import action, request, response, redirect, URL, Field
 from yatl.helpers import H5, H6, XML, HTML, TABLE, TH, TD, THEAD, TR
 from .common import db, session, auth, flash
-from .settings import SOCIETY_DOMAIN, SUPPORT_EMAIL, GRACE_PERIOD,\
+from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
 	SOCIETY_NAME, MEMBERSHIP, MEMBER_CATEGORIES, MAIL_LISTS, TIME_ZONE,\
-	PAYMENT_PROCESSOR, PAGE_BANNER, HOME_URL
+	PAYMENT_PROCESSOR, PAGE_BANNER, HOME_URL, PUBLIC_URL
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
 	primary_matriculation, dues_type, event_revenue, event_unpaid, res_tbc, res_status,\
@@ -80,7 +80,7 @@ def index():
 		header = CAT(header, A("Cancel your membership", _href=URL('cancel_subscription')), XML('<br>'))
 
 	header = CAT(header, XML('<br>'),
-	       H6(XML(f"To register for events use links below or visit {A(f'www.{SOCIETY_DOMAIN}.org', _href=f'https://www.{SOCIETY_DOMAIN}.org')}:")),
+	       H6(XML(f"To register for events use links below or visit {A(PUBLIC_URL, _href=PUBLIC_URL)}:")),
 	       XML('<br>'))
 	events = db(db.Events.DateTime>=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)).select(orderby = db.Events.DateTime)
 	events = events.find(lambda e: e.Booking_Closed>=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) or event_attend(e.id))
@@ -1866,9 +1866,9 @@ def composemail():
    			requires=[IS_NOT_EMPTY(), IS_LIST_OF_EMAILS()]))
 	fields.append(Field('bcc', 'string', requires=IS_LIST_OF_EMAILS(), default=''))
 	fields.append(Field('subject', 'string', requires=IS_NOT_EMPTY(), default=proto.Subject if proto else ''))
-	fields.append(Field('body', 'text', requires=IS_NOT_EMPTY(), default=proto.Body if proto else "<Letterhead>\n<greeting>\n\n" if query else "<Letterhead>\n\n",
+	fields.append(Field('body', 'text', requires=IS_NOT_EMPTY(), default=proto.Body if proto else "<letterhead>\n<greeting>\n\n" if query else "<letterhead>\n\n",
 				comment=CAT("You can use placeholders <letterhead>, <subject>, <greeting>, <member>, <reservation>, <email>, ",
-				"<support_email>, <society_domain>, <society_name>, or <home_url>, depending on the context. ",
+				"<support_email>, <society_short_name>, <society_name>, or <public_url>, depending on the context. ",
 				"You can also include html content thus: {{content}}. Email is formatted using ",
 				A('Markmin', _href='http://www.web2py.com/examples/static/markmin.html', _target='Markmin'), '.')))
 	fields.append(Field('save', 'boolean', default=proto!=None, comment='store/update template'))
@@ -2080,7 +2080,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 				else 'Membership Application/Renewal: Your Information')
 	if event:
 		header = CAT(header, XML(f"Event: {event.Description}<br>When: {event.DateTime.strftime('%A %B %d, %Y %I:%M%p')}<br>Where: {event.Venue}<br><br>\
-	This event is open to {'all alumni of Oxford & Cambridge' if not event.Members_only else 'members of '+SOCIETY_DOMAIN}\
+	This event is open to {'all alumni of Oxford & Cambridge' if not event.Members_only else 'members of '+SOCIETY_SHORT_NAME}\
 	{' and members of sponsoring organizations (list at the top of the Affiliations dropdown)' if event.Sponsors else ''}\
 	{' and their guests.' if not event.Guests or event.Guests>1 else ''}.<br>"))
 	elif not request.query.get('mail_lists'):
@@ -2113,11 +2113,11 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 						default=member.Membership if member and member.Membership else '',
 						requires=IS_IN_SET(MEMBER_CATEGORIES, zero='please select your membership category')))
 		fields.append(Field('notes', 'string'))
-						
+
 	def validate(form):
 		if form.vars.get('affiliation') and not db.Colleges[form.vars.get('affiliation')].Oxbridge: #sponsor member
 			if form.vars.get('join_or_renew'):
-				form.errors['join_or_renew']="You're not eligible to join "+SOCIETY_DOMAIN+'!'
+				form.errors['join_or_renew']="You're not eligible to join "+SOCIETY_SHORT_NAME+'!'
 			return	#go ahead with sponsor registration
 		if not form.vars.get('affiliation') and not (member and member.Membership): #not alum, not approved friend member
 			form.errors['affiliation']='please select your affiliation from the dropdown, or contact '+SUPPORT_EMAIL

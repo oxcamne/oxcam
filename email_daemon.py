@@ -17,15 +17,18 @@ In development, it can be run using this configuration in launch.json:
         }
   
 IDEALLY:
-This would run in it's own thread as a daemon, started by __init__.py
+This runs in it's own thread as a daemon, started by __init__.py
 
-It would also spawns the daily maintenance and backup thread at midnight local time,
+It also spawns the daily maintenance and backup thread at midnight local time,
 in a separate thread
+
+NOTE PythonAnywhere doesn't support threading so this runs instead
+	as a scheduled daily task, which requires a paid account
 """
 import time, markmin, os, random, pickle, datetime
 from pathlib import Path
 from .common import db, auth,logger
-from .settings_private import VISIT_WEBSITE_INSTRUCTIONS, TIME_ZONE
+from .settings_private import VISIT_WEBSITE_INSTRUCTIONS, TIME_ZONE, THREAD_SUPPORT
 from .utilities import member_profile, event_confirm, member_greeting, emailparse
 from .models import primary_email
 from .daily_maintenance import daily_maintenance
@@ -43,14 +46,11 @@ def email_daemon():
 	while True:
 		now = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
 
-#	THIS IS DISABLED AS Pythonanywhere does not support threads
-#	instead we use PA's scheduled task
-#		if old_now and now.date()!=old_now.date(): # or\
-			# (not daily_maintenance_thread and now.strftime('%H:%M')=='11:03'):
-			#run the daily backup and maintenance job in its own thread
-#			from threading import Thread
-#			daily_maintenance_thread = Thread(target=daily_maintenance)
-#			daily_maintenance_thread.start()
+		if THREAD_SUPPORT:
+			if old_now and now.date()!=old_now.date():
+				from threading import Thread
+				daily_maintenance_thread = Thread(target=daily_maintenance, daemon=True)
+				daily_maintenance_thread.start()
 	
 		notice = db(db.Email_Queue.id > 0).select().first()
 		if notice:

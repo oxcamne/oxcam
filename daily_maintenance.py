@@ -22,7 +22,7 @@ import datetime
 import os
 from pathlib import Path
 from .common import db, auth, logger
-from .settings_private import SOCIETY_DOMAIN, STRIPE_SKEY, IS_PRODUCTION, SUPPORT_EMAIL,\
+from .settings_private import SOCIETY_SHORT_NAME, STRIPE_SKEY, IS_PRODUCTION, SUPPORT_EMAIL,\
 	LETTERHEAD, SOCIETY_NAME, DB_URL
 from .utilities import member_greeting
 from .stripe_interface import stripe_subscription_maintenance
@@ -39,7 +39,7 @@ def daily_maintenance():
 		if (i.endswith(dname) and (datetime.date.today().day != 1)) or i.endswith(yname):
 			os.remove(i)
 
-	file=open(f'{SOCIETY_DOMAIN}_backup_{datetime.date.today().strftime("%Y%m%d")}.csv',
+	file=open(f'{SOCIETY_SHORT_NAME}_backup_{datetime.date.today().strftime("%Y%m%d")}.csv',
 					'w', encoding='utf-8', newline='')
 	db.export_to_csv_file(file)
 

@@ -3,12 +3,15 @@ This file contains controllers used to manage the user's session
 """
 from py4web import URL, request, redirect, action, Field, response
 from .common import db, session, flash, logger, auth
-from .settings import SUPPORT_EMAIL, TIME_ZONE, LETTERHEAD, SOCIETY_DOMAIN
+from .settings import SUPPORT_EMAIL, TIME_ZONE, LETTERHEAD, SOCIETY_SHORT_NAME, PAGE_BANNER, HOME_URL
 from .models import ACCESS_LEVELS, member_name
 from yatl.helpers import A, H6, XML, P, HTML, DIV
 from py4web.utils.form import Form, FormStyleBulma
 from pydal.validators import IS_IN_SET, IS_NOT_EMPTY, IS_EMAIL
+from py4web.utils.factories import Inject
 import datetime, random
+
+preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL))
 
 """
 decorator for validating login & access permission using a one-time code
@@ -44,7 +47,7 @@ def checkaccess(requiredaccess):
 	return wrap
 
 @action('login', method=['POST', 'GET'])
-@action.uses("gridform.html", db, session, flash)
+@preferred
 def login():
 	user = db(db.users.remote_addr==request.remote_addr).select().first()
 	form = Form([Field('email', 'string',
@@ -63,7 +66,7 @@ you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _h
 
 #send email confirmation message
 @action('send_email_confirmation', method=['GET'])
-@action.uses("gridform.html", session, db)
+@preferred
 def send_email_confirmation():
 	access = None	#for layout.html
 	email = (request.query.get('email') or '').lower()
@@ -81,7 +84,7 @@ def send_email_confirmation():
 						email = email, when_issued = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))
 	link = URL('validate', user.id, token, scheme=True)
 	message = HTML(XML(f"{LETTERHEAD.replace('&lt;subject&gt;', ' ')}<br><br>\
-Please click {A(link, _href=link)} to continue to {SOCIETY_DOMAIN}.<br><br>\
+Please click {A(link, _href=link)} to continue to {SOCIETY_SHORT_NAME}.<br><br>\
 If the link doesn't work, please try copy & pasting it to your browser's address bar.<br><br>\
 If you are unable to login or have other questions, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}."))
 	auth.sender.send(to=email, subject='Please Confirm Email', body=message)
@@ -90,7 +93,7 @@ If you are unable to login or have other questions, please contact {A(SUPPORT_EM
 	return locals()
 
 @action('validate/<id:int>/<token:int>', method=['GET', 'POST'])
-@action.uses("gridform.html", db, session)
+@preferred
 def validate(id, token):
 	user = db(db.users.id == id).select().first()
 	if not user or not int(token) in user.tokens or \

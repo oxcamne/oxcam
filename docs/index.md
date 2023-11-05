@@ -1,9 +1,25 @@
 # Oxford/Cambridge Alumni Group Database
 
-## [page 1](https://oxcamne.github.io/oxcam/page_1)
+This database is accessed by alumni when registering for events, joining, renewing, or modifying any of their personal information or mailing list selections.
 
-## [page 2](page_2)
+The database includes:
 
-embed a section link: [section 2](page_2#section_2) in some text.
+- all member information (including current and past members, and mailing list subscribers)
+- event information
+- records of all membership dues payments
+- records of event registrations (since 2007)
+- accounting information (since late 2011)
+- the online payment mechanism (via Stripe)
+- email and notice capability (via Mailgun)
 
-![index](/images/index.png)
+Organizers are assigned different access rights depending on their need to modify the database. All have the ability to search/view member information, event registrations, etc.
+
+The landing page of the database application is reached, for example, at `https://oxcamne.pythonanywhere.com/oxcam` for the OxCamNE database hosted on PythonAnywhere. However to reach the index page as shown below, a user must login using their email address. Oxcam responds by sending an email with a link containing a one-time security code to verify the email address. Clicking that link opens the index page as shown below. Anyone with an email address can do this.
+
+![index](images/index.png)
+
+The page banner for the Society is followed by a menu bar. Both the menu bar and the content depend on the user identified by the email address.
+
+The **Home** button links to the home page of the Society's public web site, and is always shown. The **MyAccount** button always returns the user to this page, and the **Logout** button does what it says.
+
+The [**members**](members), **events**, **accounts**, and **help** buttons are shown only to organizers of the group who have been granted database access rights, and lead to the corresponding modules of the application.

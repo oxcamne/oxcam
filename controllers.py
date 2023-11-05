@@ -80,19 +80,20 @@ def index():
 		header = CAT(header, A("Cancel your membership", _href=URL('cancel_subscription')), XML('<br>'))
 
 	header = CAT(header, XML('<br>'),
-	       H6(XML(f"To register for events use links below or visit {A(PUBLIC_URL, _href=PUBLIC_URL)}:")),
+	       H6(XML(f"To register for events use links below:")),
 	       XML('<br>'))
 	events = db(db.Events.DateTime>=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)).select(orderby = db.Events.DateTime)
 	events = events.find(lambda e: e.Booking_Closed>=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) or event_attend(e.id))
 	for event in events:
-		waitlist = ''
+		waitlist = ' '
 		if event.Booking_Closed < datetime.datetime.now(TIME_ZONE).replace(tzinfo=None):
-			waitlist = ' *Booking Closed, waitlisting*'
+			waitlist = ' *Booking Closed, waitlisting* '
 		elif event_wait(event.id) or (event.Capacity and (event_attend(event.id) or 0) >= event.Capacity):
-			waitlist = ' *Sold Out, waitlisting*'
+			waitlist = ' *Sold Out, waitlisting* '
 		pass
-		header = CAT(header, event.DateTime.strftime('%A, %B %d '), 
-			A(f"{event.Description}", _href=URL(f'registration/{event.id}')), waitlist, XML('<br>'))
+		header = CAT(header, event.DateTime.strftime('%A, %B %d '), event.Description, waitlist,
+			A('register', _href=URL(f'registration/{event.id}')), ' or ',
+			A('see details', _href=event.Page), XML('<br>'))
 	return locals()
 
 @action('members', method=['POST', 'GET'])
@@ -204,7 +205,7 @@ def members(path=None):
 					query.append(f'db.Members.{field}.ilike("{value}")')
 					qdesc += f' {field} equals {value}.'
 				else:
-					query.append(f"(db.Members.{field}{operator}{value})")
+					query.append(f'(db.Members.{field}{operator}"{value}")')
 					qdesc += f' {field} {operator} {value}.'
 			elif fieldtype == 'date' or fieldtype == 'datetime':
 				try:
@@ -246,10 +247,10 @@ def members(path=None):
 	       XML("Use filter to select a mailing list or apply other filters.<br>Selecting an event selects \
 (or excludes from a mailing list) attendees.<br>You can filter on a member record field \
 using an optional operator (=, <, >, <=, >=) together with a value."))
-		footer = CAT(A("View recent Dues Payments", _href=URL('get_date_range',
+		footer = CAT(A("View Recent Dues Payments", _href=URL('get_date_range',
 				vars=dict(function='dues_payments', title="Dues Payments"))), XML('<br>'),
-			A("Export membership analytics as CSV file", _href=URL('member_analytics')), XML('<br>'),
-			A("Export selected records as CSV file", _href=URL('members_export',
+			A("Export Membership Analytics", _href=URL('member_analytics')), XML('<br>'),
+			A("Export Displayed Records", _href=URL('members_export',
 						vars=dict(query=query, left=left or '', qdesc=qdesc))))
 
 	def member_deletable(id): #deletable if not member, never paid dues or attended recorded event, or on mailing list
@@ -2283,7 +2284,7 @@ def cancel_subscription(member_id=None):
 			member.update_record(Membership=None, Charged=None)
 
 		effective = max(member.Paiddate or datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date(), datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()).strftime('%m/%d/%Y')
-		notification(member, 'Membership Cancelled', f'Your membership is cancelled effective {effective}.')
+		notification(member, 'Membership Cancelled', f'Your membership is cancelled effective {effective}.<br>Thank you for your past support of the Society.')
 		flash.set(f"{member_name(member.id) if member_id else 'your'} membership is cancelled effective {effective}.")
 		redirect(URL('members/select' if member_id else 'index'))
 	return locals()

@@ -26,4 +26,4 @@ The **Home** button links to the home page of the Society's public web site, and
 - *Directory* takes you to the member directory
 - *Logout* does what it says!
 
-The [**members**](members), [**events**,](events.md) **accounts**, and **help** buttons are shown only to organizers of the group who have been granted database access rights, and lead to the corresponding modules of the application.
+The [**members**](members), [**events**,](events.md) [**accounts**](accounts.md), and **help** buttons are shown only to organizers of the group who have been granted database access rights, and lead to the corresponding modules of the application.

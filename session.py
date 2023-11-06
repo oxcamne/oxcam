@@ -3,7 +3,7 @@ This file contains controllers used to manage the user's session
 """
 from py4web import URL, request, redirect, action, Field, response
 from .common import db, session, flash, logger, auth
-from .settings import SUPPORT_EMAIL, TIME_ZONE, LETTERHEAD, SOCIETY_SHORT_NAME, PAGE_BANNER, HOME_URL
+from .settings import SUPPORT_EMAIL, TIME_ZONE, LETTERHEAD, SOCIETY_SHORT_NAME, PAGE_BANNER, HOME_URL, HELP_URL
 from .models import ACCESS_LEVELS, member_name
 from yatl.helpers import A, H6, XML, P, HTML, DIV
 from py4web.utils.form import Form, FormStyleBulma
@@ -11,7 +11,7 @@ from pydal.validators import IS_IN_SET, IS_NOT_EMPTY, IS_EMAIL
 from py4web.utils.factories import Inject
 import datetime, random
 
-preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL))
+preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
 
 """
 decorator for validating login & access permission using a one-time code

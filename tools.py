@@ -13,12 +13,12 @@ from .common import db, session, flash
 from .controllers import checkaccess, form_style
 from py4web.utils.form import Form, FormStyleDefault
 from py4web.utils.grid import Grid, GridClassStyle
-from .settings import SOCIETY_SHORT_NAME, PAGE_BANNER, HOME_URL
+from .settings import SOCIETY_SHORT_NAME, PAGE_BANNER, HOME_URL, HELP_URL
 from py4web.utils.factories import Inject
 import io
 from io import StringIO
 
-preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL))
+preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
 
 @action('db_tool', method=['POST', 'GET'])
 @action('db_tool/<path:path>', method=['POST', 'GET'])

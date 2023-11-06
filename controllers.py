@@ -35,7 +35,7 @@ from yatl.helpers import H5, H6, XML, HTML, TABLE, TH, TD, THEAD, TR
 from .common import db, session, auth, flash
 from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
 	SOCIETY_NAME, MEMBERSHIP, MEMBER_CATEGORIES, MAIL_LISTS, TIME_ZONE,\
-	PAYMENT_PROCESSOR, PAGE_BANNER, HOME_URL, PUBLIC_URL
+	PAYMENT_PROCESSOR, PAGE_BANNER, HOME_URL, PUBLIC_URL, HELP_URL
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
 	primary_matriculation, dues_type, event_revenue, event_unpaid, res_tbc, res_status,\
@@ -54,7 +54,7 @@ import datetime, re, markmin, csv, decimal, io, pickle
 from io import StringIO
 from py4web.utils.mailer import Mailer
 
-preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL))
+preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
 
 @action('index')
 @preferred
@@ -1247,7 +1247,9 @@ def event_copy(event_id):
 		db.Event_Selections.insert(Event=new_event_id, Selection=s.Selection, Short_name=s.Short_name)
 	for s in survey:
 		db.Event_Survey.insert(Event=new_event_id, Item=s.Item)
-	redirect(URL('events/select'))
+
+	flash.set("Please customize the new event.")
+	redirect(URL(f'events/edit/{new_event_id}'))
 
 @action('events_export', method=['GET'])
 @action.uses("download.html", db, session, flash, Inject(response=response))

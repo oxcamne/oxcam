@@ -14,14 +14,14 @@ from .controllers import checkaccess, form_style
 from .utilities import notify_support, newpaiddate, msg_header, msg_send, event_confirm
 from py4web.utils.form import Form
 from .settings import STRIPE_SKEY, STRIPE_PKEY, STRIPE_EVENT, \
-		STRIPE_PROD_FULL, STRIPE_PROD_STUDENT, PAGE_BANNER, HOME_URL
+		STRIPE_PROD_FULL, STRIPE_PROD_STUDENT, PAGE_BANNER, HOME_URL, HELP_URL
 from yatl.helpers import H5, BEAUTIFY, CAT, XML
 from py4web.utils.factories import Inject
 import stripe, decimal, datetime
 
 stripe.api_key = STRIPE_SKEY
 
-preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL))
+preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
 
 # stripe_tool (diagnostic tool)
 @action('stripe_tool', method=['GET', 'POST'])

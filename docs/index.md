@@ -20,6 +20,10 @@ The landing page of the database application is reached, for example, at `https:
 
 The page banner for the Society is followed by a menu bar. Both the menu bar and the content depend on the user identified by the email address.
 
-The **Home** button links to the home page of the Society's public web site, and is always shown. The **MyAccount** button always returns the user to this page, and the **Logout** button does what it says.
+The **Home** button links to the home page of the Society's public web site, and is always shown. Hovering over **MyAccount** produces a dropdown menu:
 
-The [**members**](members), **events**, **accounts**, and **help** buttons are shown only to organizers of the group who have been granted database access rights, and lead to the corresponding modules of the application.
+- *MyAccount* returns from anywhere to this page
+- *Directory* takes you to the member directory
+- *Logout* does what it says!
+
+The [**members**](members), [**events**,](events.md) **accounts**, and **help** buttons are shown only to organizers of the group who have been granted database access rights, and lead to the corresponding modules of the application.

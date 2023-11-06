@@ -87,6 +87,7 @@ SOCIETY_NAME = 'Oxford & Cambridge Society of New England'
 SOCIETY_SHORT_NAME = 'OxCamNE'
 HOME_URL = 'https://sites.google.com/oxcamne.org/home/?authuser=1'
         #this version allows authorized users to edit
+HELP_URL = "https://sites.google.com/oxcamne.org/help-new/home?authuser=1"
 PUBLIC_URL = 'www.oxcamne.org'
         #domain service re-routes to sites.google
 SUPPORT_EMAIL = 'dgmanns@gmail.com'

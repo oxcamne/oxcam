@@ -1,8 +1,8 @@
 # Oxford/Cambridge Alumni Group Database
 
-## Members Page
+## Member Record
 
-This page is reached through the Edit button on a member row of the [Members Page](members). Note that organizers generally don't have to edit the member records - everything is normally gathered by the database directly from the members. At the top of the page:
+This page is reached through the Edit button on a member row of the [Members Page](members) or from a [member reservation](event_registration.md). Note that organizers generally don't have to edit the member records - everything is normally gathered by the database directly from the members. At the top of the page:
 
 ![top](images/member_record_top.png)
 

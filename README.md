@@ -16,13 +16,16 @@ comprehensive accounts.
 
 A group can choose how many of the above to implement and can expand it's use over time.
 
+The project includes an online [User Guide](https:oxcamne.github.io/oxcam).
+
 ## Prerequisites
 
-- Python 3.8+ must be installed
-- [Py4web](https://py4web.com/_documentation) must also be installed.
-- You will need to use the Py4web Dashboard for certain operations, so will need that password, set up
-during Py4web installation.
-- git must be installed; you will use it in a terminal session to clone this software from the github repositary, and to pull future updates. (Git is preinstalled on PythonAnywhere)
+This is a web app and these requirements apply to your chosen web server environment:
+
+- Python 3.8+ must be installed. The app has been developed and is currently running on Python 3.10.
+- [Py4web](https://py4web.com/_documentation) must also be installed. See the Py4web documentation for information on how to install it.
+- You will need to use the Py4web Dashboard for certain operations, so will need to use that password, which is set during Py4web installation.
+- git must be installed; you will use it in a terminal session to clone this software from the github repositary, and to pull future updates.
 
 ## License
 
@@ -59,39 +62,38 @@ DB_URI = "mysql://oxcamne:<--- database password here --->@oxcamne.mysql.pythona
 """
 
 # set True only for live production instance
-IS_PRODUCTION = False
+IS_PRODUCTION = True
 #if False, email notifications are suppressed
 
 # if True, run email daemon & daily maintenance in server threads
-THREAD_SUPPORT = True
+THREAD_SUPPORT = False
 # Note, PythonAnywhere doesn't support threads, must run
-# these processes as scheduled tasks
+# these processes as scheduled tasks. Set True if your
+# environment supports threads.
 
-# html web page banner:
-PAGE_BANNER = '<h4><span style="color: blue"><em>\
-Oxford and Cambridge Society of New England</em> <img src="images/oxcamne_no_pad.png" \
-alt="logo" style="float:left;width:100px" /></span></h4>'
-# NOTE the logo image is in py4web/apps/oxcam/static/images
-
-# access levels for group administrators
+# access levels for group administrators do not change
 ACCESS_LEVELS = ['read', 'write', 'accounting', 'admin']
-
-# URL for this oxcam database instance, development local server in this case
-DB_URL = "http://127.0.0.1:8000/oxcam"
 
 #see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 TIME_ZONE = tz.gettz('America/New_York')
 
+# Customize the following group for your organization:
+# URL for this oxcam database server:
+DB_URL = "https://oxcamne.pythonanywhere.com/oxcam"
 # organization name and domain/short_name, etc:
 SOCIETY_NAME = 'Oxford & Cambridge Society of New England'
 SOCIETY_SHORT_NAME = 'OxCamNE'
+# html web page banner Customize:
+PAGE_BANNER = '<h4><span style="color: blue"><em>\
+Oxford and Cambridge Society of New England</em> <img src="images/oxcamne_no_pad.png" \
+alt="logo" style="float:left;width:100px" /></span></h4>'
+# NOTE the logo image is in py4web/apps/oxcam/static/images
 HOME_URL = 'https://sites.google.com/oxcamne.org/home/?authuser=1'
         #this version allows authorized users to edit
 HELP_URL = "https://sites.google.com/oxcamne.org/help-new/home?authuser=1"
 PUBLIC_URL = 'www.oxcamne.org'
         #domain service re-routes to sites.google
-SUPPORT_EMAIL = 'dgmanns@gmail.com'
-
+SUPPORT_EMAIL = 'secretary@oxcamne.org'
 # html letterhead for email/notices:
 LETTERHEAD = '<h2><span style="color: blue">\
 <em>Oxford and Cambridge Society of New England</em></span> \
@@ -99,12 +101,12 @@ LETTERHEAD = '<h2><span style="color: blue">\
 alt="logo" style="float:left;width:100px" /></h2>\
 <h3><span style="color: blue"><em>&lt;subject&gt;</em></span></h3>'
         #NOTE 'subject' replaced by full subject line in emails/notices
-
 # html trailer for email notices:
 VISIT_WEBSITE_INSTRUCTIONS = "<br><br>Visit us at www.oxcamne.org or \
 https://www.instagram.com/oxcamne/ or www.facebook.com/oxcamne"
 
-# html description for mailing list selection:
+# html description for mailing list selection
+# must correspond to mail lists defined in database Email_Lists table.
 MAIL_LISTS = "The <b>Member Events</b> list is used for notices of all Society in-person events \
 except <b>Pub Nights</b> and <b>Online</b> (only) Events. This includes formal dinners, \
 talk/receptions, and outdoor events. Some are for members only, others are open to all alumni.<br>\
@@ -114,6 +116,7 @@ University sports team events, and events organized by Cambridge in America or O
 
 # Paid membership categories, else empty list:
 MEMBER_CATEGORIES = ['Full', 'Student']
+# set to '[]' if your organization doesn't have paid memberships
 
 # html description of paid membership criteria:
 MEMBERSHIP = "Membership is open to all matriculated alumni and members of the \

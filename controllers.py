@@ -64,8 +64,9 @@ def index():
 	member = db.Members[session['member_id']] if session.get('member_id') else None
 	access = session['access']	#for layout.html
 
-	if not member or not member_good_standing(member, (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)+datetime.timedelta(days=GRACE_PERIOD)).date()):
+	if len(MEMBER_CATEGORIES)>0 and (not member or not member_good_standing(member, (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)+datetime.timedelta(days=GRACE_PERIOD)).date())):
 		header = CAT(header, A("Join or Renew your Membership", _href=URL('registration')), XML('<br>'))
+		# allow renewal once within GRACE_PERIOD of expiration.
 	else:
 		header = CAT(header, A("Update your member profile or contact information", _href=URL('registration')), XML('<br>'))
 
@@ -74,7 +75,8 @@ def index():
 	else:
 		header = CAT(header, A("Join our mailing list(s)", _href=URL("registration", vars=dict(mail_lists='Y'))), XML('<br>'))
 
-	if member and member.Pay_subs!='Cancelled' and member_good_standing(member, (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)-datetime.timedelta(days=45)).date()):
+	if member and member.Pay_subs!='Cancelled' and member_good_standing(member, (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)-datetime.timedelta(days=GRACE_PERIOD)).date()):
+		#the GRACE_PERIOD check means that a member without a subscription can cancel after expiration to turn of the nagging reminders.
 		if member.Pay_subs:
 			header = CAT(header, A("View membership subscription/Update credit card", _href=URL(f'{member.Pay_source}_view_card')), XML('<br>'))
 		header = CAT(header, A("Cancel your membership", _href=URL('cancel_subscription')), XML('<br>'))
@@ -140,7 +142,6 @@ def members(path=None):
 				filter['good_standing'] = 'On'
 			session['filter'] = filter
 		header = CAT(header, A("Send Email to Specific Address(es)", _href=URL('composemail')), XML('<br>'))
-		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/members-page?authuser=1"
 	elif path:
 		caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev']).group(1)
 		if caller!='members' and caller not in ['composemail', 'affiliations', 'emails', 'dues', 'member_reservations', 'cancel_subscription']:
@@ -148,7 +149,6 @@ def members(path=None):
 		if len(session['back'])>0 and re.match(f'.*/{request.app_name}/([a-z_]*).*', session['back'][-1]).group(1)!='members':
 			back = session['back'][-1]
 		header = CAT(A('back', _href=back), H5('Member Record'))
-		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/members-page/member-record?authuser=1"
 		if path.startswith('edit') or path.startswith('details'):
 			member_id = path[path.find('/')+1:]
 			member = db.Members[member_id]
@@ -161,7 +161,7 @@ def members(path=None):
 					 	vars=dict(query=f"db.Members.id=={member_id}", left='',
 		 					qdesc=member_name(member_id)))))
 			
-			if member_good_standing(member):
+			if member_good_standing(member, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()):
 				header = CAT(header, XML('<br>'),
 					A('Cancel Membership', _href=URL(f"cancel_subscription/{member_id}")))
 	else:
@@ -390,10 +390,6 @@ def member_reservations(member_id, path=None):
 				H5('Member Reservations'),
 	      		H6(member_name(member_id)),
 				A('Add New Reservation', _href=URL(f'add_member_reservation/{member_id}', scheme=True)))
-	if path=='select':
-		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/members-page/member-reservations?authuser=1"
-	else:
-		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/events-page/reservation-display?authuser=1"
 
 	grid = Grid(path, (db.Reservations.Member==member_id)&(db.Reservations.Host==True),
 			left=db.Events.on(db.Events.id == db.Reservations.Event),
@@ -445,7 +441,6 @@ def affiliations(ismember, member_id, path=None):
 		db.Affiliations.Matr.requires=IS_EMPTY_OR(IS_INT_IN_RANGE(1900,datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date().year+1))
 		#allow matr to be omitted, may get it from member later.
 		write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
-		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/members-page/member-affiliations?authuser=1"
 	db.Affiliations.Member.default=member_id
 
 	header = CAT(A('back', _href=session['url_prev']),
@@ -501,7 +496,6 @@ def emails(ismember, member_id, path=None):
 		if not session['access']:
 			redirect(URL('accessdenied'))
 		write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
-		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/members-page/member-emails?authuser=1"
 	db.Emails.Member.default=member_id
 
 	if path=='new':
@@ -572,7 +566,6 @@ def dues(member_id, path=None):
 	access = session['access']	#for layout.html
 	session['url']=session['url_prev']	#preserve back link
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
-	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/members-page/member-dues?authuser=1"
 	db.Dues.Member.default=member_id
 
 	member=db.Members[member_id]
@@ -666,10 +659,8 @@ def events(path=None):
 	elif path=='select':
 		footer = CAT(A("Export all Events as CSV file", _href=URL('events_export')), XML('<br>'),
 			A("Export event analytics as CSV file", _href=URL('event_analytics')))
-		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/events-page?authuser=1"
 	elif path=='new':
 		header = CAT(A('back', _href=back), H5('New Event'))
-		_help = "https://sites.google.com/oxcamne.org/help-new/how-to/set-up-a-new-event?authuser=1"
 	else:
 		url = URL('registration', path[path.find('/')+1:], scheme=True)
 		event_id = path[path.find('/')+1:]
@@ -679,7 +670,6 @@ def events(path=None):
 			   		A('Selections', _href=URL(f'selections/{event_id}')), XML('<br>'),
 			   		A('Survey', _href=URL(f'survey/{event_id}')), XML('<br>'),
 	       			A('Make a Copy of This Event', _href=URL('event_copy', path[path.find('/')+1:])))
-		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/events-page/event-record?authuser=1"
 
 	def validation(form):
 		if len(form.errors)>0:
@@ -716,7 +706,6 @@ def tickets(event_id, path=None):
 	access = session['access']	#for layout.html
 	session['url']=session['url_prev']	#preserve back link
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
-	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/events-page/event-record/tickets-page?authuser=1"
 
 	event=db.Events[event_id]
 	db.Event_Tickets.Event.default=event_id
@@ -756,7 +745,6 @@ def selections(event_id, path=None):
 	access = session['access']	#for layout.html
 	session['url']=session['url_prev']	#preserve back link
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
-	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/events-page/event-record/selections-page?authuser=1"
 
 	event=db.Events[event_id]
 	db.Event_Selections.Event.default=event_id
@@ -797,7 +785,6 @@ def survey(event_id, path=None):
 	access = session['access']	#for layout.html
 	session['url']=session['url_prev']	#preserve back link
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
-	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/events-page/event-record/survey-page?authuser=1"
 
 	event=db.Events[event_id]
 	db.Event_Survey.Event.default=event_id
@@ -885,7 +872,6 @@ def event_reservations(event_id, path=None):
 	      		H5('Provisional Reservations' if request.query.get('provisional') else 'Waitlist' if request.query.get('waitlist') else 'Reservations'),
 				H6(f"{event.DateTime}, {event.Description}"),
 				XML("Click on the member name to drill down on a reservation and view/edit the details."), XML('<br>'))
-	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/events-page/reservation-list?authuser=1"
 
 	query = f'(db.Reservations.Event=={event_id})'
 	#for waitlist or provisional, have to include hosts with waitlisted or provisional guests
@@ -945,7 +931,6 @@ def reservation(ismember, member_id, event_id, path=None):
 			session['url'] = session['url_prev']
 			redirect(URL('accessdenied'))
 		write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
-		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/events-page/reservation-display?authuser=1"
 
 	db.Reservations.Created.default = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
 	member = db.Members[member_id]
@@ -1339,7 +1324,6 @@ def financial_statement():
 		redirect(URL('get_date_range', vars=dict(function='financial_statement',title='Financial Statement')))
 		
 	header = CAT(H5(title), H6('Assets'))
-	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/accounts/financial-statement?authuser=1"
 
 	sumamt = db.AccTrans.Amount.sum()
 	sumfee = db.AccTrans.Fee.sum()
@@ -1450,7 +1434,6 @@ def tax_statement():
 	startdate = datetime.date.fromisoformat(start)
 	enddate = datetime.date.fromisoformat(end)
 	title = f"Financial Statement (cash based) for period {start} to {end}"
-	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/accounts/tax-statement?authuser=1"
 
 	if not start or not end:
 		redirect(URL('get_date_range', vars=dict(function='financial_statement',title='Financial Statement')))
@@ -1534,7 +1517,6 @@ def tax_statement():
 def accounting(path=None):
 	access = session['access']	#for layout.html
 	header = H5('Banks')
-	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/accounts?authuser=1"
 
 	if not path:
 		session['back'] = []	#stack or return addresses for controllers with multiple routes to reach them
@@ -1552,7 +1534,6 @@ def accounting(path=None):
 		header = CAT(A('back', _href=URL('accounting')), XML('<br>'),
 			   		A('transaction rules', _href=URL(f"bank_rules/{bank_id}")),
 			   		header)
-		_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/accounts/bank-record?authuser=1"
 	else:
 		header = CAT(A('back', _href=URL('accounting')), header)
 
@@ -1580,7 +1561,6 @@ def bank_rules(bank_id, path=None):
 	access = session['access']	#for layout.html
 	session['url']=session['url_prev']	#preserve back link
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
-	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/accounts/bank-record/transaction-rules?authuser=1"
 
 	bank=db.Bank_Accounts[bank_id]
 	db.bank_rules.bank.default=bank.id
@@ -1754,8 +1734,6 @@ def transactions(path=None):
 	access = session['access']	#for layout.html
 	db.AccTrans.Fee.writable = False
 
-	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/accounts/transaction-list?authuser=1"
-
 	back = URL('transactions/select', scheme=True)
 	if not path:
 		session['back'].append(session['url_prev'])
@@ -1833,8 +1811,6 @@ def transactions(path=None):
 def composemail():
 	access = session['access']	#for layout.html
 	session['url']=session['url_prev']	#preserve back link
-
-	_help = "https://sites.google.com/oxcamne.org/help-new/home/membership-database/members-page/send-email?authuser=1"
 	
 	query = request.query.get('query')
 	qdesc = request.query.get('qdesc')
@@ -1959,7 +1935,7 @@ def bcc_export():
 @checkaccess(None)
 def directory(path=None):
 	access = session['access']	#for layout.html
-	if not session['member_id'] or not member_good_standing(db.Members[session['member_id']]):
+	if not session['member_id'] or not member_good_standing(db.Members[session['member_id']], datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()):
 		session.flash = 'Sorry, Member Directory is only available to members in good standing.'
 		redirect(URL('index'))
 			
@@ -2107,11 +2083,11 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 
 	if event:
 		mustjoin = event.Members_only and not event.Sponsors
-		if event.Members_only or event.Allow_join:
+		if len(MEMBER_CATEGORIES)>0 and (event.Members_only or event.Allow_join):
 			fields.append(Field('join_or_renew', 'boolean', default=mustjoin,
 				comment=' this event is restricted to OxCamNE members' if mustjoin else \
 					' tick if you are an Oxbridge alum and also wish to join OxCamNE or renew your membership'))
-	elif not request.query.get('mail_lists'):
+	elif not request.query.get('mail_lists') and len(MEMBER_CATEGORIES)>0:
 		fields.append(Field('membership', 'string',
 						default=member.Membership if member and member.Membership else '',
 						requires=IS_IN_SET(MEMBER_CATEGORIES, zero='please select your membership category')))
@@ -2128,7 +2104,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 			form.errors['matr'] = 'please enter your matriculation year'
 		if event and event.Members_only and not form.vars.get('join_or_renew'):
 			form.errors['join_or_renew'] = 'This event is for members only, please join/renew to attend'
-		if not event and not request.query.get('mail_lists') and form.vars.get('membership')!=MEMBER_CATEGORIES[0]:
+		if not event and not request.query.get('mail_lists') and len(MEMBER_CATEGORIES)>0 and form.vars.get('membership')!=MEMBER_CATEGORIES[0]:
 			if not form.vars.get('notes') or form.vars.get('notes').strip()=='':
 				form.errors['notes'] = 'Please note how you qualify for '+form.vars.get('membership')+' status'
 		if len(form.errors)>0:
@@ -2267,7 +2243,7 @@ def cancel_subscription(member_id=None):
 			redirect(URL('accessdenied'))
 
 	member = db.Members[member_id or session['member_id']]
-	if not (member and member_good_standing(member, (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)-datetime.timedelta(days=45)).date())):
+	if not (member and member_good_standing(member, (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)-datetime.timedelta(days=GRACE_PERIOD)).date())):
 		raise Exception("perhaps Back button or mobile auto re-request?")
 	
 	header = CAT(A('back', _href=session['url_prev']), XML('<br>'),

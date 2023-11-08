@@ -120,7 +120,7 @@ def dues_type(date, prevpaid):
 
 db.define_table('Dues',
 	Field('Member', 'reference Members', writable=False),
-	Field('Status', 'string', requires=IS_EMPTY_OR(IS_IN_SET(MEMBER_CATEGORIES)), writable=True, readable=True),
+	Field('Status', 'string', requires=IS_IN_SET(MEMBER_CATEGORIES), writable=True, readable=True),
 	Field('Amount', 'decimal(6,2)', requires=[IS_NOT_EMPTY(), IS_DECIMAL_IN_RANGE(0, 500)]),
 	Field('Date', 'date', default=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date(), writable=False),
 	Field('Notes', 'string', default=''),

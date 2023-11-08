@@ -4,15 +4,16 @@ This file contains functions shared by multiple controllers
 from py4web import URL
 from .common import db, auth
 from .settings import TIME_ZONE, SUPPORT_EMAIL, LETTERHEAD, GRACE_PERIOD,\
-	DB_URL, SOCIETY_SHORT_NAME, PUBLIC_URL, SOCIETY_NAME
+	DB_URL, SOCIETY_SHORT_NAME, PUBLIC_URL, SOCIETY_NAME, MEMBER_CATEGORIES
 from .models import primary_email, res_tbc, res_totalcost, res_status, member_name
 from yatl.helpers import A, TABLE, TH, THEAD, H6, TR, TD, CAT, HTML, XML
 import datetime, re, markmin
 
 #check if member is in good standing at a particular date
-def member_good_standing(member, date=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()):
-	return member and member.Membership and ((not member.Paiddate or member.Paiddate>=date)\
-			or member.Charged or (member.Pay_subs and member.Pay_subs != 'Cancelled'))
+#if no MEMBER_CATEGORIES always return True
+def member_good_standing(member, date):
+	return member and (len(MEMBER_CATEGORIES)==0 or (member.Membership and ((not member.Paiddate or member.Paiddate>=date)\
+			or member.Charged or (member.Pay_subs and member.Pay_subs != 'Cancelled'))))
 
 def ageband(year, matr):
 	if matr:

@@ -6,7 +6,7 @@ This grid is reached from 'Members' button on the blue navigation bar. Initially
 
 ![members grid](images/members.png)
 
-Each row of the grid shows a member record, with the membership status and currently paid date and their affiliation. The Access column highlights members having some level of general access to the  database, normally  Advisory Committee Members. The Edit (or View) button shows the details of an individual [member record](./member_record.md).
+Each row of the grid shows a member record, with the membership status and currently paid date and their affiliation. The Access column highlights members having some level of general access to the  database, normally  Advisory Committee Members. The Edit (or View) button shows the details of an individual [**member record**](./member_record.md).
 
 ### Filtering
 

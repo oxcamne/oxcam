@@ -47,6 +47,7 @@ workspace.code-workspace
 venv
 docs/_build
 *.csv
+!oxcam_empty_database.csv
 settings_private.py
 databases/*
 !.gitattributes

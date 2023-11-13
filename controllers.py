@@ -95,7 +95,7 @@ def index():
 		pass
 		header = CAT(header, event.DateTime.strftime('%A, %B %d '), event.Description, waitlist,
 			A('register', _href=URL(f'registration/{event.id}')), ' or ',
-			A('see details', _href=event.Page), XML('<br>'))
+			A('see details', _href=event.Page, _target='event'), XML('<br>'))
 	return locals()
 
 @action('members', method=['POST', 'GET'])

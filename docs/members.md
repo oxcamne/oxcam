@@ -6,7 +6,7 @@ This grid is reached from 'Members' button on the blue navigation bar. Initially
 
 ![members grid](images/members.png)
 
-Each row of the grid shows a member record, with the membership status and currently paid date and their affiliation. The Access column highlights members having some level of general access to the  database, normally  Advisory Committee Members. The Edit (or View) button shows the details of an individual [**member record**](./member_record.md).
+Each row of the grid shows a member record, with the membership status and currently paid date and their affiliation. The Access column highlights members having some level of general access to the  database, normally  Advisory Committee Members. The Edit (or View) button shows the details of an individual [**member record**](./member_record.md). A Delete button will appear if the person is no longer on any mailing list, has never attended an event, and has never been a member.
 
 ### Filtering
 
@@ -26,7 +26,7 @@ Each row of the grid shows a member record, with the membership status and curre
 
 ### Email
 
-If you have a Society email address, the link above the grid allows you to compose and send email to any email address(es). And if a list of members has been selected using the filter, there will be an additional link to send a notice to that list.
+If you have a Society email address (address includes SOCIETY_SHORT_NAME), the link above the grid allows you to compose and send email to any email address(es). And if a list of members has been selected using the filter, there will be an additional link to send a notice to that list.
 
 ### Add Member
 

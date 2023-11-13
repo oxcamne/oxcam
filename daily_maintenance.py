@@ -39,10 +39,6 @@ def daily_maintenance():
 		if (i.endswith(dname) and (datetime.date.today().day != 1)) or i.endswith(yname):
 			os.remove(i)
 
-	file=open(f'{SOCIETY_SHORT_NAME}_backup_{datetime.date.today().strftime("%Y%m%d")}.csv',
-					'w', encoding='utf-8', newline='')
-	db.export_to_csv_file(file)
-
 	#send renewal reminders at 9 day intervals from one interval before to two intervals after renewal date
 	#note that full memberships will generally be auto renewing Stripe subscriptions, but legacy memberships and
 	#student memberships still need manual renewal.
@@ -82,5 +78,9 @@ If you have any questions, please contact {SUPPORT_EMAIL}"
 				auth.sender.send(to=primary_email(m.id), bcc=SUPPORT_EMAIL, sender=SUPPORT_EMAIL, subject='Membership Renewal Failure', body=HTML(XML(text)))
 			logger.info(f"Membership Subscription Cancelled {primary_email(m.id)}")
 			m.update_record(Pay_subs = 'Cancelled', Pay_next=None, Modified=datetime.datetime.now())
+
+	file=open(f'{SOCIETY_SHORT_NAME}_backup_{datetime.date.today().strftime("%Y%m%d")}.csv',
+					'w', encoding='utf-8', newline='')
+	db.export_to_csv_file(file)
 				
 	db.commit()

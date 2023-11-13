@@ -16,7 +16,9 @@ The database includes:
 
 Organizers are assigned different access rights depending on their need to modify the database. All have the ability to search/view member information, event registrations, etc.
 
-The landing page of the database application is reached, for example, at [https://oxcamne.pythonanywhere.com/oxcam](https://oxcamne.pythonanywhere.com/oxcam) for the OxCamNE database hosted on PythonAnywhere. However to reach the index page as shown below, a user must login using their email address. Oxcam responds by sending an email with a link containing a one-time security code to verify the email address. Clicking that link opens the index page as shown below. Anyone with an email address can do this.
+Users are identified by email address. They login by specifying their email address, then clicking on a link containing a one-time security code sent to them to verify they own the email address.
+
+The landing page of the database application is reached at, for example, [https://oxcamne.pythonanywhere.com/oxcam](https://oxcamne.pythonanywhere.com/oxcam) for the OxCamNE database hosted on PythonAnywhere and looks like:
 
 ![index](images/index.png)
 

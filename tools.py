@@ -78,7 +78,8 @@ def db_restore():
 						db(db[tablename]).delete()
 				db.import_from_csv_file(backup_file, id_map={} if form.vars.get('overwrite_existing_database') else None)   #, restore=True won't work in MySQL)
 				flash.set(f"{SOCIETY_SHORT_NAME} Database Restored from {form.vars.get('backup_file').raw_filename}")
-				redirect('login')
+				session['logged_in'] = False
+				redirect('index')
 		except Exception as e:
 			flash.set(f"{str(e)}")
 

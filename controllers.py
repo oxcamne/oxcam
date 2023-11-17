@@ -42,7 +42,7 @@ from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name
 	res_conf, res_totalcost, res_wait, res_prov, bank_accrual, tickets_sold,\
 	selections_made, survey_choices
 from pydal.validators import IS_LIST_OF_EMAILS, IS_EMPTY_OR, IS_IN_DB, IS_IN_SET,\
-	IS_NOT_EMPTY, IS_DATE, IS_DECIMAL_IN_RANGE, IS_INT_IN_RANGE
+	IS_NOT_EMPTY, IS_DATE, IS_DECIMAL_IN_RANGE, IS_INT_IN_RANGE, IS_MATCH
 from .utilities import member_good_standing, ageband, newpaiddate,\
 	collegelist, tdnum, get_banks, financial_content, event_confirm, msg_header, msg_send,\
 	society_emails, emailparse, notification, notify_support, member_profile
@@ -115,8 +115,6 @@ def members(path=None):
 	admin = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('admin')
 	if not admin:
 		db.Members.Access.writable = False
-	db.Members.City.requires=db.Members.State.requires=db.Members.Zip.requires=None
-	db.Members.Created.default = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
 
 	search_form=Form([
 		Field('mailing_list', 'reference Email_Lists', 
@@ -338,8 +336,6 @@ def member_analytics(path=None):
 	l = None
 	thisyear = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).year
 	for r in rows:
-		if r.Members.Lastname == 'Allen':
-			pass
 		if not l or r.Members.id != l.Members.id:
 			endyear = 0
 			name = r.Members.Lastname + ', ' + r.Members.Firstname
@@ -2122,10 +2118,12 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 			member.update_record(Firstname = form.vars['firstname'], Notes=notes,
 							Lastname = form.vars['lastname'])
 		else:
+			set_access = 'admin' if db(db.Members.id>0).count() == 0 else NotImplementedError
 			member_id = db.Members.insert(Firstname = form.vars['firstname'], 
-										Lastname = form.vars['lastname'])
+							Lastname = form.vars['lastname'], Access = set_access)
 			member = db.Members[member_id]
 			session['member_id'] = member_id
+			session['access'] = set_access
 			if request.query.get('mail_lists'):
 				db.Emails.Mailings.default = [list.id for list in db(db.Email_Lists.Member==True).select()]
 			email_id = db.Emails.insert(Member=member_id, Email=session.get('email'))
@@ -2208,6 +2206,10 @@ reached by using the join/renew link on our home page).<br>\
 	db.Members.Access.writable = db.Members.Committees.writable = db.Members.President.writable = False
 	db.Members.Notes.writable = db.Members.Created.writable = db.Members.Modified.writable = False
 	db.Members.Pay_source.writable = db.Members.Pay_source.readable = False
+
+	db.Members.City.requires = IS_NOT_EMPTY(error_message='please enter your city/town')
+	db.Members.State.requires = IS_MATCH('^[A-Z][A-Z]$', error_message='please enter 2 letter state code')
+	db.Members.Zip.requires = IS_NOT_EMPTY(error_message='please enter your postal zip')
 
 	def validate(form):
 		if len(form.errors)>0:

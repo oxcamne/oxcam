@@ -1,0 +1,165 @@
+TABLE Colleges
+Colleges.id,Colleges.Name,Colleges.Oxbridge
+1,"Blackfriars, Oxford",True
+2,"Harris Manchester, Oxford",True
+3,"Magdalen, Oxford",True
+4,"St Edmund Hall, Oxford",True
+5,"St Peter's, Oxford",True
+6,"Gonville & Caius, Cambridge",True
+7,Cambridge University,True
+8,"Selwyn, Cambridge",True
+9,"Wolfson, Cambridge",True
+10,"Rhodes Scholar, Oxford",True
+11,"Corpus Christi, Oxford",True
+12,"Kellogg, Oxford",True
+13,"Nuffield, Oxford",True
+14,"Downing, Cambridge",True
+15,"Peterhouse, Cambridge",True
+16,"Balliol, Oxford",True
+17,"Green Templeton, Oxford",True
+18,"Linacre, Oxford",True
+19,"Merton, Oxford",True
+20,"St Benet's Hall, Oxford",True
+21,"St Cross, Oxford",True
+22,"Trinity, Oxford",True
+23,"Fitzwilliam, Cambridge",True
+24,"Lucy Cavendish, Cambridge",True
+25,"Robinson, Cambridge",True
+26,"St Edmund's, Cambridge",True
+28,"Greyfriars, Oxford",True
+29,"Lincoln, Oxford",True
+30,"Pembroke, Oxford",True
+31,"Somerville, Oxford",True
+32,"St John's, Oxford",True
+33,"University, Oxford",True
+34,"Christ's, Cambridge",True
+35,"Clare, Cambridge",True
+36,"Clare Hall, Cambridge",True
+37,"Corpus Christi, Cambridge",True
+38,"Girton, Cambridge",True
+39,"Magdalene, Cambridge",True
+40,"Gates Scholar, Cambridge",True
+41,"All Souls, Oxford",True
+42,"Campion Hall, Oxford",True
+43,"Jesus, Oxford",True
+44,Oxford University,True
+45,"Regent's Park, Oxford",True
+46,"St Hilda's, Oxford",True
+47,"St Stephen's House, Oxford",True
+48,"Wolfson, Oxford",True
+49,"Hughes Hall, Cambridge",True
+50,"Newnham, Cambridge",True
+51,"St Catharine's, Cambridge",True
+52,"Trinity, Cambridge",True
+53,"Trinity Hall, Cambridge",True
+54,"Christ Church, Oxford",True
+55,"Keble, Oxford",True
+56,"St Catherine's, Oxford",True
+57,"Worcester, Oxford",True
+58,"Darwin, Cambridge",True
+59,"Jesus, Cambridge",True
+60,"Pembroke, Cambridge",True
+61,"St John's, Cambridge",True
+64,"Marshall Scholar, Cambridge",True
+65,"Exeter, Oxford",True
+66,"Lady Margaret Hall, Oxford",True
+67,"Ruskin, Oxford",True
+68,"St Anne's, Oxford",True
+69,"St Hugh's, Oxford",True
+70,"Wycliffe Hall, Oxford",True
+71,"Churchill, Cambridge",True
+72,"Emmanuel, Cambridge",True
+73,"King’s, Cambridge",True
+74,"Queens’, Cambridge",True
+75,"Sidney Sussex, Cambridge",True
+78,"Marshall Scholar, Oxford",True
+79,"Brasenose, Oxford",True
+80,"Hertford, Oxford",True
+81,"Mansfield, Oxford",True
+82,"New College, Oxford",True
+83,"Oriel, Oxford",True
+84,"Queen's, Oxford",True
+85,"St Antony's, Oxford",True
+86,"Wadham, Oxford",True
+87,"Homerton, Cambridge",True
+88,"Murray Edwards, Cambridge",True
+91,"Saïd Business School, Oxford",True
+92,"Judge Business School, Cambridge",True
+95,"MRC-LMB, Cambridge",True
+98,"Weatherall Institute, Oxford",True
+99,"Reuben, Oxford",True
+
+
+TABLE Email_Lists
+Email_Lists.id,Email_Lists.Listname,Email_Lists.Member
+1,Member Events,True
+4,OxCam10,False
+
+
+TABLE CoA
+CoA.id,CoA.Name,CoA.Notes
+1,"Tips, janitor",
+2,Web site,<NULL>
+3,Venue rental,
+4,Badges/Name tags,
+5,Ticket sales,
+6,Bar & snacks,
+7,Printing,"e.g. menus, AUABN programme"
+9,Insurance,
+10,Tax filing,
+11,Sponsorships,e.g. AUABN sponsorship
+12,Board Meetings,
+13,Catering,
+14,Interest,e.g. Bank interest
+15,Membership Dues,
+16,Paper goods & decorations,
+17,Musicians,
+18,Bank fees,
+20,Police detail,
+21,Unallocated,"Amounts debited or credited and not recognized automatically, e.g. as dues payments or event ticket sales"
+22,Mailing,
+23,State filings,
+24,Wine,
+25,Membership Directory,
+26,Flowers,
+30,Parking,
+31,Transfer,between Bank and PayPal
+32,Charitable Donation,Donations from the Society to 501c-3 organizations
+
+
+TABLE Bank_Accounts
+Bank_Accounts.id,Bank_Accounts.Name,Bank_Accounts.Balance,Bank_Accounts.Bankurl,Bank_Accounts.Csvheaders,Bank_Accounts.Reference,Bank_Accounts.Date,Bank_Accounts.Datefmt,Bank_Accounts.Time,Bank_Accounts.Timefmt,Bank_Accounts.CheckNumber,Bank_Accounts.Amount,Bank_Accounts.Fee,Bank_Accounts.Type,Bank_Accounts.Source,Bank_Accounts.Notes,Bank_Accounts.HowTo
+1,Cambridge Trust,19398.79,https://cambridgetrust.ebanking-services.com/,"TRC Number,Account Number,Account Type,Account Name,Post Date,Reference,Additional Reference,Amount,Description,Type,Text,","Post Date,Reference,Amount",Post Date,%m/%d/%Y,<NULL>,<NULL>,Additional Reference,Amount,<NULL>,<NULL>,<NULL>,"Description,Type,Text","- Click on 'Reports/Deposit Reports'
+- select ``**CSV (all fields)**``:red file, ``**all accounts**``:red (there is only one) and specify a ``**date range**``:red beginning no later than the date shown above, select Transaction types - ``**'All transactions'**``:red and click 'Search'
+- save the downloaded report and use the form below to select and import it. The downloaded file is 'export.csv'.
+
+Note, Cambridge Trust now supports reports longer than 30 days, so the override box should only be needed to load the first batch of transactions in a new bank account."
+2,PayPal,0.00,https://www.paypal.com/signin?country.x=US&locale.x=en_US,"Date,Time,TimeZone,Name,Type,Status,Currency,Gross,Fee,Net,From Email Address,To Email Address,Transaction ID,Shipping Address,Address Status,Item Title,Item ID,Shipping and Handling Amount,Insurance Amount,Sales Tax,Option 1 Name,Option 1 Value,Option 2 Name,Option 2 Value,Reference Txn ID,Invoice Number,Custom Number,Quantity,Receipt ID,Balance,Address Line 1,Address Line 2/District/Neighborhood,Town/City,State/Province/Region/County/Territory/Prefecture/Republic,Zip/Postal Code,Country,Contact Phone Number,Subject,Note,Country Code,Balance Impact",Transaction ID,Date,%m/%d/%Y,Time,%H:%M:%S,<NULL>,Gross,Fee,<NULL>,<NULL>,"Type,From Email Address,To Email Address,Item Title,Invoice Number","-``**NOTE** We no longer use PayPal. Uploading of transactions would no longer work``:red Using PayPal would require software development to re-implement using a current PayPal api. The old implementation did not allow real-time capture of payments, unlike Stripe.
+- Note, the email address for the Society PayPal account is ocsnemembership@gmail.com
+- go to ``**Reports/Activity Download**``:red, select a ``**date range**``:red beginning no later than than the date shown above, and select ``**file type 'CSV'**``:red and click Create Report
+- the new report will show as submitted; after a few seconds click refresh to check if the report is ready for download (usually, this takes only a few seconds)
+- download the resulting file and use the form below to select and import it.
+
+PayPal's Activity Download supports long time ranges so the override checkbox should not be needed."
+3,Stripe,8526.03,https://dashboard.stripe.com/balance,"id,Type,Source,Amount,Fee,Net,Currency,Created (UTC),Available On (UTC)",id,Created (UTC),%Y-%m-%d %H:%M,<NULL>,<NULL>,<NULL>,Amount,-Fee,Type,Source,Source,"- go to the ``**Payments/All Transactions**``:red section of the dashboard, click ``**'Export'**``:red at the top right of the panel, select a ``**date range**``:red beginning no later than than the date shown above,  and click Export
+- use the form below to select and import the downloaded file, 'balance_history.csv'.
+
+Stripe's Export supports long time ranges so the override checkbox should not be needed."
+
+
+TABLE bank_rules
+bank_rules.id,bank_rules.bank,bank_rules.csv_column,bank_rules.pattern,bank_rules.account
+1,1,Description,INTEREST CREDIT,14
+2,1,Reference,Oxford&Cambridge,31
+3,1,Text,Utica Mutual Ins,9
+4,1,Text,GO DADDY WEB ORDER,2
+5,1,Text,PYTHONANYWHERE,2
+6,1,Text,ZOOM.US,2
+7,1,Text,GSUITE,2
+8,1,Text,SEC OF MA,2
+9,1,Text,MAILGUN,2
+10,2,Type,General Withdrawal,31
+11,3,Type,Payout,31
+
+
+END

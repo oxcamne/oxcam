@@ -92,14 +92,13 @@ Colleges.id,Colleges.Name,Colleges.Oxbridge
 
 TABLE Email_Lists
 Email_Lists.id,Email_Lists.Listname,Email_Lists.Member
-1,Member Events,True
-4,OxCam10,False
+1,Group Mailings,True
 
 
 TABLE CoA
 CoA.id,CoA.Name,CoA.Notes
 1,"Tips, janitor",
-2,Web site,<NULL>
+2,Web site,
 3,Venue rental,
 4,Badges/Name tags,
 5,Ticket sales,

@@ -8,14 +8,14 @@ On your server open a bash terminal session at the py4web 'apps' directory, issu
 
 ```bash
     git clone https://github.com/oxcamne/oxcam.git
-    pip install --upgrade -r .oxcam/requirements.txt
+    pip install --upgrade -r oxcam/requirements.txt
 ```
 
-This clones the software into a new directory apps/oxcam, and ensures that necessary Python packages are installed. You may need to precede 'pip' with 'python ' or 'python3 '.
+This clones the software into a new directory apps/oxcam, and ensures that necessary Python packages are installed. You may need to precede 'pip' with 'python ' or 'python3 ' depending on your environment.
 
 You next need to create a 'settings_private.py' file in apps/oxcam. Customize the contents from the code below, which is taken from the OxCamNE environment (with sensitive keys removed):
 
-```python
+```
 """
 Configures the app for a particular alumni group/Society,
 and for a particular running instance, e.g. production or development
@@ -79,12 +79,7 @@ https://www.instagram.com/oxcamne/ or www.facebook.com/oxcamne"
 
 # html description for mailing list selection
 # must correspond to mail lists defined in database Email_Lists table.
-MAIL_LISTS = "The <b>Member Events</b> list is used for notices of all Society in-person events \
-except <b>Pub Nights</b> and <b>Online</b> (only) Events. This includes formal dinners, \
-talk/receptions, and outdoor events. Some are for members only, others are open to all alumni.<br>\
-<b>Other Events</b> includes such things as concerts by College Choirs, visiting College or \
-University sports team events, and events organized by Cambridge in America or Oxford North America.<br>\
-<b>OxCam10</b> includes informal events organized by OxCam10 for alumni within 10 years of graduation."
+MAIL_LISTS = f"The <b>Group Mailings</b> list is used for all {SOCIETY_SHORT_NAME} notices."
 
 # Paid membership categories, else empty list:
 MEMBER_CATEGORIES = ['Full', 'Student']

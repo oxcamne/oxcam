@@ -56,7 +56,6 @@ def stripe_get_dues(membership):
 def stripe_update_email(member):
 	if member.Pay_cust:
 		try:	#check customer still exists on Stripe
-			cus = stripe.Customer.retrieve(member.Pay_cust)
 			stripe.Customer.modify(member.Pay_cust, email=primary_email(member.id))
 		except Exception as e:
 			member.update_record(Pay_cust=None, Pay_subs=None, Pay_next=None)

@@ -502,7 +502,7 @@ def emails(ismember, member_id, path=None):
 			db.Emails.Mailings.readable=db.Emails.Mailings.writable=False
 	elif path=='select':
 		member = db.Members[member_id]
-		eval(f"{member.Pay_source or PAYMENT_PROCESSOR}_update_email(db.Members[member_id])")
+		eval(f"{member.Pay_source or PAYMENT_PROCESSOR}_update_email(member)")
 
 	header = CAT(A('back', _href=session['url_prev']),
 	      		H5('Member Emails'),
@@ -2118,7 +2118,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 			member.update_record(Firstname = form.vars['firstname'], Notes=notes,
 							Lastname = form.vars['lastname'])
 		else:
-			set_access = 'admin' if db(db.Members.id>0).count() == 0 else NotImplementedError
+			set_access = 'admin' if db(db.Members.id>0).count() == 0 else None
 			member_id = db.Members.insert(Firstname = form.vars['firstname'], 
 							Lastname = form.vars['lastname'], Access = set_access)
 			member = db.Members[member_id]
@@ -2144,7 +2144,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 		if (request.query.get('mail_lists')):
 			session['url'] = URL('index')
 			flash.set("Please review your subscription settings below.")
-			redirect(URL(f"emails/Y/{member_id}/edit/{email_id}"))
+			redirect(URL(f"emails/Y/{member_id}"))
 				
 		if request.query.get('join_or_renew') or not event:	#collecting dues with event registration, or joining/renewing
 			#membership dues payment

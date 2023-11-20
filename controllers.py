@@ -985,8 +985,8 @@ def reservation(ismember, member_id, event_id, path=None):
 	if ismember!='Y':
 		header = CAT(A('back', _href=back), header)
 
-	if path=='select':
-		if ismember=='Y':
+	if ismember=='Y':
+		if path=='select':
 			if not host_reservation:
 				redirect(URL(f'reservation/Y/{member_id}/{event_id}/new'))
 			attend = event_attend(event_id) or 0
@@ -1024,17 +1024,21 @@ def reservation(ismember, member_id, event_id, path=None):
 						     dues=session.get('dues'))).replace('Decimal','decimal.Decimal'),
 							 Modified=host_reservation.Modified)
 				form2 = Form(fields, formstyle=FormStyleBulma, keep_values=True, submit_value='Checkout')
-		else:
-			header = CAT(header, A('send email', _href=(URL('composemail', vars=dict(
-				query=f"(db.Members.id=={member_id})&(db.Members.id==db.Reservations.Member)&(db.Reservations.Event=={event_id})",
-				qdesc=member_name(member_id), left="db.Emails.on(db.Emails.Member==db.Members.id)")))),
-				XML(" (use "), "<reservation>", XML(" to include confirmation and payment link)<br>"),
-				A('view member record', _href=URL(f'members/edit/{member_id}')),
-				XML("<br>Top row is the member's own reservation, additional rows are guests.<br>\
+		elif path=='new':
+			header = CAT(header,
+				f"Please enter your own selection{' (you will be able to enter guests on next screen)' if (event.Guests or 2)>1 else ''}:" if not host_reservation \
+					else "Please enter your guest's details:")
+	elif path=='select':
+		header = CAT(header, A('send email', _href=(URL('composemail', vars=dict(
+			query=f"(db.Members.id=={member_id})&(db.Members.id==db.Reservations.Member)&(db.Reservations.Event=={event_id})",
+			qdesc=member_name(member_id), left="db.Emails.on(db.Emails.Member==db.Members.id)")))),
+			XML(" (use "), "<reservation>", XML(" to include confirmation and payment link)<br>"),
+			A('view member record', _href=URL(f'members/edit/{member_id}')),
+			XML("<br>Top row is the member's own reservation, additional rows are guests.<br>\
 Use Add Record to add the member, initially, then to add additional guests.<br>\
 Edit rows to move on/off waitlist or first row to record a check payment.<br>\
 Moving member on/off waitlist will also affect all guests."))
-
+	
 	#set up reservations form, we have both member and event id's
 	db.Reservations.Member.default = member.id
 	db.Reservations.Event.default=event.id

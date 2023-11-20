@@ -1,21 +1,3 @@
-# [Oxford/Cambridge Alumni Group Database - Support Guide](support.md)
-
-## Installation
-
-The oxcam software is held on Github at [https://github.com/oxcamne/oxcam](https://github.com/oxcamne/oxcam). This section assumes that you have read the README displayed there and satisfied the pre-requisites, so that you have a web server successfully running Py4web.
-
-On your server open a bash terminal session at the py4web 'apps' directory, issue the commands:
-
-```bash
-    git clone https://github.com/oxcamne/oxcam.git
-    pip install --upgrade -r oxcam/requirements.txt
-```
-
-This clones the software into a new directory apps/oxcam, and ensures that necessary Python packages are installed. You may need to precede 'pip' with 'python ' or 'python3 ' depending on your environment.
-
-You next need to create a 'settings_private.py' file in apps/oxcam. Customize the contents from the code below, which is taken from the OxCamNE environment (with sensitive keys removed). A copy of this is included in the kit as settings_private_template.py which you can copy or rename:
-
-```python
 """
 Configures the app for a particular alumni group/Society,
 and for a particular running instance, e.g. production or development
@@ -124,6 +106,3 @@ STRIPE_EVENT = "<--- test product id --->"
 #STRIPE_PROD_FULL = "<--- test product id -->"  #Annual, autorenews
 STRIPE_PROD_FULL = "<--- test product id -->"   #Weekly, autorenews
 STRIPE_PROD_STUDENT = "<--- test product id -->"    #Annual, no autorenew
-```
-
-Once the app is installed and your settings_private.py file is configured you should restart py4web. If py4web is already running you can use the 'Reload Apps' button in the 'Installed Applications' section of the Py4web Dashboard. You should now see the oxcam app running.

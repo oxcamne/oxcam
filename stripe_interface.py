@@ -74,6 +74,8 @@ def stripe_process_charge(dict_csv, bank, reference, timestamp, amount, fee):
 				customer = stripe.Customer.retrieve(charge.customer)
 				notes += ' Subscription: '+ customer.subscriptions.data[0].id
 				member.update_record(Pay_next=datetime.datetime.fromtimestamp(customer.subscriptions.data[0].current_period_end).date())
+			else:
+				notes += f" {dict_csv['Source']}"
 			product = stripe.Product.retrieve(eval(f"STRIPE_PROD_{member.Membership.upper()}"))
 			duesprice = stripe.Price.retrieve(product.default_price)
 			duesamount = decimal.Decimal(duesprice.unit_amount)/100

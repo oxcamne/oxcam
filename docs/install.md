@@ -13,6 +13,8 @@ On your server open a bash terminal session at the py4web 'apps' directory, issu
 
 This clones the software into a new directory apps/oxcam, and ensures that necessary Python packages are installed. You may need to precede 'pip' with 'python ' or 'python3 ' depending on your environment.
 
+### Configure the software for your organization
+
 You next need to create a 'settings_private.py' file in apps/oxcam. Customize the contents from the code below, which is taken from the OxCamNE environment (with sensitive keys removed). A copy of this is included in the kit as settings_private_template.py which you can copy or rename:
 
 ```python
@@ -126,4 +128,96 @@ STRIPE_PROD_FULL = "<--- test product id -->"   #Weekly, autorenews
 STRIPE_PROD_STUDENT = "<--- test product id -->"    #Annual, no autorenew
 ```
 
-Once the app is installed and your settings_private.py file is configured you should restart py4web. If py4web is already running you can use the 'Reload Apps' button in the 'Installed Applications' section of the Py4web Dashboard. You should now see the oxcam app running.
+Notes:
+
+1. The database is configured to use SQLite - this probably provides adequate performance
+for all but the largest groups.
+
+1. Setting IS_PRODUCTION False only prevents the daily maintenance process from
+sending out notices such as membership dues reminders. Any test environment can still send out email, so care needs to be taken not to generate unexpected traffic.
+
+1. There are various 'branding' elements such as logo, organization name,
+web site addresses, help site address (for volunteers), support email, etc.
+The help site might embed the [User Guide](https://oxcamne.github.io/oxcam) and
+possible also this [support guide](https://oxcamne.github.io/oxcam/support) as
+well as including organization specific information.
+
+1. A single mailing list is assumed. An organization can operate multiple
+mailing lists. MAIL_LISTS is simply an html description, the mailing lists
+themselves are set up in the database Email_Lists table.
+
+1. In the prototype membership categories are included for full and student
+members. You do not have to have paid memberships.
+
+1. There is a group of settings for outgoing email. They simply identify an
+SMTP server. Smaller groups could use a gmail address or similar. This
+will allow notices to be sent to a list of up to a few hundred addresses.
+Above that a paid email service such as mailgun.com needs to be used. A paid
+service provides sandbox and production environments, so that outgoing traffic
+from a test or development environment can be restricted set of target
+addresses.
+
+1. There is a group of settings for the Stripe payment processor. These
+include public and private account keys, and three product identifiers.
+The products are set up on the Stripe dashboard.
+In the OxCamNE case, STRIPE_EVENT is a
+generic product used for all event charges, with price and description configured
+in real time. STRIPE_PROD_FULL is an annual subscription product for full members;
+STRIPE_PROD_STUDENT is a one year renewable student membership.
+
+### Start the database and load minimal contents
+
+Once the app is installed and your settings_private.py file is configured you should restart py4web. If py4web is already running you can use the 'Reload Apps' button in the 'Installed Applications' section of the Py4web Dashboard. You should now see the oxcam app running
+as an installed application.
+
+When first started the app creates an empty database in a databases/ folder in the py4web/apps/oxcam directory.
+
+Browse to the database at \<your py4web url\>/oxcam. You will be asked to login using your email. Oxcam sends a one-time
+link to your email. The link opens a new tab ready for you to upload a copy of database contents:
+
+![db_restore form](images/db_restore.png)
+
+In this scenario, the Overwrite checkbox should be cleared; leaving it set deletes any existing database content and renumbers all records, which will break any external links such as registration links.
+
+The kit contains a file, db_oxcam_minimal.csv in the py4web/apps/oxcam directory. Csv files are used to backup and restore the contents of the database.
+The minimal database defines the Colleges table including all the
+Oxford and Cambridge Colleges, defines the default mailing list, a prototype chart of accounts, sample bank and payment processor records as well as some bank rules.
+
+To use the minimal database file, copy it from the kit to your local device where you browser is running. From here you can upload it to the database server. You will then need to login once more, and will be taken to the index page:
+
+![inital index](images/Initial_index.png)
+
+### Add yourself to the database
+
+The database does not contain any member records so can not do anything very interesting. If you do not have membership configured, you'll see only the
+mailing list option. Either joining the mailing list or as a member creates a
+member record. The form to join the mailing list looks like:
+
+![mailing list](images/mailing_list.png)
+
+Once you have created your own record, as it is first into the database it is automatically assigned 'admin' access and all the function links appear on the navigation bar:
+
+![navigation bar](images/navigation_bar.png)
+
+### Scheduled Tasks
+
+Oxcam uses two additional tasks that run separately from the web server.
+If your environment supports threads, and you configure 'THREAD_SUPPORT = True',
+nothing more is needed:
+
+- the email daemon runs all the time in its own thread. It's role is to spool
+out notices to a mailing list or other selection of members. These emails may
+be customized with a greeting or other information, such as registration details.
+
+- the daily maintenance task is triggered at midnight local time each day. It's
+role is to send out any necessary membership renewal reminders, and to generate
+a database backup .csv file. It retains on the local drive the last month's daily files, and files from the 1st of each month for a year.
+
+In the PythonAnywhere enviroment, the email daemon is configured as a 'run forever'
+task, and the daily maintenance job is scheduled at a fixed UTC time daily. The commands to use are:
+
+```bash
+py4web/py4web.py call py4web/apps oxcam.email_daemon.email_daemon
+
+py4web/py4web.py call py4web/apps oxcam.daily_maintenance.daily_maintenance
+```

@@ -13,6 +13,7 @@ from .common import db, session, flash
 from .controllers import checkaccess, form_style
 from py4web.utils.form import Form, FormStyleDefault
 from py4web.utils.grid import Grid, GridClassStyle
+from yatl.helpers import XML
 from .settings import SOCIETY_SHORT_NAME, PAGE_BANNER, HOME_URL, HELP_URL
 from py4web.utils.factories import Inject
 import io
@@ -27,13 +28,18 @@ preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=
 def db_tool(path=None):
 	access = session['access']	#for layout.html
 	form = Form([Field('query'),
+				Field('delete_all', 'boolean', comment='Beware, are you really sure you want to do this!'),
 	      		Field('do_update', 'boolean'),
 			    Field('field_update')],
 				keep_values=True, formstyle=FormStyleDefault)
 	
-	header = "The \"query\" is a condition like \"db.table1.field1=='value'\". Something like \"db.table1.field1==db.table2.field2\" results in a SQL JOIN.\
-Use (...)&(...) for AND, (...)|(...) for OR, and ~(...) for NOT to build more complex queries.\
-\"field_update\" is an optional expression like \"field1='newvalue'\". You cannot update the results of a JOIN"
+	header = XML("The \"query\" is a condition like \"db.table1.field1=='value'\" \
+or \"db.table.field2.like('%value%')\"<br>\
+Use (...)&(...) for AND, (...)|(...) for OR, and ~(...) for NOT to build more complex queries.<br>\
+Something like \"db.table1.field1==db.table2.field2\" results in a SQL JOIN. Results cannot be edited.<br>\
+\"field update\" is an optional expression like \"field1='...', field2='...', ...\".<br>\
+See the Py4web documentation (DAL) for to learn more.")
+
 	if not path:
 		session['query'] = None
 
@@ -46,8 +52,13 @@ Use (...)&(...) for AND, (...)|(...) for OR, and ~(...) for NOT to build more co
 					update_string = f"row.update_record({form.vars.get('field_update')})"
 					eval(update_string)
 				form.vars['do_update']=False
-				flash.set(f"{len(rows)} records updated, click Submit to see results")
-
+				flash.set(f"{len(rows)} records updated")
+			elif form.vars.get('delete_all'):
+				db(eval(form.vars.get('query'))).delete()
+				flash.set(f"{len(rows)} records deleted")
+			form.vars['do_update'] = False
+			form.vars['delete_all'] = False
+		
 		form.vars['query'] = query = session.get('query')
 		if query:
 			grid = Grid(path, eval(form.vars.get('query')),

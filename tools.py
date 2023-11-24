@@ -77,7 +77,7 @@ def db_restore():
 	header = f"Restore {SOCIETY_SHORT_NAME} database from backup file"
 	
 	form = Form([Field('overwrite_existing_database', 'boolean',
-	       				default=True, comment='clear if new empty database'),
+	       				default=False, comment='clear if new empty database'),
 				Field('backup_file', 'upload', uploadfield = False)],
 				submit_value = 'Restore')
 	

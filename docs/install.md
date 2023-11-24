@@ -165,25 +165,25 @@ generic product used for all event charges, with price and description configure
 in real time. STRIPE_PROD_FULL is an annual subscription product for full members;
 STRIPE_PROD_STUDENT is a one year renewable student membership.
 
-### Start the database and load minimal contents
+### Start the database
 
 Once the app is installed and your settings_private.py file is configured you should restart py4web. If py4web is already running you can use the 'Reload Apps' button in the 'Installed Applications' section of the Py4web Dashboard. You should now see the oxcam app running
 as an installed application.
 
 When first started the app creates an empty database in a databases/ folder in the py4web/apps/oxcam directory.
 
-Browse to the database at \<your py4web url\>/oxcam. You will be asked to login using your email. Oxcam sends a one-time
+### Load a Minimal Database
+
+Browse to the database at \<your_py4web_url\>/oxcam. You will be asked to login using your email. Oxcam sends a one-time
 link to your email. The link opens a new tab ready for you to upload a copy of database contents:
 
 ![db_restore form](images/db_restore.png)
-
-In this scenario, the Overwrite checkbox should be cleared; leaving it set deletes any existing database content and renumbers all records, which will break any external links such as registration links.
 
 The kit contains a file, db_oxcam_minimal.csv in the py4web/apps/oxcam directory. Csv files are used to backup and restore the contents of the database.
 The minimal database defines the Colleges table including all the
 Oxford and Cambridge Colleges, defines the default mailing list, a prototype chart of accounts, sample bank and payment processor records as well as some bank rules.
 
-To use the minimal database file, copy it from the kit to your local device where you browser is running. From here you can upload it to the database server. You will then need to login once more, and will be taken to the index page:
+To use the minimal database file, copy it from the kit to your local device where you browser is running. Click Browse and find the .csv file, then click restore. You will then need to login once more, and will be taken to the index page:
 
 ![inital index](images/Initial_index.png)
 
@@ -198,6 +198,8 @@ member record. The form to join the mailing list looks like:
 Once you have created your own record, as it is first into the database it is automatically assigned 'admin' access and all the function links appear on the navigation bar:
 
 ![navigation bar](images/navigation_bar.png)
+
+If your group is for alumni of only one of the Universities, you may wish to eliminate the irrelevant Colleges. You can use **db_tool** to do this.
 
 ### Scheduled Tasks
 

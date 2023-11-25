@@ -163,6 +163,9 @@ def members(path=None):
 				header = CAT(header, XML('<br>'),
 					A('Cancel Membership', _href=URL(f"cancel_subscription/{member_id}")))
 	else:
+		back = session.get('back')
+		if len(back)==2 and 'reservation' in back[1]:
+			redirect(back[1])	#return to reservation record
 		session['filter'] = None
 		session['back'] = []
 

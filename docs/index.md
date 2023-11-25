@@ -32,4 +32,4 @@ The **Home** button links to the home page of the Society's public web site, and
 
 The [**members**](members), [**events**,](events.md) [**accounts**](accounts.md), and **help** buttons are shown only to organizers of the group who have been granted database access rights, and lead to the corresponding modules of the application.
 
-If you are installing or supporting the database you will find [**additional help here**](support.md).
+If you are installing or supporting the database please see the [**Support Guide**](support.md).

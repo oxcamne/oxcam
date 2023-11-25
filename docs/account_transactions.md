@@ -6,7 +6,7 @@ This page is reached from the link on a bank row in the [accounts page](accounts
 
 ![transactions page](images/account_transactions.png)
 
-The back link returns to the previous context. Transactions are displayed in a grid in reverse chronological order. You can click on columns to sort by that column, or to reverse sort order, for example to look at the oldest transactions.
+The back link returns to the previous context. Transactions are displayed in a grid in reverse chronological order. You can click on a column header to sort by the values in that column, and click again to reverse sort order. For example, sorting by check number can help locate missing check records; click the ACC(rued) heading twice to see undeposited but recorded checks at the top.
 
 There is a search box at the top that allows transactions to be filtered, e.g. to specific accounts and/or events, or by searching the Notes field for name or email address.
 

@@ -24,4 +24,4 @@ A non-zero figure in the Accrued column indicates checks have been manually reco
 
 The primary outputs of the module are the [**financial statement**](financial_statement.md) and the [**tax statement**](tax_statement.md) reached through the links at the top of the page.
 
-A **chart of accounts** is used to establish accounting categories for each type of expense/revenue as well as asset classes (i.e. the banks and card processors). *Should new account categories need to be added, you can use the py4web dashboard to do so.*
+A **chart of accounts** is used to establish accounting categories for each type of expense/revenue as well as asset classes (i.e. the banks and card processors). *Should new account categories need to be added, you can use the [db_tool](db_tool.md) or py4web dashboard to do so.*

@@ -20,6 +20,7 @@ from py4web.utils.factories import Inject
 import stripe, decimal, datetime
 
 stripe.api_key = STRIPE_SKEY
+stripe.api_version = '2020-03-02'
 
 preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
 

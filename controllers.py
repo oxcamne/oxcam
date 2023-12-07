@@ -931,14 +931,13 @@ def reservation(ismember, member_id, event_id, path=None):
 			redirect(URL('accessdenied'))
 		write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 
-	db.Reservations.Created.default = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
 	member = db.Members[member_id]
 	event = db.Events[event_id]
 	all_guests = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)).select(orderby=~db.Reservations.Host)
 	host_reservation = all_guests.first()
 	tickets = db(db.Event_Tickets.Event==event_id).select()
 	event_tickets = [t.Ticket for t in tickets if \
-				(not t.Count or tickets_sold(event_id, t.Ticket, member_id)<t.Count) and\
+				(not t.Count or t.Qualify or tickets_sold(event_id, t.Ticket, member_id)<t.Count) and\
 				(not host_reservation or t.Allow_as_guest==True)]
 	tickets_available = {}
 	for t in tickets:
@@ -950,6 +949,7 @@ def reservation(ismember, member_id, event_id, path=None):
 	event_survey = [s.Item for s in survey]
 	session['event_id'] = event_id
 	is_good_standing = member_good_standing(member, event.DateTime.date())
+
 	if is_good_standing:
 		membership = member.Membership
 	elif ismember=='Y':
@@ -972,6 +972,10 @@ def reservation(ismember, member_id, event_id, path=None):
 				provisional_ticket_cost += row.Unitcost or 0
 				if row.Ticket in tickets_available:
 					tickets_available[row.Ticket] -= 1
+					if tickets_available[row.Ticket] == 0:
+						flash.set(f"There are no further {row.Ticket} tickets available after this.")
+					elif tickets_available[row.Ticket] < 0:
+						flash.set(f"There insufficient {row.Ticket} tickets available: please Checkout to add all unconfirmed guests to the waitlist.")
 			else:
 				confirmed += 1
 				confirmed_ticket_cost += row.Unitcost or 0
@@ -997,7 +1001,7 @@ def reservation(ismember, member_id, event_id, path=None):
 			waitlist = False
 			if datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.Booking_Closed:
 				waitlist = True
-				flash.set("Registration is closed, new registrations will be waitlisted.")
+				flash.set("Registration is closed, please Checkout to add new registrations to the waitlist.")
 			elif wait > 0 or (event.Capacity and attend+adding>event.Capacity):
 				waitlist = True
 				flash.set("Event is full: please Checkout to add all unconfirmed guests to the waitlist.")
@@ -1009,7 +1013,7 @@ def reservation(ismember, member_id, event_id, path=None):
 				payment += (provisional_ticket_cost or 0)
 			if not event.Guests or len(all_guests)<event.Guests:
 				header = CAT(header,  XML(f"Use the '+New' button to add another guest.<br>"))
-			if adding!=0 or payment!=0:
+			if adding!=0:
 				header = CAT(header,  XML(f"Your place(s) are not allocated until you click the 'Checkout' button.<br>"))
 			if payment>0:
 				header = CAT(header, XML(f"Your place(s) are confirmed when your payment of ${payment}{dues_tbc} is received.<br>"))
@@ -1029,8 +1033,8 @@ def reservation(ismember, member_id, event_id, path=None):
 				form2 = Form(fields, formstyle=FormStyleBulma, keep_values=True, submit_value='Checkout')
 		elif path=='new':
 			header = CAT(header,
-				f"Please enter your own selection{' (you will be able to enter guests on next screen)' if (event.Guests or 2)>1 else ''}:" if not host_reservation \
-					else "Please enter your guest's details:")
+				f"Please enter your own selection{' (you will be able to enter guests on next screen)' if (event.Guests or 2)>1 else ''}:"\
+					if not host_reservation else "Please enter your guest's details:")
 	elif path=='select':
 		header = CAT(header, A('send email', _href=(URL('composemail', vars=dict(
 			query=f"(db.Members.id=={member_id})&(db.Members.id==db.Reservations.Member)&(db.Reservations.Event=={event_id})",
@@ -1064,7 +1068,8 @@ Moving member on/off waitlist will also affect all guests."))
 			db.Reservations.Ticket.requires=IS_EMPTY_OR(IS_IN_SET(event_tickets))
 		else:
 			db.Reservations.Ticket.requires=IS_IN_SET(event_tickets, zero='please select the appropriate ticket')
-			db.Reservations.Ticket.default = host_reservation.Ticket if host_reservation and host_reservation.Ticket in event_tickets else event_tickets[0]
+			db.Reservations.Ticket.default = host_reservation.Ticket if host_reservation and host_reservation.Ticket in event_tickets\
+				else event_tickets[0]
 	else:
 		db.Reservations.Ticket.writable = db.Reservations.Ticket.readable = False
 	
@@ -1132,7 +1137,7 @@ Moving member on/off waitlist will also affect all guests."))
 		if (form.vars.get('id')):
 			if int(form.vars.get('id')) == host_reservation.id and (form.vars.get('Waitlist') != host_reservation.Waitlist or form.vars.get('Provisional') != host_reservation.Provisional):
 				for row in all_guests:
-					if row.id != host_reservation.id and not row.Provisional:
+					if row.id != host_reservation.id and (not row.Provisional or host_reservation.Provisional):
 						row.update_record(Waitlist = form.vars.get('Waitlist'), Provisional = form.vars.get('Provisional'))
 
 	grid = Grid(path, (db.Reservations.Member==member.id)&(db.Reservations.Event==event.id),
@@ -1154,12 +1159,6 @@ Moving member on/off waitlist will also affect all guests."))
 		elif adding==0 and payment==0:
 			form2 = ''	#don't need the Checkout form
 		elif form2.accepted:
-			#Checkout logic, first check required tickets are available
-			for t in tickets_available.keys():
-				if tickets_available[t]<0:
-					flash.set(f"There are not enough {t} tickets available, please make another choice")
-					redirect(URL(f'reservation/Y/{member_id}/{event_id}/select'))
-
 			host_reservation.update_record(Survey=form2.vars.get('survey'), Comment=form2.vars.get('comment'))
 			for row in all_guests.find(lambda row: row.Provisional==True):
 				row.update_record(Provisional=False, Waitlist=waitlist)

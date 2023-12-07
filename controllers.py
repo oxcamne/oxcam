@@ -1846,7 +1846,7 @@ def composemail():
 		fields.append(Field('to', 'string',
 			comment='Include spaces between multiple recipients',
    			requires=[IS_NOT_EMPTY(), IS_LIST_OF_EMAILS()]))
-	fields.append(Field('bcc', 'string', requires=IS_LIST_OF_EMAILS(), default=''))
+	fields.append(Field('bcc', 'string', requires=IS_EMPTY_OR(IS_IN_SET(source)), default=source[0] if not query else None))
 	fields.append(Field('subject', 'string', requires=IS_NOT_EMPTY(), default=proto.Subject if proto else ''))
 	fields.append(Field('body', 'text', requires=IS_NOT_EMPTY(), default=proto.Body if proto else "<letterhead>\n<greeting>\n\n" if query else "<letterhead>\n\n",
 				comment=CAT("You can use placeholders <letterhead>, <subject>, <greeting>, <member>, <reservation>, <email>, ",
@@ -1894,7 +1894,7 @@ def composemail():
 			if query:
 				db.Email_Queue.insert(Subject=form2.vars['subject'], Body=form2.vars['body'], Sender=sender,
 			 		Attachment=pickle.dumps(attachment), 
-					Bcc=bcc, Query=query, Left=left, Qdesc=qdesc,
+					Bcc=form2.vars['bcc'], Query=query, Left=left, Qdesc=qdesc,
 					Scheme=URL('index', scheme=True).replace('index', ''))
 				flash.set(f"email notice sent to '{qdesc}'")
 			else:
@@ -1904,7 +1904,7 @@ def composemail():
 					body += part[0]		
 				flash.set(f"Email sent to: {to}")
 				auth.sender.send(to=to, sender=sender, reply_to=sender, subject=form2.vars['subject'], 
-		     		bcc=bcc, body=HTML(XML(body)), attachments=attachment)
+		     		bcc=form2.vars['bcc'], body=HTML(XML(body)), attachments=attachment)
 			redirect(session['url_prev'])
 	return locals()
 

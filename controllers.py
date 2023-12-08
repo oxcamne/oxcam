@@ -1013,8 +1013,11 @@ def reservation(ismember, member_id, event_id, path=None):
 				payment += (provisional_ticket_cost or 0)
 			if not event.Guests or len(all_guests)<event.Guests:
 				header = CAT(header,  XML(f"Use the '+New' button to add another guest.<br>"))
-			if adding!=0 and not waitlist:
-				header = CAT(header,  XML(f"Your place(s) are not allocated until you click the 'Checkout' button.<br>"))
+			if adding!=0:
+				if waitlist:
+					header = CAT(header,  XML(f"Please click 'Checkout' to join the waitlist.<br>"))
+				else:
+					header = CAT(header,  XML(f"Your place(s) are not allocated until you click the 'Checkout' button.<br>"))
 			if payment>0 and payment>int(session.get('dues') or 0):
 				header = CAT(header, XML(f"Your registration will be confirmed when your payment of ${payment}{dues_tbc} is received at Checkout.<br>"))
 
@@ -1165,7 +1168,7 @@ Moving member on/off waitlist will also affect all guests."))
 
 			if waitlist:
 				flash.set(f"{'You' if confirmed==0 else 'Your additional guest(s)'} have been added to the waitlist.")
-			
+		
 			if payment==0:	#free event, confirm booking
 				if not waitlist:
 					host_reservation.update_record(Checkout=None)

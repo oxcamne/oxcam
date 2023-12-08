@@ -90,7 +90,7 @@ def index():
 		waitlist = ' '
 		if event.Booking_Closed < datetime.datetime.now(TIME_ZONE).replace(tzinfo=None):
 			waitlist = ' *Booking Closed, waitlisting* '
-		elif event_wait(event.id) or (event.Capacity and (event_attend(event.id) or 0) >= event.Capacity):
+		elif event.Capacity and (event_attend(event.id) or 0) >= event.Capacity:
 			waitlist = ' *Sold Out, waitlisting* '
 		pass
 		header = CAT(header, event.DateTime.strftime('%A, %B %d '), event.Description, waitlist,
@@ -961,6 +961,7 @@ def reservation(ismember, member_id, event_id, path=None):
 	provisional_ticket_cost = 0
 	adding = 0
 	confirmed = 0
+	waitlist = False
 	for row in all_guests:
 		if row.Ticket:
 			t = tickets.find(lambda t: t.Ticket==row.Ticket).first()
@@ -976,6 +977,7 @@ def reservation(ismember, member_id, event_id, path=None):
 						flash.set(f"There are no further {row.Ticket} tickets available after this.")
 					elif tickets_available[row.Ticket] < 0:
 						flash.set(f"There insufficient {row.Ticket} tickets available: please Checkout to add all unconfirmed guests to the waitlist.")
+						waitlist = True
 			else:
 				confirmed += 1
 				confirmed_ticket_cost += row.Unitcost or 0
@@ -997,26 +999,24 @@ def reservation(ismember, member_id, event_id, path=None):
 			if not host_reservation:
 				redirect(URL(f'reservation/Y/{member_id}/{event_id}/new'))
 			attend = event_attend(event_id) or 0
-			wait = event_wait(event_id) or 0
-			waitlist = False
 			if datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.Booking_Closed:
 				waitlist = True
 				flash.set("Registration is closed, please Checkout to add new registrations to the waitlist.")
-			elif wait > 0 or (event.Capacity and attend+adding>event.Capacity):
+			elif event.Capacity and attend+adding>event.Capacity:
 				waitlist = True
 				flash.set("Event is full: please Checkout to add all unconfirmed guests to the waitlist.")
-			elif event.Capacity and attend+adding>=event.Capacity-2:
-				flash.set(f"Event is nearly full, registration for more than {event.Capacity-attend} places will be wait listed.")
+			elif event.Capacity and attend+adding==event.Capacity:
+				flash.set(f"Please note, this fills the event; if you add another guest all unconfirmed guests will be waitlisted.")
 			dues_tbc = f" (including ${session['dues']} membership dues)" if session.get('dues') else ''
 			payment = (int(session.get('dues') or 0)) + confirmed_ticket_cost - (host_reservation.Paid or 0) - (host_reservation.Charged or 0)
 			if not waitlist:
 				payment += (provisional_ticket_cost or 0)
 			if not event.Guests or len(all_guests)<event.Guests:
 				header = CAT(header,  XML(f"Use the '+New' button to add another guest.<br>"))
-			if adding!=0:
+			if adding!=0 and not waitlist:
 				header = CAT(header,  XML(f"Your place(s) are not allocated until you click the 'Checkout' button.<br>"))
-			if payment>0:
-				header = CAT(header, XML(f"Your place(s) are confirmed when your payment of ${payment}{dues_tbc} is received.<br>"))
+			if payment>0 and payment>int(session.get('dues') or 0):
+				header = CAT(header, XML(f"Your registration will be confirmed when your payment of ${payment}{dues_tbc} is received at Checkout.<br>"))
 
 			fields = []
 			if survey:

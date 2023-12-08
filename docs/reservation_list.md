@@ -18,4 +18,4 @@ Each row shows one member booking. Additional guests are reflected only in the c
 
 **TBC** indicates any unpaid amount relating to confirmed tickets. Email confirmation is not sent until any necessary payment is completed. **Cost** is the total cost for both member and guests.
 
-Click on the member name to display the full details of the reservation.
+Click on the member name to display the [full details of the reservation](event_registration.md).

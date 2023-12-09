@@ -1879,7 +1879,6 @@ def composemail():
 				db.EMProtos.insert(Subject=form2.vars['subject'], Body=form2.vars['body'])
 				flash.set("Template stored: "+ form2.vars['subject'])
 
-		bcc = re.compile('[^,;\s]+').findall(form2.vars['bcc'])
 		try:
 			bodyparts = emailparse(form2.vars['body'], form2.vars['subject'], query)
 		except Exception as e:

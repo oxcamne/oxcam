@@ -1841,14 +1841,16 @@ def composemail():
 	proto = db(db.EMProtos.id == request.query.get('proto')).select().first()
 	fields =[Field('sender', 'string', requires=IS_IN_SET(source), default=source[0])]
 	if query:
-		header = CAT(header, XML(f'To: {qdesc}'))
+		query_count = len(db(eval(query)).select(left=eval(left) if left!='' else None, distinct=True))
+		header = CAT(header, XML(f'To: {qdesc} ({query_count})'))
 		footer = A("Export bcc list for use in email", _href=URL('bcc_export',
 						vars=dict(query=query, left=left or '')))
 	else:
 		fields.append(Field('to', 'string',
 			comment='Include spaces between multiple recipients',
    			requires=[IS_NOT_EMPTY(), IS_LIST_OF_EMAILS()]))
-	fields.append(Field('bcc', 'string', requires=IS_EMPTY_OR(IS_IN_SET(source)), default=source[0] if not query else None))
+	if not query or query_count==1:
+		fields.append(Field('bcc', 'string', requires=IS_LIST_OF_EMAILS()))
 	fields.append(Field('subject', 'string', requires=IS_NOT_EMPTY(), default=proto.Subject if proto else ''))
 	fields.append(Field('body', 'text', requires=IS_NOT_EMPTY(), default=proto.Body if proto else "<letterhead>\n<greeting>\n\n" if query else "<letterhead>\n\n",
 				comment=CAT("You can use placeholders <letterhead>, <subject>, <greeting>, <member>, <reservation>, <email>, ",
@@ -1879,6 +1881,7 @@ def composemail():
 				db.EMProtos.insert(Subject=form2.vars['subject'], Body=form2.vars['body'])
 				flash.set("Template stored: "+ form2.vars['subject'])
 
+		bcc = re.compile('[^,;\s]+').findall(form2.vars.get('bcc') or '')
 		try:
 			bodyparts = emailparse(form2.vars['body'], form2.vars['subject'], query)
 		except Exception as e:
@@ -1895,17 +1898,17 @@ def composemail():
 			if query:
 				db.Email_Queue.insert(Subject=form2.vars['subject'], Body=form2.vars['body'], Sender=sender,
 			 		Attachment=pickle.dumps(attachment), 
-					Bcc=form2.vars['bcc'], Query=query, Left=left, Qdesc=qdesc,
+					Bcc=bcc, Query=query, Left=left, Qdesc=qdesc,
 					Scheme=URL('index', scheme=True).replace('index', ''))
-				flash.set(f"email notice sent to '{qdesc}'")
+				flash.set(f"email notice sent to '{qdesc}' ({query_count})")
 			else:
 				to = re.compile('[^,;\s]+').findall(form2.vars['to'])
 				body = ''
 				for part in bodyparts:
 					body += part[0]		
-				flash.set(f"Email sent to: {to}")
+				flash.set(f"Email sent to: {to} ({len(to)})")
 				auth.sender.send(to=to, sender=sender, reply_to=sender, subject=form2.vars['subject'], 
-		     		bcc=form2.vars['bcc'], body=HTML(XML(body)), attachments=attachment)
+		     		bcc=bcc, body=HTML(XML(body)), attachments=attachment)
 			redirect(session['url_prev'])
 	return locals()
 

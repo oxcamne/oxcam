@@ -120,7 +120,9 @@ def members(path=None):
 		Field('mailing_list', 'reference Email_Lists', 
 				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Email_Lists', '%(Listname)s', zero="mailing?"))),
 		Field('event', 'reference Events', 
-				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Events', '%(Description).20s', orderby = ~db.Events.DateTime, zero="event?")),
+				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Events',
+				lambda r: f"{r.DateTime.strftime('%m/%d/%Y')} {r.Description[:25]}",
+				orderby = ~db.Events.DateTime, zero="event?")),
 				comment = "exclude/select confirmed event registrants (with/without mailing list selection) "),
 		Field('good_standing', 'boolean', comment='tick to limit to members in good standing'),
 		Field('field', 'string', requires=IS_EMPTY_OR(IS_IN_SET(['Affiliation', 'Email']+db.Members.fields,
@@ -415,8 +417,9 @@ def add_member_reservation(member_id):
 				)
 
 	form=Form([Field('event', 'reference db.Events',
-		  requires=IS_IN_DB(db, 'Events', '%(Description)s', orderby = ~db.Events.DateTime,
-		      				zero='Please select event for new reservation from dropdown.'))],
+		  requires=IS_IN_DB(db, 'Events', lambda r: f"{r.DateTime.strftime('%m/%d/%Y')} {r.Description[:25]}",
+						orderby = ~db.Events.DateTime,
+		      			zero='Please select event for new reservation from dropdown.'))],
 		formstyle=FormStyleBulma)
 	
 	if form.accepted:

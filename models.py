@@ -171,7 +171,7 @@ db.define_table('Events',
 	Field('Comment', 'string', comment="open ended question at Checkout."),
 	Field('Modified', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None),
        			update=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),
-	singular="Event", plural="Events", format='%(Description)s')
+	singular="Event", plural="Events", format=lambda r: f"{r.DateTime.strftime('%m/%d/%Y')} {r.Description[:25]}")
 
 def tickets_sold(event_id, ticket, member_id=None):
 	return db((db.Reservations.Event==event_id)&(db.Reservations.Ticket==ticket)&\
@@ -289,7 +289,6 @@ db.define_table('Reservations',
 	Field('Modified', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None),
        			update=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),
 	singular="Reservation", plural="Reservations")
-db.Reservations.Event.requires=IS_IN_DB(db, 'Events.id', '%(Event)s', zero=None, orderby=~db.Events.DateTime)
 
 db.define_table('EMProtos',
 	Field('Subject', 'string', requires=IS_NOT_EMPTY()),
@@ -356,8 +355,8 @@ db.define_table('AccTrans',
 				requires=IS_IN_DB(db, 'Bank_Accounts.id', '%(Name)s')),	#e.g. PayPal, Cambridge Trust, ...
 	Field('Account', 'reference CoA', requires=IS_IN_DB(db, 'CoA.id', '%(Name)s')),
 	Field('Event', 'reference Events',
-				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Events.id', '%(Description)s', orderby=~db.Events.DateTime)),
-				comment='leave blank if not applicable'),
+				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Events.id', lambda r: f"{r.DateTime.strftime('%m/%d/%Y')} {r.Description[:25]}",
+				orderby=~db.Events.DateTime)), comment='leave blank if not applicable'),
 	Field('Amount', 'decimal(8,2)',
 				requires=IS_DECIMAL_IN_RANGE(-100000, 100000)),	# >=0 for asset/revenue, <0 for liability/expense
 	Field('Fee', 'decimal(6,2)', requires=IS_EMPTY_OR(IS_DECIMAL_IN_RANGE(-1000,1000))),	# e.g. PayPal transaction fee, <0 (unless refunded)

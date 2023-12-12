@@ -20,7 +20,7 @@ from py4web.utils.factories import Inject
 import stripe, decimal, datetime
 
 stripe.api_key = STRIPE_SKEY
-stripe.api_version = '2020-03-02'
+stripe.api_version = '2023-10-16'
 
 preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
 
@@ -51,7 +51,6 @@ def stripe_get_dues(membership):
 	price = stripe.Price.retrieve(product.default_price)
 	session['membership'] = membership
 	session['dues'] = str(decimal.Decimal(price.unit_amount)/100)
-	session['subscription'] = True if price.recurring else False
 	
 #update Stripe Customer Record with current primary email
 def stripe_update_email(member):
@@ -72,9 +71,9 @@ def stripe_process_charge(dict_csv, bank, reference, timestamp, amount, fee):
 		if charge.description=='Subscription update' or (member.Charged and amount>=member.Charged):
 			#dues paid, charge may also cover an event (auto renewal or manual)
 			if (charge.description or '').startswith('Subscription'):
-				customer = stripe.Customer.retrieve(charge.customer)
-				notes += ' Subscription: '+ customer.subscriptions.data[0].id
-				member.update_record(Pay_next=datetime.datetime.fromtimestamp(customer.subscriptions.data[0].current_period_end).date())
+				subscription = stripe.Subscription.list(customer=charge.customer).data[0]
+				notes += f' Subscription: {subscription.id}'
+				member.update_record(Pay_next=datetime.datetime.fromtimestamp(subscription.current_period_end).date())
 			else:
 				notes += f" {dict_csv['Source']}"
 			product = stripe.Product.retrieve(eval(f"STRIPE_PROD_{member.Membership.upper()}"))
@@ -179,7 +178,7 @@ def stripe_cancel_subscription(member):
 	return False
 
 #daily maintence for subscriptions
-def stripe_subscription_maintenance(member):	#return True if subscription no longer current
+def stripe_subscription_cancelled(member):	#return True if subscription no longer current
 	product = stripe.Product.retrieve(eval(f"STRIPE_PROD_{member.Membership.upper()}"))
 	if member.Pay_subs:	#delete Stripe subscription if applicable
 		try:
@@ -238,9 +237,18 @@ def stripe_checkout():
 		if tickets_tbc:
 			params['event_id'] = event.id
 			params['tickets_tbc'] = tickets_tbc
-			items.append(dict(price_data = dict(currency='usd', unit_amount=int(tickets_tbc*100),
-						product=STRIPE_EVENT), description = event.Description, quantity=1))
-		 
+			items.append({
+				'price_data': {
+					'currency': 'usd',
+					'unit_amount': int(tickets_tbc*100),
+					'product_data': {
+						'name': 'Event Registration',
+						'description': event.Description,
+					},
+				},
+				'quantity': 1,
+			}),
+ 		 
 	stripe_session = stripe.checkout.Session.create(
 	  customer=member.Pay_cust,
 	  payment_method_types=['card'], line_items=items, mode=mode,

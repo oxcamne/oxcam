@@ -25,7 +25,7 @@ from .common import db, auth, logger
 from .settings_private import SOCIETY_SHORT_NAME, STRIPE_SKEY, IS_PRODUCTION, SUPPORT_EMAIL,\
 	LETTERHEAD, SOCIETY_NAME, DB_URL
 from .utilities import member_greeting
-from .stripe_interface import stripe_subscription_maintenance
+from .stripe_interface import stripe_subscription_cancelled
 from .models import primary_email
 from yatl.helpers import HTML, XML
 
@@ -66,7 +66,7 @@ If you have any questions, please contact {SUPPORT_EMAIL}"
 
 	subs = db((db.Members.Pay_subs!=None)&(db.Members.Pay_subs!='Cancelled')).select()
 	for m in subs:
-		if eval(f"{m.Pay_source}_subscription_maintenance(m)"):	#subscription no longer operational
+		if eval(f"{m.Pay_source}_subscription_cancelled(m)"):	#subscription no longer operational
 			if IS_PRODUCTION:
 				to = primary_email(m.id) if IS_PRODUCTION else SUPPORT_EMAIL
 				bcc = SUPPORT_EMAIL if IS_PRODUCTION else None

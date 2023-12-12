@@ -2125,7 +2125,8 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 		
 	if form.accepted:
 		if member:
-			notes = f"{datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).strftime('%m/%d/%y')} {form.vars.get('notes')}"
+			notes = f"{datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).strftime('%m/%d/%y')} {form.vars.get('notes')}" if form.vars.get('notes') else ''
+
 			if member.Notes:
 				notes = member.Notes+'\n'+notes
 				

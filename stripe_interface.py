@@ -85,7 +85,7 @@ def stripe_process_charge(dict_csv, bank, reference, timestamp, amount, fee):
 				Notes='Stripe', Prevpaid=member.Paiddate, Nowpaid=nowpaid, Status=member.Membership)
 			member.update_record(Paiddate=nowpaid, Charged=None)
 			db.AccTrans.insert(Bank = bank.id, Account = acdues.id, Amount = duesamount,
-					Fee = duesfee, Accrual = False, Timestamp = timestamp,
+					Member=member.id, Fee = duesfee, Accrual = False, Timestamp = timestamp,
 					Reference = reference, Notes = notes)
 			fee -= duesfee
 			amount -= duesamount
@@ -94,7 +94,7 @@ def stripe_process_charge(dict_csv, bank, reference, timestamp, amount, fee):
 			resvtn=db((db.Reservations.Member==member.id)&(db.Reservations.Charged>=amount)).select(
 							orderby=db.Reservations.Modified).first()
 			if resvtn:
-				db.AccTrans.insert(Bank = bank.id, Account = actkts.id, Amount = amount, Fee = fee,
+				db.AccTrans.insert(Bank = bank.id, Account = actkts.id, Member=member.id, Amount = amount, Fee = fee,
 					Timestamp = timestamp, Event = resvtn.Event, Reference = reference, Accrual = False, Notes = notes)
 				resvtn.update_record(Paid=(resvtn.Paid or 0) + amount, Charged = resvtn.Charged - amount, Checkout=None)
 				amount = 0

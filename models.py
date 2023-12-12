@@ -104,7 +104,7 @@ db.define_table('Members',
 	Field('Modified', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None),
        			update=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),
 	plural="Members", singular="Member",
-	format=lambda r: f"{r['Lastname']}, {r['Title'] or ''} {r['Firstname']} {r['Suffix'] or ''}")
+	format=lambda r: f"{r.Lastname}, {r.Title or ''} {r.Firstname} {r.Suffix or ''}")
 	
 db.define_table('Emails',
 	Field('Member', 'reference Members', writable=False),
@@ -357,6 +357,9 @@ db.define_table('AccTrans',
 	Field('Event', 'reference Events',
 				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Events.id', lambda r: f"{r.DateTime.strftime('%m/%d/%Y')} {r.Description[:25]}",
 				orderby=~db.Events.DateTime)), comment='leave blank if not applicable'),
+	Field('Member', 'reference Members',
+				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Members.id', lambda r: f"{r.Lastname}, {r.Firstname}",
+				orderby=db.Members.Lastname|db.Members.Firstname)), comment='leave blank if not applicable'),
 	Field('Amount', 'decimal(8,2)',
 				requires=IS_DECIMAL_IN_RANGE(-100000, 100000)),	# >=0 for asset/revenue, <0 for liability/expense
 	Field('Fee', 'decimal(6,2)', requires=IS_EMPTY_OR(IS_DECIMAL_IN_RANGE(-1000,1000))),	# e.g. PayPal transaction fee, <0 (unless refunded)

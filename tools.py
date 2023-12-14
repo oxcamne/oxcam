@@ -7,13 +7,13 @@ The @action(path) decorator exposed the function at URL:
 The actions in this file are tools used either by database administrator
 or developers. They are accessed using the URL, not via menus
 """
-from py4web import action, response, redirect, Field
+from py4web import action, response, redirect, Field, request
 from py4web.utils.factories import Inject
 from .common import db, session, flash
 from .controllers import checkaccess, form_style
 from py4web.utils.form import Form, FormStyleDefault
 from py4web.utils.grid import Grid, GridClassStyle
-from yatl.helpers import XML
+from yatl.helpers import XML, H5
 from .settings import SOCIETY_SHORT_NAME, PAGE_BANNER, HOME_URL, HELP_URL
 from py4web.utils.factories import Inject
 import io
@@ -67,6 +67,31 @@ See the Py4web documentation (DAL) for to learn more.")
 					)
 	except Exception as e:
 		flash.set(e)
+	return locals()
+
+@action('transaction_members', method=['POST', 'GET'])
+@action('transaction_members/<path:path>', method=['POST', 'GET'])
+@preferred
+@checkaccess('admin')
+def transaction_members(path=None):
+	access = session['access']	#for layout.html
+	
+	header = H5("get member id into dues and events payments")
+	acdues = db(db.CoA.Name == "Membership Dues").select().first()
+	actkts = db(db.CoA.Name == "Ticket sales").select().first()
+
+	if not session.get('transaction_members'):
+		rows = db(db.AccTrans.Notes.contains(db.Emails.Email)).select(db.AccTrans.id, db.Emails.Member)
+
+		for row in rows:
+			db.AccTrans[row.AccTrans.id].update_record(Member=row.Emails.Member)
+	session['transaction_members'] = True
+
+	grid = Grid(path, ((db.AccTrans.Account==acdues)|(db.AccTrans.Account==actkts))&(db.AccTrans.Member==None)&(db.AccTrans.Timestamp>="2019-01-01 00:00"),
+				columns=[db.AccTrans.Timestamp, db.AccTrans.Notes],
+				details=False, editable=True, create=False, deletable=False,
+				grid_class_style=GridClassStyle, formstyle=form_style, show_id=True,
+				)
 	return locals()
 
 @action("db_restore", method=['POST', 'GET'])

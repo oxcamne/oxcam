@@ -28,6 +28,8 @@ preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=
 def db_tool(path=None):
 	access = session['access']	#for layout.html
 	form = Form([Field('query'),
+			  	Field('orderby'),
+				Field('left'),
 				Field('delete_all', 'boolean', comment='Beware, are you really sure you want to do this!'),
 	      		Field('do_update', 'boolean'),
 			    Field('field_update')],
@@ -42,10 +44,14 @@ See the Py4web documentation (DAL) for to learn more.")
 
 	if not path:
 		session['query'] = None
+		session['orderby'] = None
+		session['left'] = None
 
 	try:
 		if form.accepted:
-			session['query'] = query=form.vars.get('query')
+			session['query'] = form.vars.get('query')
+			session['orderby'] = form.vars.get('orderby')
+			session['left'] = form.vars.get('left')
 			rows = db(eval(form.vars.get('query'))).select()
 			if form.vars.get('do_update'):
 				for row in rows:
@@ -59,9 +65,13 @@ See the Py4web documentation (DAL) for to learn more.")
 			form.vars['do_update'] = False
 			form.vars['delete_all'] = False
 		
-		form.vars['query'] = query = session.get('query')
-		if query:
+		form.vars['query'] = session.get('query')
+		form.vars['orderby'] = session.get('orderby')
+		form.vars['left'] = session.get('left')
+		if form.vars.get('query'):
 			grid = Grid(path, eval(form.vars.get('query')),
+			   		orderby=eval(form.vars.get('orderby')) if form.vars.get('orderby') else None,
+			   		left=eval(form.vars.get('left')) if form.vars.get('left') else None,
 					details=False, editable=True, create=True, deletable=True,
 					grid_class_style=GridClassStyle, formstyle=form_style, show_id=True,
 					)
@@ -87,7 +97,7 @@ def transaction_members(path=None):
 			db.AccTrans[row.AccTrans.id].update_record(Member=row.Emails.Member)
 	session['transaction_members'] = True
 
-	grid = Grid(path, ((db.AccTrans.Account==acdues)|(db.AccTrans.Account==actkts))&(db.AccTrans.Member==None)&(db.AccTrans.Timestamp>="2019-01-01 00:00"),
+	grid = Grid(path, ((db.AccTrans.Account==acdues.id)|(db.AccTrans.Account==actkts.id))&(db.AccTrans.Member==None)&(db.AccTrans.Timestamp>="2019-01-01 00:00"),
 				columns=[db.AccTrans.Timestamp, db.AccTrans.Notes],
 				details=False, editable=True, create=False, deletable=False,
 				grid_class_style=GridClassStyle, formstyle=form_style, show_id=True,

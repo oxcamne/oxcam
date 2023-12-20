@@ -147,7 +147,7 @@ def members(path=None):
 		if caller!='members' and caller not in ['composemail', 'affiliations', 'emails', 'dues', 'member_reservations', 'cancel_subscription']:
 			session['back'].append(session['url_prev'])
 		if len(session['back'])>0 and re.match(f'.*/{request.app_name}/([a-z_]*).*', session['back'][-1]).group(1)!='members':
-			back = session['back'][-1]
+			back = session['back'][-1] if len(session['back'])>0 else back
 		header = CAT(A('back', _href=back), H5('Member Record'))
 		if path.startswith('edit') or path.startswith('details'):
 			member_id = path[path.find('/')+1:]
@@ -250,8 +250,7 @@ def members(path=None):
 	       XML("Use filter to select a mailing list or apply other filters.<br>Selecting an event selects \
 (or excludes from a mailing list) attendees.<br>You can filter on a member record field \
 using an optional operator (=, <, >, <=, >=) together with a value."))
-		footer = CAT(A("View Recent Dues Payments", _href=URL('get_date_range',
-				vars=dict(function='dues_payments', title="Dues Payments"))), XML('<br>'),
+		footer = CAT(A("View Recent New Members", _href=URL('new_members')), XML('<br>'),
 			A("Export Membership Analytics", _href=URL('member_analytics')), XML('<br>'),
 			A("Export Displayed Records", _href=URL('members_export',
 						vars=dict(query=query, left=left or '', qdesc=qdesc))))
@@ -263,7 +262,7 @@ using an optional operator (=, <, >, <=, >=) together with a value."))
 		for em in emails:
 			if em.Mailings and len(em.Mailings) > 0: ifmailings = True
 		return not m.Membership and not m.Paiddate and not m.Access and \
-				not ifmailings and db(db.Dues.Member == id).count()==0 and \
+				not ifmailings and db(db.AccTrans.Member == id).count()==0 and \
 				db(db.Reservations.Member == id).count()==0 and not m.President
 
 	def validate(form):
@@ -273,11 +272,6 @@ using an optional operator (=, <, >, <=, >=) together with a value."))
 		if not form.vars.get('id'):
 			return	#adding record
 		
-		if form.vars.get('Paiddate'):
-			dues = db(db.Dues.Member == form.vars.get('id')).select(orderby=~db.Dues.Date).first()
-			if dues:
-				dues.update_record(Nowpaid = form.vars.get('Paiddate'))
-
 	grid = Grid(path, eval(query), left=eval(left) if left else None,
 	     	orderby=db.Members.Lastname|db.Members.Firstname,
 			columns=[Column('Name', lambda r: member_name(r['id'])),
@@ -598,52 +592,41 @@ def dues(member_id, path=None):
 			)
 	return locals()
 	
-@action('dues_payments', method=['GET'])
-@action('dues_payments/<path:path>', method=['GET'])
+@action('new_members', method=['GET'])
+@action('new_members/<path:path>', method=['GET'])
 @preferred
 @checkaccess('read')
-def dues_payments(path=None):
+def new_members(path=None):
 	access = session['access']	#for layout.html
-	if not path:
-		session['query2'] = f"(db.Dues.Date >= \'{request.query.get('start')}\') & (db.Dues.Date <= \'{request.query.get('end')}\')"
-	
-	header =H5('Dues Payments')
-	footer = A("Export as CSV file", _href=URL('dues_export'))
+	acdues = db(db.CoA.Name == "Membership Dues").select().first().id
 
-	grid = Grid(path, eval(session.get('query2')),
-			orderby=~db.Dues.Date,
-			columns=[Column("Name", lambda row: A(member_name(row['Member'])[0:20], _href=URL(f"members/edit/{row['Member']}"))),
+	rows = db((db.AccTrans.Account==acdues) & (db.AccTrans.Member!=None)).select(orderby=~db.AccTrans.Timestamp)
+
+	def classify(member_id,timestamp):
+		prev_dues = db((db.AccTrans.Account==acdues)&(db.AccTrans.Member==member_id)&(db.AccTrans.Timestamp<timestamp)).select(orderby=~db.AccTrans.Timestamp).first()
+		if not prev_dues:
+			return 'New'
+		if prev_dues.Timestamp > timestamp - datetime.timedelta(days=365+2*GRACE_PERIOD):
+			return 'Renewal'
+		return prev_dues.Timestamp.strftime("%m/%d/%Y")
+	
+	rows = rows.find(lambda r: classify(r.Member, r.Timestamp) != 'Renewal')
+	ids = [r.id for r in rows]
+	
+	header =H5('Recent New/Reinstated Members')
+
+	grid = Grid(path, db.AccTrans.id.belongs(ids), orderby=~db.AccTrans.Timestamp,
+			columns=[Column("Name", lambda row: A(member_name(row['Member']), _href=URL(f"members/edit/{row['Member']}"))),
 	    			Column("College", lambda row: primary_affiliation(row['Member'])),
 	    			Column("Matr", lambda row: primary_matriculation(row['Member'])),
-					db.Dues.Status, db.Dues.Date, db.Dues.Prevpaid, db.Dues.Nowpaid,
-					Column("Type", lambda row: dues_type(row['Date'], row['Prevpaid']))],
+					Column("Status", lambda row: db.Members[row['Member']].Membership),
+					Column('Date', lambda row: row.Timestamp.strftime("%m/%d/%Y")),
+					Column('Previous', lambda row: classify(row.Member,row.Timestamp))],
 			deletable=False, details=False, editable=False, create=False,
 			grid_class_style=grid_style,
 			formstyle=form_style,
 			)
 	return locals()
-
-@action('dues_export', method=['GET'])
-@action.uses("download.html", db, session, flash, Inject(response=response))
-@checkaccess('read')
-def dues_export():
-	stream = StringIO()
-	content_type = "text/csv"
-	filename = 'dues.csv'
-	query = session['query2']
-	rows = db(eval(query)).select(orderby=~db.Dues.Date)
-	try:
-		writer=csv.writer(stream)
-		writer.writerow(['Member_id', 'Name', 'College', 'Matr', 'Status', 'Date', 'PrevDate', 'Type'])
-		for row in rows:
-			data = [row.Member, member_name(row.Member), primary_affiliation(row.Member), 
-	   				primary_matriculation(row.Member), row.Status, row.Date, row.Prevpaid or '',
-					dues_type(row.Date, row.Prevpaid)]
-			writer.writerow(data)
-	except Exception as e:
-		flash.set(e)
-		redirect(session['url_prev'])
-	return locals()	
 	
 @action('events', method=['POST', 'GET'])
 @action('events/<path:path>', method=['POST', 'GET'])
@@ -990,7 +973,7 @@ def reservation(ismember, member_id, event_id, path=None):
 	if caller not in ['reservation', 'composemail', 'members', '']:
 		session['back'].append(session['url_prev'])
 	if path=='select' and len(session['back'])>0:
-			back = session['back'][-1]
+			back = session['back'][-1] if len(session['back'])>0 else back
 
 	header = CAT(H5('Event Registration'), H6(member_name(member_id)),
 			XML(event_confirm(event.id, member.id, event_only=True)))
@@ -1536,6 +1519,8 @@ def accounting(path=None):
 					function='financial_statement', title='Financial Statement'))), XML('<br>'),
 	       		A('Tax Statement', _href=URL('get_date_range', vars=dict(
 					function='tax_statement', title='Tax Statement', range='taxyear'))), XML('<br>'),
+	       		A('All Transactions', _href=URL('transactions', vars=dict(
+					query="db.AccTrans.id>0"))), XML('<br>'),
 				"Use Upload to load a file you've downloaded from bank/payment processor into accounting")
 	elif path.startswith('edit') or path.startswith('details'):
 		bank_id = path[path.find('/')+1:]
@@ -1603,8 +1588,6 @@ def bank_file(bank_id):
 	rules = db(db.bank_rules.bank==bank.id).select()
 	bkrecent = db((db.AccTrans.Bank==bank.id)&(db.AccTrans.Accrual!=True)).select(orderby=~db.AccTrans.Timestamp, limitby=(0,1)).first()
 	unalloc = db(db.CoA.Name == 'Unallocated').select().first()
-	acdues = db(db.CoA.Name == "Membership Dues").select().first()
-	actkts = db(db.CoA.Name == "Ticket sales").select().first()
 	origin = 'since account start'
 
 	header = CAT(A('back', _href=URL('accounting')),
@@ -1741,6 +1724,8 @@ def bank_file(bank_id):
 def transactions(path=None):
 	access = session['access']	#for layout.html
 	db.AccTrans.Fee.writable = False
+	acdues = db(db.CoA.Name == "Membership Dues").select().first().id
+	actkts = db(db.CoA.Name == "Ticket sales").select().first().id
 
 	back = URL('transactions/select', scheme=True)
 	if not path:
@@ -1749,7 +1734,7 @@ def transactions(path=None):
 		session['query'] = request.query.get('query')
 		session['left'] = request.query.get('left')
 	elif path=='select':
-		back = session['back'][-1]
+		back = session['back'][-1] if len(session['back'])>0 else back
 	elif path.startswith('edit') or path.startswith('details'):	#editing AccTrans record
 		session['url'] = URL(f"transactions/{path}")	#strip off _referrer parameter to save cookie space
 		db.AccTrans.Amount.comment = 'to split transaction, enter amount of a split piece'
@@ -1779,6 +1764,8 @@ def transactions(path=None):
 	header = CAT(A('back', _href=back), H5('Accounting Transactions'))
 
 	def validate(form):
+		if (form.vars.get('Account')==acdues or form.vars.get('Account')==actkts) and not form.vars.get('Member'):
+			form.errors['Member'] = "Please identify the member"
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
@@ -1790,7 +1777,7 @@ def transactions(path=None):
 			if fee:
 				fee = (fee*new_amount/transaction.Amount).quantize(decimal.Decimal('0.01'))
 			db.AccTrans.insert(Timestamp=transaction.Timestamp, Bank=transaction.Bank,
-								Account=transaction.Account, Event=transaction.Event,
+								Account=transaction.Account, Event=transaction.Event, Member=transaction.Member,
 								Amount=transaction.Amount-new_amount, Fee=transaction.Fee - fee if fee else None,
 								CheckNumber=transaction.CheckNumber, Accrual=transaction.Accrual,
 								 Reference=transaction.Reference,Notes=form.vars.get('Notes'))	#the residual piece
@@ -1798,15 +1785,15 @@ def transactions(path=None):
 			
 	search_queries = [
 		["Account", lambda value: db.AccTrans.Account.belongs([r.id for r in db(db.CoA.Name.ilike(f'%{value}%')).select(db.CoA.id)])],
+		["Member", lambda value: db.AccTrans.Member.belongs([r.id for r in db(db.Members.Lastname.ilike(f'%{value}%')|db.Members.Firstname.ilike(f'%{value}%')).select(db.Members.id)])],
 		["Event", lambda value: db.AccTrans.Event.belongs([r.id for r in db(db.Events.Description.ilike(f'%{value}%')).select(db.Events.id)])],
 		["Notes", lambda value: db.AccTrans.Notes.ilike(f'%{value}%')],
 	]
 	
 	grid = Grid(path, eval(query), left=eval(left) if left else None,
 			orderby=~db.AccTrans.Timestamp,
-			columns=[db.AccTrans.Timestamp, db.AccTrans.Account, db.AccTrans.Event,
-	 				db.AccTrans.Amount, db.AccTrans.Fee, db.AccTrans.CheckNumber, db.AccTrans.Accrual,
-					db.AccTrans.Notes],
+			columns=[db.AccTrans.Timestamp, db.AccTrans.Account, db.AccTrans.Event, db.AccTrans.Member,
+	 				db.AccTrans.Amount, db.AccTrans.Fee, db.AccTrans.CheckNumber, db.AccTrans.Accrual],
 			headings=['Timestamp', 'Account','Event','Amt', 'Fee', 'Chk#', 'Acc', 'Notes'],
 			validation=validate, search_queries=search_queries, show_id=True,
 			deletable=lambda r: r.Accrual, details=False, editable=True, create=bank_id!=None,

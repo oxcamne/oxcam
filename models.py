@@ -360,6 +360,9 @@ db.define_table('AccTrans',
 	Field('Member', 'reference Members',
 				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Members.id', lambda r: f"{r.Lastname}, {r.Firstname}",
 				orderby=db.Members.Lastname|db.Members.Firstname)), comment='leave blank if not applicable'),
+	Field('Paiddate', 'date', comment="On dues payment, record pre-existing paid date"),
+	Field('Membership', requires=IS_EMPTY_OR(IS_IN_SET(MEMBER_CATEGORIES)),
+	   		comment="On dues payment, record new membership status"),
 	Field('Amount', 'decimal(8,2)',
 				requires=IS_DECIMAL_IN_RANGE(-100000, 100000)),	# >=0 for asset/revenue, <0 for liability/expense
 	Field('Fee', 'decimal(6,2)', requires=IS_EMPTY_OR(IS_DECIMAL_IN_RANGE(-1000,1000))),	# e.g. PayPal transaction fee, <0 (unless refunded)

@@ -66,16 +66,14 @@ def stripe_process_charge(dict_csv, bank, reference, timestamp, amount, fee):
 	actkts = db(db.CoA.Name == "Ticket sales").select().first()
 	charge = stripe.Charge.retrieve(dict_csv['Source'])
 	member = db(db.Members.Pay_cust==charge.customer).select().first()
-	notes = f"{member_name(member.id)} {primary_email(member.id)}"
+	notes = f"{dict_csv['Source']}"
 	if dict_csv['Type']=='charge':
-		if charge.description=='Subscription update' or (member.Charged and amount>=member.Charged):
+		if (charge.description=='Subscription update' or (member.Charged and amount>=member.Charged)) and member.Membership:
 			#dues paid, charge may also cover an event (auto renewal or manual)
 			if (charge.description or '').startswith('Subscription'):
 				subscription = stripe.Subscription.list(customer=charge.customer).data[0]
 				notes += f' Subscription: {subscription.id}'
 				member.update_record(Pay_next=datetime.datetime.fromtimestamp(subscription.current_period_end).date())
-			else:
-				notes += f" {dict_csv['Source']}"
 			product = stripe.Product.retrieve(eval(f"STRIPE_PROD_{member.Membership.upper()}"))
 			duesprice = stripe.Price.retrieve(product.default_price)
 			duesamount = decimal.Decimal(duesprice.unit_amount)/100
@@ -83,10 +81,11 @@ def stripe_process_charge(dict_csv, bank, reference, timestamp, amount, fee):
 			nowpaid = newpaiddate(member.Paiddate, timestamp=timestamp)
 			db.Dues.insert(Member=member.id, Amount=duesamount, Date=timestamp.date(),
 				Notes='Stripe', Prevpaid=member.Paiddate, Nowpaid=nowpaid, Status=member.Membership)
-			member.update_record(Paiddate=nowpaid, Charged=None)
 			db.AccTrans.insert(Bank = bank.id, Account = acdues.id, Amount = duesamount,
-					Member=member.id, Fee = duesfee, Accrual = False, Timestamp = timestamp,
+					Member=member.id, Paiddate=member.Paiddate, Membership=member.Membership,
+					Fee = duesfee, Accrual = False, Timestamp = timestamp,
 					Reference = reference, Notes = notes)
+			member.update_record(Paiddate=nowpaid, Charged=None)
 			fee -= duesfee
 			amount -= duesamount
 

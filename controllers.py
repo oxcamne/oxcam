@@ -319,58 +319,67 @@ def member_analytics(path=None):
 	filename = 'member_analytics.csv'
 	writer=csv.writer(stream)
 	writer.writerow(['Name', 'Matr', 'AgeBand', 'Year', 'Category'])
+	acdues = db(db.CoA.Name == "Membership Dues").select().first().id
 
 	matr = db.Affiliations.Matr.min()
 	matrrows = db(db.Affiliations.Matr!=None).select(db.Affiliations.Member, matr, groupby = db.Affiliations.Member)
 
-	query = (db.Members.Paiddate >= datetime.date(2007,1,1))|((db.Members.Paiddate==None)&(db.Members.Membership!=None))
-	left = db.Dues.on(db.Dues.Member==db.Members.id)
+	query = (db.Members.Paiddate >= datetime.date(2016,1,1))|((db.Members.Paiddate==None)&(db.Members.Membership!=None))
+	left = db.AccTrans.on((db.AccTrans.Member==db.Members.id)&(db.AccTrans.Account==acdues))
 
 	rows = db(query).select(db.Members.id, db.Members.Firstname, db.Members.Lastname,
-			 		db.Members.Paiddate, db.Members.Created, db.Dues.Date, 
-					db.Dues.Amount, db.Dues.Nowpaid, db.Dues.Prevpaid, db.Dues.Status,
-					orderby=db.Members.Lastname|db.Members.Firstname|db.Dues.Date,
+			 		db.Members.Paiddate, db.Members.Created, db.Members.Pay_next, db.AccTrans.Timestamp, 
+					db.AccTrans.Amount, db.AccTrans.Paiddate, db.AccTrans.Membership,
+					orderby=db.Members.Lastname|db.Members.Firstname|~db.AccTrans.Timestamp,
 					left = left)
 	
 	l = None
-	thisyear = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).year
+	
+	def output(r, startpaid, endpaid, status):
+		if not endpaid:
+			return
+		name = r.Members.Lastname + ', ' + r.Members.Firstname
+		m = matrrows.find(lambda m: m.Affiliations.Member == r.Members.id).first()
+		matric = m[matr] if m else None
+		year = endpaid.year-1
+		while year >= max(startpaid.year, 2016):
+			writer.writerow([name, str(matric) if matric else '', ageband(year, matric),
+						str(year), status])
+			year -= 1
+	
 	for r in rows:
 		if not l or r.Members.id != l.Members.id:
-			endyear = 0
-			name = r.Members.Lastname + ', ' + r.Members.Firstname
-			m = matrrows.find(lambda m: m.Affiliations.Member == r.Members.id).first()
-			matric = m[matr] if m else None
-			if r.Dues.Date and r.Dues.Prevpaid and not r.Dues.Nowpaid:
-				#assume has been a member since 2007 until Prevaid
-				startyear = max(r.Members.Created.date().year, 2007)
-				endyear = r.Dues.Prevpaid.year - 1
-				while startyear <= endyear:
-					writer.writerow([name, str(matric) if matric else '',
-									ageband(startyear, matric),
-									str(startyear), r.Dues.Status if r.Dues.Status else 'Full'])
-					startyear += 1
+			if l:
+				output(l, l.AccTrans.Timestamp, endpaid, l.AccTrans.Membership)
+				l = None
+
+			if not r.AccTrans.Timestamp:
+				if not r.Members.Paiddate:	#comp/life members
+					output(r, r.Members.Created, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)+datetime.timedelta(days=365), 'Full')
+				continue	#early checks were aggregated, not individually recorded
+
+			if r.Members.id==1597:
+				pass
+			endpaid = r.Members.Pay_next or r.Members.Paiddate
+			if r.Members.Pay_next and r.Members.Pay_next.year==datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).year:
+				endpaid = r.Members.Paiddate + datetime.timedelta(days=365)
+			if (not r.AccTrans.Paiddate or r.AccTrans.Timestamp.date()>r.AccTrans.Paiddate + datetime.timedelta(days=GRACE_PERIOD)):
+				output(r, r.AccTrans.Timestamp, endpaid, r.AccTrans.Membership)
+				endpaid = r.AccTrans.Paiddate
+			l = r	#this was a renewal, check next record
+			continue
+
+		if (l.AccTrans.Paiddate and l.AccTrans.Timestamp.date()<=l.AccTrans.Paiddate + datetime.timedelta(days=GRACE_PERIOD)\
+			and l.AccTrans.Membership != r.AccTrans.Membership):
+			output(l, l.AccTrans.Timestamp, endpaid, l.AccTrans.Membership)
+			endpaid = l.AccTrans.Timestamp
+		if (not r.AccTrans.Paiddate or r.AccTrans.Timestamp.date()>r.AccTrans.Paiddate + datetime.timedelta(days=GRACE_PERIOD)):
+			output(r, r.AccTrans.Timestamp, endpaid, r.AccTrans.Membership)
+			endpaid = r.AccTrans.Paiddate
 		l = r
-		if not r.Members.Paiddate:	#life members
-			startyear = max(r.Members.Created.date().year, 2007)
-			endyear = thisyear
-		elif not r.Dues.Date:	#no dues payment recorded
-			endyear = r.Members.Paiddate.year - 1
-			startyear = endyear
-			# assume a one year membership from attending an event.
-		elif not r.Dues.Nowpaid:
-			startyear = max(r.Dues.Date.year, endyear+1)
-			endyear = startyear + r.Dues.Amount/(5 if r.Dues.Status=='Student' else 20) - 1
-		else:				#dues payments recorded
-			startyear = max(r.Dues.Date.year, endyear+1)
-			endyear = r.Dues.Nowpaid.year-1
-			if r.Dues.Nowpaid>=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date() and endyear==thisyear-1:
-				endyear = thisyear	#assume renewal later this year
-	
-		while startyear <= endyear:
-			writer.writerow([name, str(matric) if matric else '',
-							ageband(startyear, matric),
-							str(startyear), r.Dues.Status if r.Dues.Status else 'Full'])
-			startyear += 1
+
+	if l:
+		output(l, l.AccTrans.Timestamp, endpaid, l.AccTrans.Membership)
 
 	return locals()
 
@@ -602,15 +611,14 @@ def new_members(path=None):
 
 	rows = db((db.AccTrans.Account==acdues) & (db.AccTrans.Member!=None)).select(orderby=~db.AccTrans.Timestamp)
 
-	def classify(member_id,timestamp):
-		prev_dues = db((db.AccTrans.Account==acdues)&(db.AccTrans.Member==member_id)&(db.AccTrans.Timestamp<timestamp)).select(orderby=~db.AccTrans.Timestamp).first()
-		if not prev_dues:
+	def classify(transaction):
+		if not transaction.Paiddate:
 			return 'New'
-		if prev_dues.Timestamp > timestamp - datetime.timedelta(days=365+2*GRACE_PERIOD):
+		if transaction.Timestamp.date() < transaction.Paiddate + datetime.timedelta(days=GRACE_PERIOD):
 			return 'Renewal'
-		return prev_dues.Timestamp.strftime("%m/%d/%Y")
+		return transaction.Paiddate.strftime("%m/%d/%Y")
 	
-	rows = rows.find(lambda r: classify(r.Member, r.Timestamp) != 'Renewal')
+	rows = rows.find(lambda r: classify(r) != 'Renewal')
 	ids = [r.id for r in rows]
 	
 	header =H5('Recent New/Reinstated Members')
@@ -621,7 +629,7 @@ def new_members(path=None):
 	    			Column("Matr", lambda row: primary_matriculation(row['Member'])),
 					Column("Status", lambda row: db.Members[row['Member']].Membership),
 					Column('Date', lambda row: row.Timestamp.strftime("%m/%d/%Y")),
-					Column('Previous', lambda row: classify(row.Member,row.Timestamp))],
+					Column('Previous', lambda row: classify(row))],
 			deletable=False, details=False, editable=False, create=False,
 			grid_class_style=grid_style,
 			formstyle=form_style,
@@ -1766,6 +1774,8 @@ def transactions(path=None):
 	def validate(form):
 		if (form.vars.get('Account')==acdues or form.vars.get('Account')==actkts) and not form.vars.get('Member'):
 			form.errors['Member'] = "Please identify the member"
+		if form.vars.get('Account')==acdues and not form.vars.get('Paiddate'):
+			form.errors['Paiddate'] = "Please supply member's pre-renewail paiddate"
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return

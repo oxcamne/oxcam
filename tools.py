@@ -14,9 +14,9 @@ from .controllers import checkaccess, form_style
 from py4web.utils.form import Form, FormStyleDefault
 from py4web.utils.grid import Grid, GridClassStyle
 from yatl.helpers import XML, H5
-from .settings import SOCIETY_SHORT_NAME, PAGE_BANNER, HOME_URL, HELP_URL
+from .settings import SOCIETY_SHORT_NAME, PAGE_BANNER, HOME_URL, HELP_URL, GRACE_PERIOD
 from py4web.utils.factories import Inject
-import io
+import io, datetime
 from io import StringIO
 
 preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
@@ -85,23 +85,26 @@ See the Py4web documentation (DAL) for to learn more.")
 @checkaccess('admin')
 def transaction_members(path=None):
 	access = session['access']	#for layout.html
-	
-	header = H5("get member id into dues and events payments")
 	acdues = db(db.CoA.Name == "Membership Dues").select().first()
-	actkts = db(db.CoA.Name == "Ticket sales").select().first()
+	
+	header = H5("copy member paiddate from dues records into dues transactions")
 
-	if not session.get('transaction_members'):
-		rows = db(db.AccTrans.Notes.contains(db.Emails.Email)).select(db.AccTrans.id, db.Emails.Member)
+	transactions = db((db.AccTrans.Account==acdues)&(db.AccTrans.Member!=None)).select(orderby=db.AccTrans.Member|~db.AccTrans.Timestamp)
+	dues_records = db(db.Dues.id>0).select(orderby=db.Dues.Member|~db.Dues.Date)
 
-		for row in rows:
-			db.AccTrans[row.AccTrans.id].update_record(Member=row.Emails.Member)
-	session['transaction_members'] = True
+	t = 0	#index for transactions
+	d = 0	#inded for dues_records
 
-	grid = Grid(path, ((db.AccTrans.Account==acdues.id)|(db.AccTrans.Account==actkts.id))&(db.AccTrans.Member==None)&(db.AccTrans.Timestamp>="2019-01-01 00:00"),
-				columns=[db.AccTrans.Timestamp, db.AccTrans.Notes],
-				details=False, editable=True, create=False, deletable=False,
-				grid_class_style=GridClassStyle, formstyle=form_style, show_id=True,
-				)
+	for t in range(len(transactions)):
+		trans = transactions[t]
+		while d<len(dues_records):
+			dues = dues_records[d]
+			if dues.Member > trans.Member or (dues.Member == trans.Member and dues.Date < trans.Timestamp.date()+datetime.timedelta(days=GRACE_PERIOD)):
+				break
+			d += 1
+		if d<len(dues_records) and dues.Member == trans.Member:
+			trans.update_record(Paiddate=dues.Prevpaid, Membership=dues.Status)
+
 	return locals()
 
 @action("db_restore", method=['POST', 'GET'])

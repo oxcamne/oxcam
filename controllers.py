@@ -325,9 +325,9 @@ def member_analytics(path=None):
 	matrrows = db(db.Affiliations.Matr!=None).select(db.Affiliations.Member, matr, groupby = db.Affiliations.Member)
 
 	query = (db.Members.Paiddate >= datetime.date(2016,1,1))|((db.Members.Paiddate==None)&(db.Members.Membership!=None))
-	left = db.AccTrans.on((db.AccTrans.Member==db.Members.id)&(db.AccTrans.Account==acdues))
+	left = db.AccTrans.on((db.AccTrans.Member==db.Members.id)&(db.AccTrans.Account==acdues)&(db.AccTrans.Amount>0))
 
-	rows = db(query).select(db.Members.id, db.Members.Firstname, db.Members.Lastname,
+	rows = db(query).select(db.Members.id, db.Members.Firstname, db.Members.Lastname, db.Members.Membership,
 			 		db.Members.Paiddate, db.Members.Created, db.Members.Pay_next, db.AccTrans.Timestamp, 
 					db.AccTrans.Amount, db.AccTrans.Paiddate, db.AccTrans.Membership,
 					orderby=db.Members.Lastname|db.Members.Firstname|~db.AccTrans.Timestamp,
@@ -356,10 +356,10 @@ def member_analytics(path=None):
 			if not r.AccTrans.Timestamp:
 				if not r.Members.Paiddate:	#comp/life members
 					output(r, r.Members.Created, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)+datetime.timedelta(days=365), 'Full')
+				else:
+					output(r, r.Members.Paiddate-datetime.timedelta(days=365), r.Members.Paiddate, r.Members.Membership or 'Full')
 				continue	#early checks were aggregated, not individually recorded
 
-			if r.Members.id==1597:
-				pass
 			endpaid = r.Members.Pay_next or r.Members.Paiddate
 			if r.Members.Pay_next and r.Members.Pay_next.year==datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).year:
 				endpaid = r.Members.Paiddate + datetime.timedelta(days=365)

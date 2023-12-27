@@ -79,8 +79,6 @@ def stripe_process_charge(dict_csv, bank, reference, timestamp, amount, fee):
 			duesamount = decimal.Decimal(duesprice.unit_amount)/100
 			duesfee = (duesamount * fee)/amount	#prorate fee
 			nowpaid = newpaiddate(member.Paiddate, timestamp=timestamp)
-			db.Dues.insert(Member=member.id, Amount=duesamount, Date=timestamp.date(),
-				Notes='Stripe', Prevpaid=member.Paiddate, Nowpaid=nowpaid, Status=member.Membership)
 			db.AccTrans.insert(Bank = bank.id, Account = acdues.id, Amount = duesamount,
 					Member=member.id, Paiddate=member.Paiddate, Membership=member.Membership,
 					Fee = duesfee, Accrual = False, Timestamp = timestamp,

@@ -38,7 +38,7 @@ from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
 	PAYMENT_PROCESSOR, PAGE_BANNER, HOME_URL, PUBLIC_URL, HELP_URL
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
-	primary_matriculation, dues_type, event_revenue, event_unpaid, res_tbc, res_status,\
+	primary_matriculation, event_revenue, event_unpaid, res_tbc, res_status,\
 	res_conf, res_totalcost, res_wait, res_prov, bank_accrual, tickets_sold,\
 	selections_made, survey_choices
 from pydal.validators import IS_LIST_OF_EMAILS, IS_EMPTY_OR, IS_IN_DB, IS_IN_SET,\
@@ -144,19 +144,20 @@ def members(path=None):
 		header = CAT(header, A("Send Email to Specific Address(es)", _href=URL('composemail')), XML('<br>'))
 	elif path:
 		caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev']).group(1)
-		if caller!='members' and caller not in ['composemail', 'affiliations', 'emails', 'dues', 'member_reservations', 'cancel_subscription']:
+		if caller!='members' and caller not in ['composemail', 'affiliations', 'emails', 'transactions', 'member_reservations', 'cancel_subscription']:
 			session['back'].append(session['url_prev'])
 		if len(session['back'])>0 and re.match(f'.*/{request.app_name}/([a-z_]*).*', session['back'][-1]).group(1)!='members':
 			back = session['back'][-1] if len(session['back'])>0 else back
 		header = CAT(A('back', _href=back), H5('Member Record'))
 		if path.startswith('edit') or path.startswith('details'):
+			acdues = db(db.CoA.Name == "Membership Dues").select().first().id
 			member_id = path[path.find('/')+1:]
 			member = db.Members[member_id]
 			header= CAT(header, 
 	       			A('Member reservations', _href=URL(f'member_reservations/{member_id}/select')), XML('<br>'),
 					A('OxCam affiliation(s)', _href=URL(f'affiliations/N/{member_id}/select')), XML('<br>'),
 					A('Email addresses and subscriptions', _href=URL(f'emails/N/{member_id}/select')), XML('<br>'),
-					A('Dues payments', _href=URL(f'dues/{member_id}/select')), XML('<br>'),
+					A('Dues payments', _href=URL('transactions', vars=dict(query=f"(db.AccTrans.Account=={acdues})&(db.AccTrans.Member=={member_id})"))), XML('<br>'),
 					A('Send Email to Member', _href=URL('composemail',
 					 	vars=dict(query=f"db.Members.id=={member_id}", left='',
 		 					qdesc=member_name(member_id)))))
@@ -309,20 +310,9 @@ def members_export():
 		redirect(URL('members/select'))
 	return locals()	
 
-@action('member_analytics', method=['GET'])
-@action('member_analytics/<path:path>', method=['GET'])
-@action.uses("download.html", db, session, flash, Inject(response=response))
-@checkaccess('write')
-def member_analytics(path=None):
-	stream=StringIO()
-	content_type = "text/csv"
-	filename = 'member_analytics.csv'
-	writer=csv.writer(stream)
-	writer.writerow(['Name', 'Matr', 'AgeBand', 'Year', 'Category'])
+#used by member_analytics and financial_statement to analyze the stream of dues payments
+def scan_dues(function):
 	acdues = db(db.CoA.Name == "Membership Dues").select().first().id
-
-	matr = db.Affiliations.Matr.min()
-	matrrows = db(db.Affiliations.Matr!=None).select(db.Affiliations.Member, matr, groupby = db.Affiliations.Member)
 
 	query = (db.Members.Paiddate >= datetime.date(2016,1,1))|((db.Members.Paiddate==None)&(db.Members.Membership!=None))
 	left = db.AccTrans.on((db.AccTrans.Member==db.Members.id)&(db.AccTrans.Account==acdues)&(db.AccTrans.Amount>0))
@@ -334,6 +324,54 @@ def member_analytics(path=None):
 					left = left)
 	
 	l = None
+	
+	for r in rows:
+		if not l or r.Members.id != l.Members.id:
+			if l:
+				function(l, l.AccTrans.Timestamp, endpaid, l.AccTrans.Membership)
+				l = None
+
+			if not r.AccTrans.Timestamp:
+				if not r.Members.Paiddate:	#comp/life members
+					function(r, r.Members.Created, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)+datetime.timedelta(days=365), 'Full')
+				else:
+					function(r, r.Members.Paiddate-datetime.timedelta(days=365), r.Members.Paiddate, r.Members.Membership or 'Full')
+				continue	#early checks were aggregated, not individually recorded
+			
+			endpaid = r.Members.Pay_next or r.Members.Paiddate
+			if r.Members.Pay_next and r.Members.Pay_next.year==datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).year:
+				endpaid = r.Members.Paiddate + datetime.timedelta(days=365)
+			if (not r.AccTrans.Paiddate or r.AccTrans.Timestamp.date()>r.AccTrans.Paiddate + datetime.timedelta(days=GRACE_PERIOD)):
+				function(r, r.AccTrans.Timestamp, endpaid, r.AccTrans.Membership)
+				endpaid = r.AccTrans.Paiddate
+			l = r	#this was a renewal, check next record
+			continue
+
+		if (l.AccTrans.Paiddate and l.AccTrans.Timestamp.date()<=l.AccTrans.Paiddate + datetime.timedelta(days=GRACE_PERIOD)\
+			and l.AccTrans.Membership != r.AccTrans.Membership):
+			function(l, l.AccTrans.Timestamp, endpaid, l.AccTrans.Membership)
+			endpaid = l.AccTrans.Timestamp.date()
+		if (not r.AccTrans.Paiddate or r.AccTrans.Timestamp.date()>r.AccTrans.Paiddate + datetime.timedelta(days=GRACE_PERIOD)):
+			function(r, r.AccTrans.Timestamp, endpaid, r.AccTrans.Membership)
+			endpaid = r.AccTrans.Paiddate
+		l = r
+
+	if l:
+		function(l, l.AccTrans.Timestamp, endpaid, l.AccTrans.Membership)
+
+@action('member_analytics', method=['GET'])
+@action('member_analytics/<path:path>', method=['GET'])
+@action.uses("download.html", db, session, flash, Inject(response=response))
+@checkaccess('write')
+def member_analytics(path=None):
+	stream=StringIO()
+	content_type = "text/csv"
+	filename = 'member_analytics.csv'
+	writer=csv.writer(stream)
+	writer.writerow(['Name', 'Matr', 'AgeBand', 'Year', 'Category'])
+
+	matr = db.Affiliations.Matr.min()
+	matrrows = db(db.Affiliations.Matr!=None).select(db.Affiliations.Member, matr, groupby = db.Affiliations.Member)
 	
 	def output(r, startpaid, endpaid, status):
 		if not endpaid:
@@ -347,40 +385,7 @@ def member_analytics(path=None):
 						str(year), status])
 			year -= 1
 	
-	for r in rows:
-		if not l or r.Members.id != l.Members.id:
-			if l:
-				output(l, l.AccTrans.Timestamp, endpaid, l.AccTrans.Membership)
-				l = None
-
-			if not r.AccTrans.Timestamp:
-				if not r.Members.Paiddate:	#comp/life members
-					output(r, r.Members.Created, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)+datetime.timedelta(days=365), 'Full')
-				else:
-					output(r, r.Members.Paiddate-datetime.timedelta(days=365), r.Members.Paiddate, r.Members.Membership or 'Full')
-				continue	#early checks were aggregated, not individually recorded
-
-			endpaid = r.Members.Pay_next or r.Members.Paiddate
-			if r.Members.Pay_next and r.Members.Pay_next.year==datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).year:
-				endpaid = r.Members.Paiddate + datetime.timedelta(days=365)
-			if (not r.AccTrans.Paiddate or r.AccTrans.Timestamp.date()>r.AccTrans.Paiddate + datetime.timedelta(days=GRACE_PERIOD)):
-				output(r, r.AccTrans.Timestamp, endpaid, r.AccTrans.Membership)
-				endpaid = r.AccTrans.Paiddate
-			l = r	#this was a renewal, check next record
-			continue
-
-		if (l.AccTrans.Paiddate and l.AccTrans.Timestamp.date()<=l.AccTrans.Paiddate + datetime.timedelta(days=GRACE_PERIOD)\
-			and l.AccTrans.Membership != r.AccTrans.Membership):
-			output(l, l.AccTrans.Timestamp, endpaid, l.AccTrans.Membership)
-			endpaid = l.AccTrans.Timestamp
-		if (not r.AccTrans.Paiddate or r.AccTrans.Timestamp.date()>r.AccTrans.Paiddate + datetime.timedelta(days=GRACE_PERIOD)):
-			output(r, r.AccTrans.Timestamp, endpaid, r.AccTrans.Membership)
-			endpaid = r.AccTrans.Paiddate
-		l = r
-
-	if l:
-		output(l, l.AccTrans.Timestamp, endpaid, l.AccTrans.Membership)
-
+	scan_dues(output)
 	return locals()
 
 @action('member_reservations/<member_id:int>', method=['POST', 'GET'])
@@ -560,45 +565,6 @@ To change your mailing list subscritions, use the <b>Edit</b> button."))
 			notify_support(db.Members[member_id],"Mail Subscriptions Updated",
 		  		f"{email.Email} {', '.join([list.Listname for list in db(db.Email_Lists.id.belongs(mailings)).select()])}")
 			redirect(URL(f"emails/Y/{member_id}/select"))
-	return locals()
-	
-@action('dues/<member_id:int>', method=['POST', 'GET'])
-@action('dues/<member_id:int>/<path:path>', method=['POST', 'GET'])
-@preferred
-@checkaccess('read')
-def dues(member_id, path=None):
-# .../dues/member_id/...
-	access = session['access']	#for layout.html
-	session['url']=session['url_prev']	#preserve back link
-	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
-	db.Dues.Member.default=member_id
-
-	member=db.Members[member_id]
-	db.Dues.Member.default=member.id
-	db.Dues.Status.default=member.Membership
-	db.Dues.Prevpaid.default = member.Paiddate
-	db.Dues.Nowpaid.default = newpaiddate(member.Paiddate)
-
-	header = CAT(A('back', _href=session['url_prev']),
-	      		H5('Member Dues'),
-	      		H6(member_name(member_id)))
-
-	def dues_validated(form):
-		if len(form.errors)>0:
-			flash.set("Error(s) in form, please check")
-			return
-		if (not form.vars.get('id')): 	#adding dues record
-			member.update_record(Membership=form.vars.get('Status'), Paiddate=form.vars.get('Nowpaid'),
-								Charged=None)
-
-	grid = Grid(path, db.Dues.Member==member_id,
-	     	orderby=~db.Dues.Date,
-			columns=[db.Dues.Amount, db.Dues.Date, db.Dues.Notes, db.Dues.Prevpaid, db.Dues.Nowpaid],
-			details=not write, editable=write, create=write, deletable=write,
-			validation=dues_validated,
-			grid_class_style=grid_style,
-			formstyle=form_style,
-			)
 	return locals()
 	
 @action('new_members', method=['GET'])
@@ -1318,6 +1284,7 @@ def financial_statement():
 	startdate = datetime.date.fromisoformat(start)
 	enddate = datetime.date.fromisoformat(end)
 	title = f"Financial Statement for period {start} to {end}"
+	acdues = db(db.CoA.Name == "Membership Dues").select().first().id
 
 	if not start or not end:
 		redirect(URL('get_date_range', vars=dict(function='financial_statement',title='Financial Statement')))
@@ -1341,13 +1308,14 @@ def financial_statement():
 		
 	def prepaiddues(date_time):
 		end = (date_time + datetime.timedelta(days=365)).date()
-		date = date_time.date()
-		rows = db((db.Dues.Nowpaid > end) & (db.Dues.Date < date)).select()
 		prepaid = 0
-		for r in rows:
-			yr = r.Prevpaid.year if r.Prevpaid else r.Date.year
-			if yr < r.Date.year: yr = r.Date.year
-			prepaid -= r.Amount * (r.Nowpaid.year - end.year) / (r.Nowpaid.year - yr)
+	
+		def dues_payment(r, startpaid, endpaid, status):
+			nonlocal prepaid
+			if r.AccTrans.Timestamp and endpaid and r.AccTrans.Timestamp<date_time and endpaid>end:
+				prepaid -= r.AccTrans.Amount*(endpaid-end).days/(endpaid-startpaid.date()).days
+
+		scan_dues(dues_payment)
 		return (prepaid, None, None)
 	
 	assets = get_banks(startdatetime, enddatetime)
@@ -1774,8 +1742,6 @@ def transactions(path=None):
 	def validate(form):
 		if (form.vars.get('Account')==acdues or form.vars.get('Account')==actkts) and not form.vars.get('Member'):
 			form.errors['Member'] = "Please identify the member"
-		if form.vars.get('Account')==acdues and not form.vars.get('Paiddate'):
-			form.errors['Paiddate'] = "Please supply member's pre-renewail paiddate"
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
@@ -1804,7 +1770,7 @@ def transactions(path=None):
 			orderby=~db.AccTrans.Timestamp,
 			columns=[db.AccTrans.Timestamp, db.AccTrans.Account, db.AccTrans.Event, db.AccTrans.Member,
 	 				db.AccTrans.Amount, db.AccTrans.Fee, db.AccTrans.CheckNumber, db.AccTrans.Accrual],
-			headings=['Timestamp', 'Account','Event','Amt', 'Fee', 'Chk#', 'Acc', 'Notes'],
+			headings=['Timestamp', 'Account','Event','Member','Amt', 'Fee', 'Chk#', 'Acc'],
 			validation=validate, search_queries=search_queries, show_id=True,
 			deletable=lambda r: r.Accrual, details=False, editable=True, create=bank_id!=None,
 			field_id=db.AccTrans.id, grid_class_style=grid_style, formstyle=form_style)

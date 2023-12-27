@@ -114,19 +114,6 @@ db.define_table('Emails',
 	Field('Modified', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None),
        			update=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),
 	singular="Email", plural="Emails", format='%(Email)s')
-
-def dues_type(date, prevpaid):
-	return 'new' if not prevpaid else 'renewal' if date <= prevpaid + datetime.timedelta(days=365) else 'reinstated'
-
-db.define_table('Dues',
-	Field('Member', 'reference Members', writable=False),
-	Field('Status', 'string', requires=IS_IN_SET(MEMBER_CATEGORIES), writable=True, readable=True),
-	Field('Amount', 'decimal(6,2)', requires=[IS_NOT_EMPTY(), IS_DECIMAL_IN_RANGE(0, 500)]),
-	Field('Date', 'date', default=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date(), writable=False),
-	Field('Notes', 'string', default=''),
-	Field('Prevpaid', 'date'), #used to track paid member history
-	Field('Nowpaid', 'date'), #paid date after this payment
-	singular="Dues", plural="Dues")
 	
 def event_revenue(event_id):	#revenue from confirmed tickets
 	rows = db(db.Reservations.Event==event_id).\

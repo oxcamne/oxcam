@@ -43,15 +43,15 @@ Something like \"db.table1.field1==db.table2.field2\" results in a SQL JOIN. Res
 See the Py4web documentation (DAL) for to learn more.")
 
 	if not path:
-		session['query'] = None
-		session['orderby'] = None
-		session['left'] = None
+		session['query2'] = None
+		session['orderby2'] = None
+		session['left2'] = None
 
 	try:
 		if form.accepted:
-			session['query'] = form.vars.get('query')
-			session['orderby'] = form.vars.get('orderby')
-			session['left'] = form.vars.get('left')
+			session['query2'] = form.vars.get('query')
+			session['orderby2'] = form.vars.get('orderby')
+			session['left2'] = form.vars.get('left')
 			rows = db(eval(form.vars.get('query'))).select()
 			if form.vars.get('do_update'):
 				for row in rows:
@@ -65,9 +65,9 @@ See the Py4web documentation (DAL) for to learn more.")
 			form.vars['do_update'] = False
 			form.vars['delete_all'] = False
 		
-		form.vars['query'] = session.get('query')
-		form.vars['orderby'] = session.get('orderby')
-		form.vars['left'] = session.get('left')
+		form.vars['query'] = session.get('query2')
+		form.vars['orderby'] = session.get('orderby2')
+		form.vars['left'] = session.get('left2')
 		if form.vars.get('query'):
 			grid = Grid(path, eval(form.vars.get('query')),
 			   		orderby=eval(form.vars.get('orderby')) if form.vars.get('orderby') else None,
@@ -77,34 +77,6 @@ See the Py4web documentation (DAL) for to learn more.")
 					)
 	except Exception as e:
 		flash.set(e)
-	return locals()
-
-@action('transaction_members', method=['POST', 'GET'])
-@action('transaction_members/<path:path>', method=['POST', 'GET'])
-@preferred
-@checkaccess('admin')
-def transaction_members(path=None):
-	access = session['access']	#for layout.html
-	acdues = db(db.CoA.Name == "Membership Dues").select().first()
-	
-	header = H5("copy member paiddate from dues records into dues transactions")
-
-	transactions = db((db.AccTrans.Account==acdues)&(db.AccTrans.Member!=None)).select(orderby=db.AccTrans.Member|~db.AccTrans.Timestamp)
-	dues_records = db(db.Dues.id>0).select(orderby=db.Dues.Member|~db.Dues.Date)
-
-	t = 0	#index for transactions
-	d = 0	#inded for dues_records
-
-	for t in range(len(transactions)):
-		trans = transactions[t]
-		while d<len(dues_records):
-			dues = dues_records[d]
-			if dues.Member > trans.Member or (dues.Member == trans.Member and dues.Date < trans.Timestamp.date()+datetime.timedelta(days=GRACE_PERIOD)):
-				break
-			d += 1
-		if d<len(dues_records) and dues.Member == trans.Member:
-			trans.update_record(Paiddate=dues.Prevpaid, Membership=dues.Status)
-
 	return locals()
 
 @action("db_restore", method=['POST', 'GET'])

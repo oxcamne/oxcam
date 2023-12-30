@@ -1,6 +1,6 @@
 # [Oxford/Cambridge Alumni Group Database](index.md)
 
-## Members Affiliations Page
+## Members Dues Page
 
 This screen, reached from the [member record](./member_record.md) displays a member's dues payments, in the reverse chronological order:
 

@@ -33,21 +33,20 @@ A confirmed registration may not yet have been paid for (assuming there is a cha
 ### Building the Waitlist
 
 When a host member checks out a new reservation that would exceed the event capacity, the entire reservation is waitlisted: both the host and any guest reservation records have 'Waitlist' set true.
+Once the overall capacity of an event has been reached, the 'Waiting' flag in the event record is set and all additional registrations are waitlisted.
 
-However, a confirmed reservation can also contain additional guests in the provisional or waitlisted states. For example, the host may return and add an additional guest and not have checked out or paid, or there may not be space for the additional guest(s).
+If sales of a particular ticket type reach their limit, the 'Waiting' flag in that ticket type is set and all additional registrations for that ticket type are waitlisted. Registrations for other ticket types may still be confirmed.
+
+A confirmed reservation can also contain additional guests in the provisional or waitlisted states. For example, the host may return and add an additional guest and not have checked out or paid, or there may not be space for the additional guest(s).
 
 To view the waitlist, click on the event name in the Events Page to display the Reservations List, then click on the 'waitlist' link. The waitlist is displayed in chronological order. This will include all reservations that include any waitlisted guests.
-
-Note that if there is a limited number of tickets of a particular ticket type, there may be a waitlist even though the event is not full.
 
 ### Allocating Available Spaces to the Waitlist
 
 If spaces become available, the Secretary or other official managing registration will determine how to allocate them, normally starting at the top of the waitlist.
 
-It is **important not to delete** the cancelled registrations until efforts to re-sell them to the waitlist have failed, otherwise members not on the waitlist might grab them. You might use the notes to document that they need to be cancelled later.
+When cancellations are received, the associated reservation records may either be deleted or set to provisional.
 
-When someone on the waitlist is found who can use the freed places, allocate the spaces by clearing the 'waitlist' flag. If it is a reservation that is entirely waitlisted, simply edit the host reservation (first row). In the case of a waitlisted additional guest, edit the individual waitlisted row(s). The member should then revisit the booking link and checkout, making payment and receiving confirmation.
-
-Depending on how close the event is, one can offer places to a single waitlistee, or to a whole group on a first-come first-serve basis.
+When someone on the waitlist is found who can use the freed places, allocate the spaces by clearing the 'waitlist' flag. If it is a reservation that is entirely waitlisted, simply edit the host reservation (first row). In the case of a waitlisted additional guest, edit the individual waitlisted row(s). The member should then revisit the booking link and checkout; they will receive their confirmation when any necessary payment is completed.
 
 The Reservation Display includes a link to email the host member. You can include '\<reservation>' at the bottom of the text to include a confirmation of the registration. If a payment is needed, this will show the amount and also include the payment link.

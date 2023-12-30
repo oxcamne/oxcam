@@ -311,7 +311,7 @@ def members_export():
 	return locals()	
 
 #used by member_analytics and financial_statement to analyze the stream of dues payments
-def scan_dues(function):
+def scan_dues(function, oldest=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)):
 	acdues = db(db.CoA.Name == "Membership Dues").select().first().id
 
 	query = (db.Members.Paiddate >= datetime.date(2016,1,1))|((db.Members.Paiddate==None)&(db.Members.Membership!=None))
@@ -341,17 +341,24 @@ def scan_dues(function):
 			endpaid = r.Members.Pay_next or r.Members.Paiddate
 			if r.Members.Pay_next and r.Members.Pay_next.year==datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).year:
 				endpaid = r.Members.Paiddate + datetime.timedelta(days=365)
-			if (not r.AccTrans.Paiddate or r.AccTrans.Timestamp.date()>r.AccTrans.Paiddate + datetime.timedelta(days=GRACE_PERIOD)):
+			if r.AccTrans.Timestamp and r.AccTrans.Timestamp>oldest:
+				endpaid = r.AccTrans.Paiddate
+				r.AccTrans.Amount = 0
+			elif (not r.AccTrans.Paiddate or r.AccTrans.Timestamp.date()>r.AccTrans.Paiddate + datetime.timedelta(days=GRACE_PERIOD)):
 				function(r, r.AccTrans.Timestamp, endpaid, r.AccTrans.Membership)
 				endpaid = r.AccTrans.Paiddate
 			l = r	#this was a renewal, check next record
 			continue
 
-		if (l.AccTrans.Paiddate and l.AccTrans.Timestamp.date()<=l.AccTrans.Paiddate + datetime.timedelta(days=GRACE_PERIOD)\
+		r.AccTrans.Amount += l.AccTrans.Amount
+		if r.AccTrans.Timestamp and r.AccTrans.Timestamp>oldest:
+			endpaid = r.AccTrans.Paiddate
+			r.AccTrans.Amount = 0
+		elif (l.AccTrans.Paiddate and l.AccTrans.Timestamp.date()<=l.AccTrans.Paiddate + datetime.timedelta(days=GRACE_PERIOD)\
 			and l.AccTrans.Membership != r.AccTrans.Membership):
 			function(l, l.AccTrans.Timestamp, endpaid, l.AccTrans.Membership)
 			endpaid = l.AccTrans.Timestamp.date()
-		if (not r.AccTrans.Paiddate or r.AccTrans.Timestamp.date()>r.AccTrans.Paiddate + datetime.timedelta(days=GRACE_PERIOD)):
+		elif (not r.AccTrans.Paiddate or r.AccTrans.Timestamp.date()>r.AccTrans.Paiddate + datetime.timedelta(days=GRACE_PERIOD)):
 			function(r, r.AccTrans.Timestamp, endpaid, r.AccTrans.Membership)
 			endpaid = r.AccTrans.Paiddate
 		l = r
@@ -902,7 +909,7 @@ def reservation(ismember, member_id, event_id, path=None):
 	tickets_available = {}
 	for t in tickets:
 		if t.Count:
-			tickets_available[t.Ticket] = t.Count - tickets_sold(event_id, t.Ticket)
+			tickets_available[t.Ticket] = t.Count - tickets_sold(event_id, t.Ticket) if not t.Waiting else 0
 	selections = db(db.Event_Selections.Event==event_id).select()
 	event_selections = [s.Selection for s in selections]
 	survey = db(db.Event_Survey.Event==event_id).select()
@@ -921,7 +928,7 @@ def reservation(ismember, member_id, event_id, path=None):
 	provisional_ticket_cost = 0
 	adding = 0
 	confirmed = 0
-	waitlist = False
+	waitlist = event.Waiting
 	for row in all_guests:
 		if row.Ticket:
 			t = tickets.find(lambda t: t.Ticket==row.Ticket).first()
@@ -962,7 +969,7 @@ def reservation(ismember, member_id, event_id, path=None):
 			if datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.Booking_Closed:
 				waitlist = True
 				flash.set("Registration is closed, please Checkout to add new registrations to the waitlist.")
-			elif event.Capacity and attend+adding>event.Capacity:
+			elif event.Capacity and (attend+adding>event.Capacity or event.Waiting):
 				waitlist = True
 				flash.set("Event is full: please Checkout to add all unconfirmed guests to the waitlist.")
 			elif event.Capacity and attend+adding==event.Capacity:
@@ -1124,10 +1131,14 @@ Moving member on/off waitlist will also affect all guests."))
 		elif form2.accepted:
 			host_reservation.update_record(Survey=form2.vars.get('survey'), Comment=form2.vars.get('comment'))
 			for row in all_guests.find(lambda row: row.Provisional==True):
+				if row.Ticket in tickets_available and tickets_available[row.Ticket] < 0:
+					tickets.find(lambda t: t.Ticket==row.Ticket).first().update_record(Waiting=True)
 				row.update_record(Provisional=False, Waitlist=waitlist)
 
 			if waitlist:
 				flash.set(f"{'You' if confirmed==0 else 'Your additional guest(s)'} have been added to the waitlist.")
+				if event.Capacity and attend+adding>event.Capacity:
+					event.update_record(Waiting=True)
 		
 			if payment==0:	#free event, confirm booking
 				if not waitlist:
@@ -1315,7 +1326,7 @@ def financial_statement():
 			if r.AccTrans.Timestamp and endpaid and r.AccTrans.Timestamp<date_time and endpaid>end:
 				prepaid -= r.AccTrans.Amount*(endpaid-end).days/(endpaid-startpaid.date()).days
 
-		scan_dues(dues_payment)
+		scan_dues(dues_payment, oldest=date_time)
 		return (prepaid, None, None)
 	
 	assets = get_banks(startdatetime, enddatetime)
@@ -1700,6 +1711,8 @@ def bank_file(bank_id):
 def transactions(path=None):
 	access = session['access']	#for layout.html
 	db.AccTrans.Fee.writable = False
+	db.AccTrans.Paiddate.writable = False
+	db.AccTrans.Membership.writable = False
 	acdues = db(db.CoA.Name == "Membership Dues").select().first().id
 	actkts = db(db.CoA.Name == "Ticket sales").select().first().id
 
@@ -1740,15 +1753,44 @@ def transactions(path=None):
 	header = CAT(A('back', _href=back), H5('Accounting Transactions'))
 
 	def validate(form):
-		if (form.vars.get('Account')==acdues or form.vars.get('Account')==actkts) and not form.vars.get('Member'):
-			form.errors['Member'] = "Please identify the member"
-		if len(form.errors)>0:
-			flash.set("Error(s) in form, please check")
-			return
 		if not form.vars.get('id'): #must be creating an accrual
 			return
 		new_amount = decimal.Decimal(form.vars.get('Amount'))
 		fee = transaction.Fee
+		if form.vars.get('Account')==acdues:
+			if not form.vars.get('Member'):
+				form.errors['Member'] = "Please identify the member"
+			elif form.vars.get('Event'):
+				form.errors['Event'] = "Membership dues do not associate with an event."
+			elif transaction.Account!=acdues:
+				member = db.Members[form.vars.get('Member')]
+				valid_dues = False
+				for membership in MEMBER_CATEGORIES:
+					dues = stripe_get_dues(membership)
+					if new_amount == dues*int(new_amount/dues):
+						transaction.update_record(Paiddate = member.Paiddate, Membership=membership)
+						member.update_record(Membership=membership,
+							Paiddate=newpaiddate(member.Paiddate, transaction.Timestamp, years=int(new_amount/dues)))
+						valid_dues = True
+						break
+				if not valid_dues:
+					form.errors['Amount'] = "not a valid dues payment"
+		if form.vars.get('Account')==actkts:
+			if not form.vars.get('Member'):
+				form.errors['Member'] = "Please identify the member"
+			elif not form.vars.get('Event'):
+				form.errors['Event'] = "Please identify the event"
+			elif transaction.Account!=acdues:
+				tbc = res_tbc(form.vars.get('Member'), form.vars.get('Event'))
+				if not tbc or tbc < new_amount:
+					form.errors['Member'] = "Unexpected ticket payment"
+				else:
+					host_res = db((db.Reservations.Event==form.vars.get('Event'))&(db.Reservations.Member==form.vars.get('Member'))&(db.Reservations.Host==True)).select().first()
+					host_res.update_record(Paid=(host_res.Paid or 0)+new_amount)
+		if len(form.errors)>0:
+			flash.set("Error(s) in form, please check")
+			return
+
 		if new_amount!=transaction.Amount:	#new split
 			if fee:
 				fee = (fee*new_amount/transaction.Amount).quantize(decimal.Decimal('0.01'))
@@ -2127,7 +2169,8 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 		if request.query.get('join_or_renew') or not event:	#collecting dues with event registration, or joining/renewing
 			#membership dues payment
 			#get the subscription plan id (Full membership) or 1-year price (Student) from Stripe Products
-			eval(f"{PAYMENT_PROCESSOR}_get_dues(form.vars.get('membership'))")
+			session['dues'] = str(eval(f"{PAYMENT_PROCESSOR}_get_dues(form.vars.get('membership'))"))
+			session['membership'] = form.vars.get('membership')
 			#ensure the default mailing list subscriptions are in place in the primary email
 			email = db(db.Emails.Member==member.id).select(orderby=~db.Emails.Modified).first()
 			mailings = email.Mailings or []

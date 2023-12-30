@@ -16,7 +16,7 @@ Many of the database pages have a **'back'** link at the top. This differs from 
 
 [Email addresses and subscriptions](member_emails.md) allows you to review/edit the user's email address(es) and mailing subscriptions.
 
-[Dues payments](member_dues.md) allows you to review the record of dues payments the member has made, or to add a record of such payment made by check, for example.
+[Dues payments](member_dues.md) allows you to review/edit the accounting records of dues payments the member has made. These records include the membership history, i.e. each renewal records the member's membership type going forward, and the end date of prior membership, if applicable.
 
 If you own a Society email address there is a link to [send Email](send_email.md) to the displayed Member.
 
@@ -54,4 +54,4 @@ The organizers can use the **Notes** field to record anything of significance re
 
 The remaining fields are for address and phone numbers, and are supplied by the member when joining. The fields marked with '\*' are required when joining.
 
-Note that the website about page is generated using the 'Committees' and 'President' fields of the member records, along with the associated email records, which should be maintained in parallel with the Google Workspace users and group lists.
+Note that the website 'about' page is generated using the 'Committees' and 'President' fields of the member records, along with the associated email records, which should be maintained in parallel with the Google Workspace group lists.

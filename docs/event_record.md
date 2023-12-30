@@ -22,21 +22,23 @@ Below the menu appear the fields of the main event record.
 
 **Datetime** should contain the start date and time of the event.
 
-Once registration is opened, **Booking Closed** indicates the date and time when registration will close. When an event if first set up this is usually set to a past time, disabling the booking link and preventing the event from appearing as a registration link on the 'My Accounts' page.
+Once registration is opened, **Booking Closed** indicates the date and time when registration will close. When an event if first set up this is usually set to a past time, disabling the booking link and preventing the event from appearing as a registration link on the 'My Accounts' page until we are ready to open registration.
 
-Registration is opened by editing Booking Closed to reflect the end of the registration period. Between that point and the event itself the registration link will allow users to place themselves on the **waitlist**. Below this:
+Registration is opened by editing Booking Closed to reflect the end of the registration period. After that point until the event itself the registration link will allow users to place themselves on the **waitlist**. Below this:
 
 ![event_record_2](images/event_record_2.png)
 
-Ticking the **Members Only** checkbox restricts registration to members in good-standing at the time the event will take place. Full members with auto-renewing subscriptions will be assumed to be in good standing even if the event takes place after their currently paid date. Non-member alums and members whose paid date precedes the event will need to join or renew at the time of registration.
+Ticking the **Members Only** checkbox restricts registration to members in good-standing at the time the event will take place. Full members with auto-renewing subscriptions will be assumed to be in good standing even if the event takes place after their currently paid date. Non-member alums and members whose renewal date precedes the event will need to join or renew at the time of registration.
 
 Leaving Members Only unchecked allows any Oxbridge alumni to register. In this case, ticking **Allow Join** allows alumni to choose to join or renew as part of the registration process, as a convenience. For certain events, such as the Freshers' event, we do not allow join as registration includes the first year's membership.
 
-If a number is placed in the **Guests** field it limits the party size a member can register, including themself.
+If a number is placed in the **Guests** field it limits the total party size a member can register, including themself.
 
 The **Sponsors** field allows us to open registration to other groups, e.g. for Burns Nicht. Potential sponsors are included in the Colleges table of the database as non-Oxbridge rows. Multiple Sponsor organizations can be enabled.
 
-**Capacity** limits the total number of attendees, including members' guests. Below this:
+**Capacity** limits the total number of attendees, including members' guests. Once this limit is
+breached, the **Waiting** flag is set so that future space allocations must be made manually
+through the wait list. Below this:
 
 ![event_record_3](images/event_record_3.png)
 

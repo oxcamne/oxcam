@@ -49,8 +49,7 @@ def stripe_tool():
 def stripe_get_dues(membership):
 	product = stripe.Product.retrieve(eval(f"STRIPE_PROD_{membership.upper()}"))
 	price = stripe.Price.retrieve(product.default_price)
-	session['membership'] = membership
-	session['dues'] = str(decimal.Decimal(price.unit_amount)/100)
+	return decimal.Decimal(price.unit_amount)/100
 	
 #update Stripe Customer Record with current primary email
 def stripe_update_email(member):

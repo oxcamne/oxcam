@@ -8,9 +8,11 @@ This screen, reached from the [member record](./member_record.md) or from a numb
 
 The template form at the top allows you to load a pre-prepared message, which can then be adjusted if necessary. You can save your work as a template by ticking the save box near the bottom of the form.
 
-For an explicitly addressed message 'To:' will be a box allowing the entry of one or more email addresses separated by comma, space or whatever. In this case the message will automatically be bcc:'d to the sender.
+For an explicitly addressed message 'To:' will be a box allowing the entry of one or more email addresses separated by comma, space or whatever.
 
-If you are sending a notice to a mailing list or to any filtered list of members, it will describe the pre-selected target list. In this case the message is not bbc:'d as individual messages are sent to each recipient and would flood the bcc:'d inbox.
+If you are sending a notice to a mailing list or to any filtered list of members, it will describe the pre-selected target list.
+
+If the message is explicitly addressed, or targetted to a single member, a 'Bcc:' box allows one or more bcc address(es) to be added.
 
 The Sender field allows you select which address to use if you have multiple roles. Replies will be sent to this address.
 

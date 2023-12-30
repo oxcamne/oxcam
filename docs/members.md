@@ -47,10 +47,10 @@ to navigate from page to page.
 
 ### Export Links
 
-At the very end of the page are several links for exporting member data from
+At the very end of the page are several links for displaying/exporting member data from
 the database.
 
-*View Recent Dues Payments* displays a grid of membership dues payments in reverse chronological order (a date range can be selected), without regard for the member filter. This information normally finds its way into the Membership Secretary's report - there will be a link below the displayed results to export a .csv file.
+*View Recent New Members* displays a grid of recent new/reinstated members in reverse chronological order, without regard for the member filter. This information normally finds its way into the Membership Secretary's report to which it will be copy/pasted.
 
 *Export Membership Analytics* is used by the Membership Secretary to analyze year to year membership demographics; it is also exported in raw .csv format.
 

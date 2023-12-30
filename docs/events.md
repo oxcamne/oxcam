@@ -13,6 +13,6 @@ The **Search** row allows search on (all or part of) an event name, venue, or sp
 The grid contains one row for each event, showing summary data including guest and waitlist counts, total ticket revenue collected and any unpaid amounts (e.g. if a member checks out to confirm registration but does not complete the payment process).
 
 The event name in a row is a link which opens up the [**reservation list**](reservation_list.md).
-The **Edit/Display** button on the row allows the [event record](event_record.md) to be viewed or edited.
+The **Edit/Display** button on the row allows the [**event record**](event_record.md) to be viewed or edited.
 
 At the bottom of the page is an 'export' button allowing data on the selected events to be loaded into a spreadsheet, and an 'analytics' link which generates a spreadsheet on event attendance by member.

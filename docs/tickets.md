@@ -22,6 +22,9 @@ When Edit or Display button displays the individual ticket type record:
 
 ![ticket record](images/ticket_record.png)
 
+If the count limit of this ticket type is breached, the **Waiting** flag is set to ensure
+that any of these tickets that become available are allocated manually through the waitlist.
+
 **Price** is the numerical version of the price that is actually used.
 
 **Short Name** (optional) replaces the ticket name in the exported .csv doorlist file for convenience.

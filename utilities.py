@@ -47,12 +47,12 @@ def notification(member, subject, body):
 	message += body
 	msg_send(member, subject, message)
 
-def newpaiddate(paiddate, timestamp=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), graceperiod=GRACE_PERIOD):
+def newpaiddate(paiddate, timestamp=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), graceperiod=GRACE_PERIOD, years=1):
 #within graceperiod days of expiration is treated as renewal if renewed by check, or if student subscription.
 #auto subscription will start from actual date
 	basedate = timestamp.date() if not paiddate or paiddate<datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()-datetime.timedelta(days=graceperiod) else paiddate
 	if basedate.month==2 and basedate.day==29: basedate -= datetime.timedelta(days=1)
-	return datetime.date(basedate.year+1, basedate.month, basedate.day)
+	return datetime.date(basedate.year+years, basedate.month, basedate.day)
 
 def collegelist(sponsors=[]):
 	colleges = db().select(db.Colleges.ALL, orderby=db.Colleges.Oxbridge|db.Colleges.Name).find(lambda c: c.Oxbridge==True or c.id in sponsors)

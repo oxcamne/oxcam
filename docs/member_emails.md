@@ -1,6 +1,6 @@
 # [Oxford/Cambridge Alumni Group Database](index.md)
 
-## Members Affiliations Page
+## Members Emails Page
 
 This screen, reached from the [member record](./member_record.md) displays a member's email addresses, in the order each email record was modified:
 

@@ -2,11 +2,10 @@
 
 ## Accounts Page
 
-This page is reached from **Accounts** button on the blue navigation bar. Initially it presents an unfiltered grid of all event records (past and future) in reverse chronological order:
+This page is reached from **Accounts** button on the blue navigation bar. It shows the financial
+institutions (banks and payment processors) used by the Society:
 
 ![accounts page](images/accounts.png)
-
-The page displays a grid of banks and payment processors.
 
 The database maintains accounts by combining transactions data downloaded from the organization's bank (in the example Cambridge Trust) and payment processor (Stripe), and producing financial reports.
 

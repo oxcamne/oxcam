@@ -311,7 +311,7 @@ def members_export():
 	return locals()	
 
 #used by member_analytics and financial_statement to analyze the stream of dues payments
-def scan_dues(function, oldest=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)):
+def scan_dues(function, cutoff=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)):
 	acdues = db(db.CoA.Name == "Membership Dues").select().first().id
 
 	query = (db.Members.Paiddate >= datetime.date(2016,1,1))|((db.Members.Paiddate==None)&(db.Members.Membership!=None))
@@ -337,11 +337,14 @@ def scan_dues(function, oldest=datetime.datetime.now(TIME_ZONE).replace(tzinfo=N
 				else:
 					function(r, r.Members.Paiddate-datetime.timedelta(days=365), r.Members.Paiddate, r.Members.Membership or 'Full')
 				continue	#early checks were aggregated, not individually recorded
-			
+
+			if r.Members.id==48:
+				pass
+
 			endpaid = r.Members.Pay_next or r.Members.Paiddate
 			if r.Members.Pay_next and r.Members.Pay_next.year==datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).year:
-				endpaid = r.Members.Paiddate + datetime.timedelta(days=365)
-			if r.AccTrans.Timestamp and r.AccTrans.Timestamp>oldest:
+				endpaid = datetime.date(r.Members.Pay_next.year+1, 1, 1) #assume autosubscription good through year end
+			if r.AccTrans.Timestamp and r.AccTrans.Timestamp>cutoff:
 				endpaid = r.AccTrans.Paiddate
 				r.AccTrans.Amount = 0
 			elif (not r.AccTrans.Paiddate or r.AccTrans.Timestamp.date()>r.AccTrans.Paiddate + datetime.timedelta(days=GRACE_PERIOD)):
@@ -351,7 +354,7 @@ def scan_dues(function, oldest=datetime.datetime.now(TIME_ZONE).replace(tzinfo=N
 			continue
 
 		r.AccTrans.Amount += l.AccTrans.Amount
-		if r.AccTrans.Timestamp and r.AccTrans.Timestamp>oldest:
+		if r.AccTrans.Timestamp and r.AccTrans.Timestamp>cutoff:
 			endpaid = r.AccTrans.Paiddate
 			r.AccTrans.Amount = 0
 		elif (l.AccTrans.Paiddate and l.AccTrans.Timestamp.date()<=l.AccTrans.Paiddate + datetime.timedelta(days=GRACE_PERIOD)\
@@ -1326,7 +1329,7 @@ def financial_statement():
 			if r.AccTrans.Timestamp and endpaid and r.AccTrans.Timestamp<date_time and endpaid>end:
 				prepaid -= r.AccTrans.Amount*(endpaid-end).days/(endpaid-startpaid.date()).days
 
-		scan_dues(dues_payment, oldest=date_time)
+		scan_dues(dues_payment, cutoff=date_time)
 		return (prepaid, None, None)
 	
 	assets = get_banks(startdatetime, enddatetime)

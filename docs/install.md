@@ -120,8 +120,6 @@ PAYMENT_PROCESSOR='stripe'
 #Stripe settings development keys and id's
 STRIPE_PKEY = "<--- test public key --->"
 STRIPE_SKEY = "<--- test secret key --->"
-# generic product for event registration:
-STRIPE_EVENT = "<--- test product id --->"
 # specific products for membership dues
 #STRIPE_PROD_FULL = "<--- test product id -->"  #Annual, autorenews
 STRIPE_PROD_FULL = "<--- test product id -->"   #Weekly, autorenews
@@ -158,12 +156,8 @@ from a test or development environment can be restricted set of target
 addresses.
 
 1. There is a group of settings for the Stripe payment processor. These
-include public and private account keys, and three product identifiers.
-The products are set up on the Stripe dashboard.
-In the OxCamNE case, STRIPE_EVENT is a
-generic product used for all event charges, with price and description configured
-in real time. STRIPE_PROD_FULL is an annual subscription product for full members;
-STRIPE_PROD_STUDENT is a one year renewable student membership.
+include public and private account keys, and product identifiers corresponding to the membership categories.
+The products are set up on the Stripe dashboard and define the membership annual dues. In the OxCamNE case Student membership must be manually renewed annualy, where as Full membership sets up an auto-renewing subscription.
 
 ### Start the database
 

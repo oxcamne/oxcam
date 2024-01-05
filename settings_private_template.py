@@ -100,8 +100,6 @@ PAYMENT_PROCESSOR='stripe'
 #Stripe settings development keys and id's
 STRIPE_PKEY = "<--- test public key --->"
 STRIPE_SKEY = "<--- test secret key --->"
-# generic product for event registration:
-STRIPE_EVENT = "<--- test product id --->"
 # specific products for membership dues
 #STRIPE_PROD_FULL = "<--- test product id -->"  #Annual, autorenews
 STRIPE_PROD_FULL = "<--- test product id -->"   #Weekly, autorenews

@@ -13,7 +13,7 @@ from .models import primary_email, member_name, res_tbc
 from .controllers import checkaccess, form_style
 from .utilities import notify_support, newpaiddate, msg_header, msg_send, event_confirm
 from py4web.utils.form import Form
-from .settings import STRIPE_SKEY, STRIPE_PKEY, STRIPE_EVENT, \
+from .settings import STRIPE_SKEY, STRIPE_PKEY, \
 		STRIPE_PROD_FULL, STRIPE_PROD_STUDENT, PAGE_BANNER, HOME_URL, HELP_URL
 from yatl.helpers import H5, BEAUTIFY, CAT, XML
 from py4web.utils.factories import Inject

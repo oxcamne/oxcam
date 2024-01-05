@@ -264,6 +264,7 @@ using an optional operator (=, <, >, <=, >=) together with a value."))
 			if em.Mailings and len(em.Mailings) > 0: ifmailings = True
 		return not m.Membership and not m.Paiddate and not m.Access and \
 				not ifmailings and db(db.AccTrans.Member == id).count()==0 and \
+				db(db.AccTrans.Member == id).count()==0 and \
 				db(db.Reservations.Member == id).count()==0 and not m.President
 
 	def validate(form):
@@ -337,9 +338,6 @@ def scan_dues(function, cutoff=datetime.datetime.now(TIME_ZONE).replace(tzinfo=N
 				else:
 					function(r, r.Members.Paiddate-datetime.timedelta(days=365), r.Members.Paiddate, r.Members.Membership or 'Full')
 				continue	#early checks were aggregated, not individually recorded
-
-			if r.Members.id==48:
-				pass
 
 			endpaid = r.Members.Pay_next or r.Members.Paiddate
 			if r.Members.Pay_next and r.Members.Pay_next.year==datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).year:

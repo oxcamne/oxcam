@@ -8,7 +8,7 @@ To access the tool browse to \<your_py4web_url\>/oxcam/db_tool. You will see:
 
 ![db_tool](images/db_tool.png)
 
-As the headings indicate, the query is as described in the py4web documentation, as applied to the database schema defined in py4web/apps/oxcam/models.py.
+As the headings indicate, the query is as described in the [py4web documentation](https://py4web.com/_documentation/static/en/chapter-07.html#the-database-abstraction-layer-dal), as applied to the database schema defined in py4web/apps/oxcam/models.py. You can specify the display order in 'Orderby' and turn the query into a left join using 'Left'.
 
 For example, we might want to list lapsed members by selecting those marked as members but with a paid date prior to some past date. The query might be:
 

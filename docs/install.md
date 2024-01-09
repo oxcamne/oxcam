@@ -28,11 +28,11 @@ from dateutil import tz
 
 # database connection string:
 DB_URI = "sqlite://storage.db"
-DB_POOL_SIZE = 10
 """
 SQLite is built into Py4web and should be adequate except for large groups.
 On PythonAnywhere you can alternatively use MySQL, e.g.:
 DB_URI = "mysql://oxcamne:<--- database password here --->@oxcamne.mysql.pythonanywhere-services.com/oxcamne$default"
+DB_POOL_SIZE = 10
 """
 
 # set True only for live production instance
@@ -118,12 +118,11 @@ SMTP_TLS = True
 # payment processor (currently only stripe implemented):
 PAYMENT_PROCESSOR='stripe'  
 #Stripe settings development keys and id's
-STRIPE_PKEY = "<--- test public key --->"
-STRIPE_SKEY = "<--- test secret key --->"
+STRIPE_PKEY = "<--- Stripe public key --->"
+STRIPE_SKEY = "<--- Stripe secret key --->"
 # specific products for membership dues
-#STRIPE_PROD_FULL = "<--- test product id -->"  #Annual, autorenews
-STRIPE_PROD_FULL = "<--- test product id -->"   #Weekly, autorenews
-STRIPE_PROD_STUDENT = "<--- test product id -->"    #Annual, no autorenew
+STRIPE_PROD_FULL = "<--- Stripe product id -->"  #Annual, autorenews
+STRIPE_PROD_STUDENT = "<--- Stripe product id -->"    #Annual, no autorenew
 ```
 
 Notes:
@@ -133,6 +132,8 @@ for all but the largest groups.
 
 1. Setting IS_PRODUCTION False only prevents the daily maintenance process from
 sending out notices such as membership dues reminders. Any test environment can still send out email, so care needs to be taken not to generate unexpected traffic.
+
+1. Set THREAD_SUPPORT True only if your environment supports threading. PythonAnywhere does not, but typically a desktop development environment does. If set True, then the email daemon is started in its own thread whenever py4web/oxcam is started, and in turn spawns the daily_maintenance job in its own thread at midnight.
 
 1. There are various 'branding' elements such as logo, organization name,
 web site addresses, help site address (for volunteers), support email, etc.

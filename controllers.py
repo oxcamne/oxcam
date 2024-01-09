@@ -35,7 +35,8 @@ from yatl.helpers import H5, H6, XML, HTML, TABLE, TH, TD, THEAD, TR
 from .common import db, session, auth, flash
 from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
 	SOCIETY_NAME, MEMBERSHIP, MEMBER_CATEGORIES, MAIL_LISTS, TIME_ZONE,\
-	PAYMENT_PROCESSOR, PAGE_BANNER, HOME_URL, PUBLIC_URL, HELP_URL
+	PAYMENT_PROCESSOR, PAGE_BANNER, HOME_URL, PUBLIC_URL, HELP_URL, IS_PRODUCTION,\
+	ALLOWED_EMAILS
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
 	primary_matriculation, event_revenue, event_unpaid, res_tbc, res_status,\
@@ -1871,7 +1872,16 @@ def composemail():
 	if proto:
 		form=''
 		fields.append(Field('delete', 'boolean', comment='tick to delete template; sends no message'))
-	form2 = Form(fields, form_name="message_form", keep_values=True,
+
+	def validate(form2):
+		if form2.vars.get('to'):
+			to = re.compile('[^,;\s]+').findall(form2.vars['to'])
+			if not IS_PRODUCTION:
+				to = [em for em in to if em.lower() in ALLOWED_EMAILS]
+			if len(to)==0:
+				form2.errors['to'] = "not an allowed address"
+
+	form2 = Form(fields, form_name="message_form", keep_values=True, validation=validate,
 					submit_value = 'Send', formstyle=FormStyleBulma)
 			
 	if form2.accepted:
@@ -1891,6 +1901,8 @@ def composemail():
 				flash.set("Template stored: "+ form2.vars['subject'])
 
 		bcc = re.compile('[^,;\s]+').findall(form2.vars.get('bcc') or '')
+		if not IS_PRODUCTION:
+			bcc = [em for em in bcc if em.lower() in ALLOWED_EMAILS]
 		try:
 			bodyparts = emailparse(form2.vars['body'], form2.vars['subject'], query)
 		except Exception as e:
@@ -1912,6 +1924,8 @@ def composemail():
 				flash.set(f"email notice sent to '{qdesc}' ({query_count})")
 			else:
 				to = re.compile('[^,;\s]+').findall(form2.vars['to'])
+				if not IS_PRODUCTION:
+					to = [em for em in to if em.lower() in ALLOWED_EMAILS]
 				body = ''
 				for part in bodyparts:
 					body += part[0]		

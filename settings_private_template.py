@@ -8,16 +8,17 @@ from dateutil import tz
 
 # database connection string:
 DB_URI = "sqlite://storage.db"
-DB_POOL_SIZE = 10
 """
 SQLite is built into Py4web and should be adequate except for large groups.
 On PythonAnywhere you can alternatively use MySQL, e.g.:
 DB_URI = "mysql://oxcamne:<--- database password here --->@oxcamne.mysql.pythonanywhere-services.com/oxcamne$default"
+DB_POOL_SIZE = 10
 """
 
 # set True only for live production instance
 IS_PRODUCTION = True
-#if False, email notifications are suppressed
+#if False, email notifications are suppressed except to the following:
+ALLOWED_EMAILS = ['dgmanns@gmail.com', 'secretary@oxcamne.org', 'david.manns@trinity.cantab.net']
 
 # if True, run email daemon & daily maintenance in server threads
 THREAD_SUPPORT = False
@@ -98,9 +99,8 @@ SMTP_TLS = True
 # payment processor (currently only stripe implemented):
 PAYMENT_PROCESSOR='stripe'  
 #Stripe settings development keys and id's
-STRIPE_PKEY = "<--- test public key --->"
-STRIPE_SKEY = "<--- test secret key --->"
+STRIPE_PKEY = "<--- Stripe public key --->"
+STRIPE_SKEY = "<--- Stripe secret key --->"
 # specific products for membership dues
-#STRIPE_PROD_FULL = "<--- test product id -->"  #Annual, autorenews
-STRIPE_PROD_FULL = "<--- test product id -->"   #Weekly, autorenews
-STRIPE_PROD_STUDENT = "<--- test product id -->"    #Annual, no autorenew
+STRIPE_PROD_FULL = "<--- Stripe product id -->"  #Annual, autorenews
+STRIPE_PROD_STUDENT = "<--- Stripe product id -->"    #Annual, no autorenew

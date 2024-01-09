@@ -28,7 +28,7 @@ NOTE PythonAnywhere doesn't support threading so this runs instead
 import time, markmin, os, random, pickle, datetime
 from pathlib import Path
 from .common import db, auth,logger
-from .settings_private import VISIT_WEBSITE_INSTRUCTIONS, TIME_ZONE, THREAD_SUPPORT
+from .settings import VISIT_WEBSITE_INSTRUCTIONS, TIME_ZONE, THREAD_SUPPORT, IS_PRODUCTION, ALLOWED_EMAILS
 from .utilities import member_profile, event_confirm, member_greeting, emailparse
 from .models import primary_email
 from .daily_maintenance import daily_maintenance
@@ -72,7 +72,7 @@ def email_daemon():
 				body = ''
 				member = db.Members[row.get(db.Members.id)]
 				to = row.get(db.Emails.Email) or primary_email(member.id)
-				if not to:
+				if not to or (not IS_PRODUCTION and not (to.lower() in ALLOWED_EMAILS)):
 					continue
 				for part in bodyparts:
 					if part[0]:

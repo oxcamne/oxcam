@@ -41,7 +41,7 @@ $ git clone https://github.com/oxcamne/r.git
 
 This creates the py4web folder (directory) and downloads the latest version of py4web along with a copy of it's git repository and then, within py4web's apps folder, the latest version of oxcam with a copy of its git repository, together with two small backward compatability apps that translate old links.
 
-We are following the procedure 'Installing from source (locally)' in the py4web documentation BUT executing ONLY the git clone command at this stage as we first want to setup the correct environment.
+We are following the procedure '[Installing from source (locally)](https://py4web.com/_documentation/static/en/chapter-03.html#installing-from-source-locally)' in the py4web documentation BUT executing ONLY the git clone command at this stage as we first want to setup the correct environment.
 
 ### Select Py4web Release to Run
 
@@ -74,7 +74,7 @@ In the example the latest commit is a tagged version, so probably have a safe ve
 
 At this point we are done with the standalone terminal window, and will continue using vscode.
 
-### Set up VScode Environment
+### Set up VScode and Python Virtual Environment
 
 Launch Vscode, and open the workspace on the py4web folder you have now created. This is a good time to install the Vscode extensions you may need. Make sure the Microsoft IntelliSense Python extension is included. I also recommend installing the Git History extension (Don Jayamanne).
 
@@ -93,6 +93,8 @@ Once the virtual environment is set up, you can use a terminal window within VSc
 The (venv) confirms that you are operating in the virtual environment. As shown you should be looking at the py4web folder itself. Now execute the commands:
 
 ```bash
+$ pip install  --upgrade -r requirements.txt
+...
 $ pip install  --upgrade -r ./apps/oxcam/requirements.txt
 ...
 $ ./py4web.py setup apps
@@ -101,7 +103,7 @@ $ ./py4web.py set_password
 ...
 ```
 
-This password is for running the Py4web dashboard on the localhost [http://127.0.0.1:8000/_dashboard](http://127.0.0.1:8000/_dashboard) so it doesn't need to be a strong password. The pip install may be unnecessary as the VScode Create Environment may detect py4web's requirements.txt file and have already taken care of this, but running it again is benign.
+This password is for running the Py4web dashboard on the localhost [http://127.0.0.1:8000/_dashboard](http://127.0.0.1:8000/_dashboard) so it doesn't need to be a strong password. The pip install's may be unnecessary as the VScode Create Environment may detect py4web and oxcam's requirements.txt files and have already taken care of this, but running them again is benign.
 
 You should also use VScode to edit the py4web/.vscode/launch.json. This already contains a configuration to launch the localhost webserver running py4web under the vscode debugger. I recommend adding the "-L 20" argument to show web calls in the terminal window. I have also added configurations to allow for running the email daemon and daily maintenance job under vscode. You can edit the installed launch.json to replace it with the following:
 
@@ -144,7 +146,9 @@ You should also use VScode to edit the py4web/.vscode/launch.json. This already 
 }
 ```
 
-Finally, you need to create settings_private.py in the py4web/apps/oxcam directory. If you are maintaining OxCamNE's instance you can copy the oxcamne development version from the root folder of the OxCamNE archive.
+Finally, you need to create [settings_private.py](https://oxcamne.github.io/oxcam/install#configure-the-software-for-your-organization) in the py4web/apps/oxcam directory. If you are maintaining OxCamNE's instance you can copy the oxcamne development version from the root folder of the OxCamNE archive.
+
+Note that if you THREAD_SUPPORT=True you should not need the Python: Email configuration. You might use the Python: daily configuration to run the task on demand.
 
 ### Start Py4web and oxcam
 

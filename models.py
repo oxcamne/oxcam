@@ -65,11 +65,11 @@ def member_affiliations(id):
 	
 def member_emails(id):
 	emails = db(db.Emails.Member == id).select(orderby=~db.Emails.Modified)
-	return ', '.join([e.Email for e in emails])
+	return ', '.join([e.Email.lower() for e in emails])
 
 def primary_email(id):
 	em = db(db.Emails.Member == id).select(orderby=~db.Emails.Modified).first()
-	return em.Email if em else None
+	return em.Email.lower() if em else None
 
 def member_name(id):
 	member = db.Members[id]

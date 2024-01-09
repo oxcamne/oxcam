@@ -22,8 +22,8 @@ import datetime
 import os
 from pathlib import Path
 from .common import db, auth, logger
-from .settings_private import SOCIETY_SHORT_NAME, STRIPE_SKEY, IS_PRODUCTION, SUPPORT_EMAIL,\
-	LETTERHEAD, SOCIETY_NAME, DB_URL
+from .settings import SOCIETY_SHORT_NAME, STRIPE_SKEY, IS_PRODUCTION, ALLOWED_EMAILS, \
+	SUPPORT_EMAIL, LETTERHEAD, SOCIETY_NAME, DB_URL
 from .utilities import member_greeting
 from .stripe_interface import stripe_subscription_cancelled
 from .models import primary_email

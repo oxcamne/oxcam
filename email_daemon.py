@@ -25,10 +25,11 @@ in a separate thread
 NOTE PythonAnywhere doesn't support threading so this runs instead
 	as a scheduled daily task, which requires a paid account
 """
-import time, markmin, os, random, pickle, datetime
+import time, markmin, os, random, pickle, datetime, re
 from pathlib import Path
-from .common import db, auth,logger
-from .settings import VISIT_WEBSITE_INSTRUCTIONS, TIME_ZONE, THREAD_SUPPORT, IS_PRODUCTION, ALLOWED_EMAILS
+from .common import db,logger
+from .settings import VISIT_WEBSITE_INSTRUCTIONS, TIME_ZONE, THREAD_SUPPORT, IS_PRODUCTION,\
+	ALLOWED_EMAILS, BULK_SENDER
 from .utilities import member_profile, event_confirm, member_greeting, emailparse
 from .models import primary_email
 from .daily_maintenance import daily_maintenance
@@ -59,11 +60,13 @@ def email_daemon():
 			select_fields = [db.Members.id]
 			if 'Reservations.Event' in notice.Query:	#refers to Reservation
 				select_fields.append(db.Reservations.Event)
-			if 'Mailings.contains'in notice.Query:		#using a mailing list
+			match = re.search(r"Mailings\.contains\((\d+)\)", notice.Query)
+			if match:		#using a mailing list
 				select_fields.append(db.Emails.Email)
 				select_fields.append(db.Emails.id)
 				bodyparts.append((VISIT_WEBSITE_INSTRUCTIONS, None))
 				bodyparts.append((None, 'unsubscribe'))
+				mailing_list = db.Email_Lists[match.group(1)]
 			rows = db(eval(notice.Query)).select(*select_fields, left=eval(notice.Left) if notice.Left!='' else None, distinct=True)
 			#because sending may take several minutes, for fairness send in random order
 			dispatch = random.sample(range(len(rows)), len(rows))
@@ -86,12 +89,12 @@ def email_daemon():
 					elif part[1] == 'reservation':
 						body += event_confirm(row.get(db.Reservations.Event), member.id)
 					elif part[1] == 'unsubscribe':
-						body += markmin.markmin2html(f"\n\nThis message addressed to {notice.Qdesc} [[unsubscribe {notice.Scheme}{f'emails/Y/{member.id}/select'}]]")
+						body += f"<br><br><a href={notice.Scheme}unsubscribe/{row.get(db.Emails.id)}/{mailing_list.id}/{member.id}/{row.get(db.Emails.Email)}>Unsubscribe</a> from '{mailing_list.Listname}' mailing list."
 				retry_seconds = 2
 				while True:
 					try:
-						auth.sender.send(to=to, subject=notice.Subject, sender=notice.Sender, reply_to=notice.Sender,
-		       				bcc=eval(notice.Bcc) if notice.Bcc else None, body=HTML(XML(body)), attachments=attachment)
+						BULK_SENDER.send(to=to, subject=notice.Subject, sender=notice.Sender, reply_to=notice.Sender,
+		       				bcc=eval(notice.Bcc), body=HTML(XML(body)), attachments=attachment)
 						break
 					except Exception as e:
 						if retry_seconds==14:

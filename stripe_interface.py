@@ -122,7 +122,7 @@ def stripe_switched_card():
 	stripe.Subscription.modify(member.Pay_subs,
 				default_payment_method=stripe_session.setup_intent.payment_method)
 	flash.set('Thank you for updating your credit card information!')
-	notify_support(member, 'Credit Card Update', 'Credit card updated.')
+	notify_support(member.id, 'Credit Card Update', 'Credit card updated.')
 	redirect(URL('stripe_view_card'))
 
 @action('stripe_view_card', method=['GET', 'POST'])

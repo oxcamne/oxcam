@@ -34,8 +34,8 @@ def ageband(year, matr):
 		ageband = 'unknown'
 	return ageband
 
-def notify_support(member, subject, body):
-	message = f"{member_name(member.id)} id {member.id}<br>{body}"
+def notify_support(member_id, subject, body):
+	message = f"{member_name(member_id)} id {member_id}<br>{body}"
 	message = HTML(XML(message))
 	auth.sender.send(to=SUPPORT_EMAIL, sender=SUPPORT_EMAIL, subject=subject, body=message)
 
@@ -193,7 +193,7 @@ def msg_send(member,subject, message):
 	if not email:
 		return
 	message = HTML(XML(message))
-	auth.sender.send(to=email, sender=SUPPORT_EMAIL, bcc=SUPPORT_EMAIL, subject=subject, body=message)
+	auth.sender.send(to=email, sender=SUPPORT_EMAIL, reply_to=SUPPORT_EMAIL, subject=subject, body=message)
 	
 #create confirmation of event
 def event_confirm(event_id, member_id, justpaid=0, event_only=False):

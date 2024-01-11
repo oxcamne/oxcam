@@ -25,6 +25,7 @@ Customize for your organization and instance
 """
 import datetime
 from dateutil import tz
+from py4web.utils.mailer import Mailer
 
 # database connection string:
 DB_URI = "sqlite://storage.db"
@@ -37,7 +38,8 @@ DB_POOL_SIZE = 10
 
 # set True only for live production instance
 IS_PRODUCTION = True
-#if False, email notifications are suppressed
+#if False, email is suppressed except to the following:
+ALLOWED_EMAILS = ['dgmanns@gmail.com', 'secretary@oxcamne.org', 'david.manns@trinity.cantab.net']
 
 # if True, run email daemon & daily maintenance in server threads
 THREAD_SUPPORT = False
@@ -106,14 +108,24 @@ and during following 3 weeks. So we set the grace period to cover 18+21 \
 days.
 """
 
-# email settings -development (uses Mailgun Sandbox, limited addressees)
+# email settings use in common.py to construct auth.sender which is used for all
+# transactional messages (low volume of messages)
 SMTP_SSL = False
-SMTP_SERVER = "smtp.mailgun.com:587"
-SMTP_SENDER = "OxCamNE Development <test@oxcamne.org>"
-SMTP_LOGIN = "postmaster@<--- sandbox account key --->"
+SMTP_SERVER = "smtp.gmail.com:587"
+SMTP_SENDER = "Oxford & Cambridge Society <oxcamne@oxcamne.org>"
+SMTP_LOGIN = "<--- gmail login with app password --->"
 SMTP_TLS = True
+
+#define the bulk email sender for mailing list use etc.
 # smaller organizations (up to a few hundred on mailing list) could even
-# use a free gmail account.
+# use the same account as above
+BULK_SENDER =  Mailer(
+        server="smtp.mailgun.com:587",
+        sender="Oxford & Cambridge Society <oxcamne@oxcamne.org>",
+        login="postmaster@<---- domain SMTP login ---->",
+        tls=SMTP_TLS,
+        ssl=SMTP_SSL,
+)
 
 # payment processor (currently only stripe implemented):
 PAYMENT_PROCESSOR='stripe'  
@@ -148,17 +160,13 @@ themselves are set up in the database Email_Lists table.
 1. In the prototype membership categories are included for full and student
 members. You do not have to have paid memberships.
 
-1. There is a group of settings for outgoing email. They simply identify an
-SMTP server. Smaller groups could use a gmail address or similar. This
-will allow notices to be sent to a list of up to a few hundred addresses.
-Above that a paid email service such as mailgun.com needs to be used. A paid
-service provides sandbox and production environments, so that outgoing traffic
-from a test or development environment can be restricted set of target
-addresses.
+1. There are two groups of settings for outgoing email, each of which configures an SMTP Mailer. The first is for transactional emails, such as login email verification, transaction confirms, and emails addressed explicitly. In the case of OxCamNE, this uses the Society's Google Workspace address, <oxcamne@oxcamne.org> using an app password.
 
-1. There is a group of settings for the Stripe payment processor. These
-include public and private account keys, and product identifiers corresponding to the membership categories.
-The products are set up on the Stripe dashboard and define the membership annual dues. In the OxCamNE case Student membership must be manually renewed annualy, where as Full membership sets up an auto-renewing subscription.
+1. The second mailer is for bulk emails, sent to mailing list or filtered sets of members. Smaller groups could re-use the same account as above, which may accommodate up to a few hundred addresses.
+Above that a paid email service such as mailgun.com needs to be used.
+
+1. There is a group of settings for the Stripe payment processor. These include public and private account keys, and product identifiers corresponding to the membership categories.
+The products are set up on the Stripe dashboard and define the membership annual dues. In the OxCamNE case Student membership must be manually renewed annually, whereas Full membership sets up an auto-renewing subscription.
 
 ### Start the database
 

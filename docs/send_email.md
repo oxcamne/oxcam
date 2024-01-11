@@ -12,7 +12,7 @@ For an explicitly addressed message 'To:' will be a box allowing the entry of on
 
 If you are sending a notice to a mailing list or to any filtered list of members, it will describe the pre-selected target list.
 
-If the message is explicitly addressed, or targetted to a single member, a 'Bcc:' box allows one or more bcc address(es) to be added.
+If the message is explicitly addressed, or targetted to a single member, a 'Bcc:' box allows one or more bcc address(es) to be added. Depending on how email is set up, there may in effect be an implicit bcc to the sender, for example in OxCamNE these sent message will appear in the sender's folder in the Society email.
 
 The Sender field allows you select which address to use if you have multiple roles. Replies will be sent to this address.
 

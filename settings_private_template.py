@@ -5,6 +5,7 @@ Customize for your organization and instance
 """
 import datetime
 from dateutil import tz
+from py4web.utils.mailer import Mailer
 
 # database connection string:
 DB_URI = "sqlite://storage.db"
@@ -17,7 +18,7 @@ DB_POOL_SIZE = 10
 
 # set True only for live production instance
 IS_PRODUCTION = True
-#if False, email notifications are suppressed except to the following:
+#if False, email is suppressed except to the following:
 ALLOWED_EMAILS = ['dgmanns@gmail.com', 'secretary@oxcamne.org', 'david.manns@trinity.cantab.net']
 
 # if True, run email daemon & daily maintenance in server threads
@@ -44,10 +45,10 @@ Oxford and Cambridge Society of New England</em> <img src="images/oxcamne_no_pad
 alt="logo" style="float:left;width:100px" /></span></h4>'
 # NOTE the logo image is in py4web/apps/oxcam/static/images
 HOME_URL = 'https://sites.google.com/oxcamne.org/home/?authuser=1'
-        #this version allows authorized users to edit
+	#this version allows authorized users to edit
 HELP_URL = "https://sites.google.com/oxcamne.org/help-new/home?authuser=1"
 PUBLIC_URL = 'www.oxcamne.org'
-        #domain service re-routes to sites.google
+	#domain service re-routes to sites.google
 SUPPORT_EMAIL = 'secretary@oxcamne.org'
 # html letterhead for email/notices:
 LETTERHEAD = '<h2><span style="color: blue">\
@@ -55,7 +56,7 @@ LETTERHEAD = '<h2><span style="color: blue">\
 <img src="https://oxcamne.pythonanywhere.com/oxcam/static/images/oxcamne_no_pad.png" \
 alt="logo" style="float:left;width:100px" /></h2>\
 <h3><span style="color: blue"><em>&lt;subject&gt;</em></span></h3>'
-        #NOTE 'subject' replaced by full subject line in emails/notices
+	#NOTE 'subject' replaced by full subject line in emails/notices
 # html trailer for email notices:
 VISIT_WEBSITE_INSTRUCTIONS = "<br><br>Visit us at www.oxcamne.org or \
 https://www.instagram.com/oxcamne/ or www.facebook.com/oxcamne"
@@ -87,14 +88,24 @@ and during following 3 weeks. So we set the grace period to cover 18+21 \
 days.
 """
 
-# email settings -development (uses Mailgun Sandbox, limited addressees)
+# email settings use in common.py to construct auth.sender which is used for all
+# transactional messages (low volume of messages)
 SMTP_SSL = False
-SMTP_SERVER = "smtp.mailgun.com:587"
-SMTP_SENDER = "OxCamNE Development <test@oxcamne.org>"
-SMTP_LOGIN = "postmaster@<--- sandbox account key --->"
+SMTP_SERVER = "smtp.gmail.com:587"
+SMTP_SENDER = "Oxford & Cambridge Society <oxcamne@oxcamne.org>"
+SMTP_LOGIN = "<--- gmail login with app password --->"
 SMTP_TLS = True
+
+#define the bulk email sender for mailing list use etc.
 # smaller organizations (up to a few hundred on mailing list) could even
-# use a free gmail account.
+# use the same account as above
+BULK_SENDER =  Mailer(
+	server="smtp.mailgun.com:587",
+	sender="Oxford & Cambridge Society <oxcamne@oxcamne.org>",
+	login="postmaster@<---- domain SMTP login ---->",
+	tls=SMTP_TLS,
+	ssl=SMTP_SSL,
+)
 
 # payment processor (currently only stripe implemented):
 PAYMENT_PROCESSOR='stripe'  

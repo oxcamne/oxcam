@@ -49,9 +49,6 @@ def daily_maintenance():
 	members = db((db.Members.Paiddate>=first_date)&(db.Members.Paiddate<=last_date)&(db.Members.Membership!=None)&\
 				(db.Members.Pay_subs==None)&(db.Members.Charged==None)).select()
 	for m in members:
-		to = primary_email(m.id) if IS_PRODUCTION else SUPPORT_EMAIL
-		bcc = SUPPORT_EMAIL if IS_PRODUCTION else None
-
 		if (m.Paiddate - datetime.date.today()).days % interval == 0:
 			text = f"{LETTERHEAD.replace('&lt;subject&gt;', 'Renewal Reminder')}{member_greeting(m)}"
 			text += f"<p>This is a friendly reminder that your {SOCIETY_NAME} membership expiration \
@@ -61,21 +58,19 @@ or cancel membership to receive no futher reminders.</p><p>\
 We are very grateful for your membership support and hope that you will renew!</p>\
 If you have any questions, please contact {SUPPORT_EMAIL}"
 			if IS_PRODUCTION:
-				auth.sender.send(to=primary_email(m.id), sender=SUPPORT_EMAIL, subject='Renewal Reminder', body=HTML(XML(text)))
+				auth.sender.send(to=primary_email(m.id), reply_to=SUPPORT_EMAIL, sender=SUPPORT_EMAIL, subject='Renewal Reminder', body=HTML(XML(text)))
 			logger.info(f"Renewal Reminder sent to {primary_email(m.id)}")
 
 	subs = db((db.Members.Pay_subs!=None)&(db.Members.Pay_subs!='Cancelled')).select()
 	for m in subs:
 		if eval(f"{m.Pay_source}_subscription_cancelled(m)"):	#subscription no longer operational
 			if IS_PRODUCTION:
-				to = primary_email(m.id) if IS_PRODUCTION else SUPPORT_EMAIL
-				bcc = SUPPORT_EMAIL if IS_PRODUCTION else None
 				text = f"{LETTERHEAD.replace('&lt;subject&gt;', 'Membership Renewal Failure')}{member_greeting(m)}"
 				text += f"<p>We have been unable to process your auto-renewal and as a result your membership has been cancelled. </p><p>\
-	We hope you will <a href={DB_URL}> reinstate your membership</a>, \
-	but in any case we are grateful for your past support!</p>\
-	If you have any questions, please contact {SUPPORT_EMAIL}"
-				auth.sender.send(to=primary_email(m.id), bcc=SUPPORT_EMAIL, sender=SUPPORT_EMAIL, subject='Membership Renewal Failure', body=HTML(XML(text)))
+We hope you will <a href={DB_URL}> reinstate your membership</a>, \
+but in any case we are grateful for your past support!</p>\
+If you have any questions, please contact {SUPPORT_EMAIL}"
+				auth.sender.send(to=primary_email(m.id), reply_to=SUPPORT_EMAIL, sender=SUPPORT_EMAIL, subject='Membership Renewal Failure', body=HTML(XML(text)))
 			logger.info(f"Membership Subscription Cancelled {primary_email(m.id)}")
 			m.update_record(Pay_subs = 'Cancelled', Pay_next=None, Modified=datetime.datetime.now())
 

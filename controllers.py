@@ -494,10 +494,23 @@ def switch_email():
 	session['access'] = member.Access
 	email_id = db.Emails.insert(Member=member_id, Email=session['email'], Mailings=eval(request.query.get('mailings')))
 	flash.set("Please review your mailing list subscriptions")
-	notify_support(member, 'Email address change',
+	notify_support(member.id, 'Email address change',
 		f"New primary email address {primary_email(member.id)}")
 	session['url'] = URL('index')	#will be back link from emails page
-	redirect(f"emails/Y/{member_id}/select")
+	redirect(URL(f"emails/Y/{member_id}/select"))
+
+@action('unsubscribe/<email_id:int>/<list_id:int>/<member_id:int>/<email_address>', method=['GET'])
+@preferred
+def unsubscribe(email_id, list_id, member_id, email_address):
+	email = db.Emails[email_id]
+	list = db.Email_Lists[list_id]
+	if not email or email.Member != int(member_id) or list.id not in email.Mailings or email.Email!=email_address:
+		redirect(URL(f"emails/Y/{member_id}/select"))
+	email.Mailings.remove(list.id)
+	email.update_record(Mailings=email.Mailings)
+	header = f"'{email.Email}' unsubscribed from '{list.Listname}' mailing list."
+	notify_support(member_id, 'Unsubscribe', f"{email_address} unsubscribed from '{list.Listname}'")
+	return locals()
 
 @action('emails/<ismember>/<member_id:int>', method=['POST', 'GET'])
 @action('emails/<ismember>/<member_id:int>/<path:path>', method=['POST', 'GET'])
@@ -571,7 +584,7 @@ To change your mailing list subscritions, use the <b>Edit</b> button."))
 					mailings.append(list.id)
 			email.update_record(Mailings=mailings)
 			flash.set('Thank you for updating your mailing list subscriptions')
-			notify_support(db.Members[member_id],"Mail Subscriptions Updated",
+			notify_support(member_id, "Mail Subscriptions Updated",
 		  		f"{email.Email} {', '.join([list.Listname for list in db(db.Email_Lists.id.belongs(mailings)).select()])}")
 			redirect(URL(f"emails/Y/{member_id}/select"))
 	return locals()
@@ -1874,12 +1887,12 @@ def composemail():
 		fields.append(Field('delete', 'boolean', comment='tick to delete template; sends no message'))
 
 	def validate(form2):
-		if form2.vars.get('to'):
-			to = re.compile('[^,;\s]+').findall(form2.vars['to'])
-			if not IS_PRODUCTION:
-				to = [em for em in to if em.lower() in ALLOWED_EMAILS]
-			if len(to)==0:
-				form2.errors['to'] = "not an allowed address"
+		if not IS_PRODUCTION:
+			if form2.vars.get('to'):
+				to = re.compile('[^,;\s]+').findall(form2.vars['to'])
+				for em in to:
+					if not em in ALLOWED_EMAILS:
+						form2.errors['to'] = f"{em} is not an allowed address in this environment"
 
 	form2 = Form(fields, form_name="message_form", keep_values=True, validation=validate,
 					submit_value = 'Send', formstyle=FormStyleBulma)
@@ -2262,7 +2275,7 @@ reached by using the join/renew link on our home page).<br>\
 				redirect(URL(f"reservation/Y/{member.id}/{session['event_id']}/new"))	#go create this member's reservation
 			redirect(URL(f'{member.Pay_source or PAYMENT_PROCESSOR}_checkout'))
 		flash.set('Thank you for updating your profile information.')
-		notify_support(member, 'Member Profile Updated', member_profile(member))
+		notify_support(member.id, 'Member Profile Updated', member_profile(member))
 	
 	return locals()
 	

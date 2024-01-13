@@ -106,14 +106,10 @@ def validate(id, token):
 	header = H6("Please select which of you is signing in:")
 	members = [(row.id, member_name(row.id)+(' '+row.Membership+' member until '+(row.Paiddate.strftime('%m/%d/%Y') if row.Paiddate else '')  if row.Membership else '')) for row in rows]
 	form = Form([Field('member', 'integer', requires=IS_IN_SET(members))],
-	     formstyle=FormStyleBulma)
+	     formstyle=FormStyleBulma, csrf_protection=False)
 	if len(rows)<=1 or 'switch_email' in user.url:
 		member_id = rows.first().id if len(rows)==1 else None
-	elif form.vars.get('member'):
-		#note, if we use form.accepted the user will have to click twice;
-		#apparently when validate is invoked from another site (e.g. gmail) a new form_key
-		#is put in the response cookie, but won't match the proper key, in other words we
-		#run into CSRF protection.
+	elif form.accepted:
 		member_id = form.vars.get('member')
 	else:
 		return locals()	#display form

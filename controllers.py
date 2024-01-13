@@ -499,17 +499,23 @@ def switch_email():
 	session['url'] = URL('index')	#will be back link from emails page
 	redirect(URL(f"emails/Y/{member_id}/select"))
 
-@action('unsubscribe/<email_id:int>/<list_id:int>/<member_id:int>/<email_address>', method=['GET'])
+@action('unsubscribe/<email_id:int>/<list_id:int>/<member_id:int>/<email_address>', method=['POST', 'GET'])
 @preferred
 def unsubscribe(email_id, list_id, member_id, email_address):
 	email = db.Emails[email_id]
 	list = db.Email_Lists[list_id]
 	if not email or email.Member != int(member_id) or list.id not in email.Mailings or email.Email!=email_address:
 		redirect(URL(f"emails/Y/{member_id}/select"))
-	email.Mailings.remove(list.id)
-	email.update_record(Mailings=email.Mailings)
-	header = f"'{email.Email}' unsubscribed from '{list.Listname}' mailing list."
-	notify_support(member_id, 'Unsubscribe', f"{email_address} unsubscribed from '{list.Listname}'")
+	header = f"Please Confirm to unsubscribe '{email.Email}' from '{list.Listname}' mailing list."
+	form = Form([], csrf_protection=False, submit_value='Confirm', formstyle=FormStyleBulma)
+
+	if form.accepted:
+		email.Mailings.remove(list.id)
+		email.update_record(Mailings=email.Mailings)
+		header = f"{email_address} unsubscribed from '{list.Listname}'"
+		notify_support(member_id, 'Unsubscribe', header)
+		header = "Thank you: "+header
+		form = None
 	return locals()
 
 @action('emails/<ismember>/<member_id:int>', method=['POST', 'GET'])

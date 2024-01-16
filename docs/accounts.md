@@ -15,7 +15,7 @@ Successful Stripe payments are recorded in real-time by marking the member recor
 
 PayPal is included because the database contains historical data of our PayPal usage from late 2011 through 2018. We then switched to Stripe as our payment processor. The current software does not support upload of data from PayPal. We use Stripe checkout which allows us to capture successful payments in real time in order to be able to issue confirmations accurately and immediately. Stripe also allows us to create auto-renewing subscriptions.
 
-Alongside each institution is an **upload** link for uploading new information from the institution, a [**transactions**](account_transactions.md) link to view the corresponding transactions register, and an **Edit** button for viewing/editing the [**bank record**](bank_record.md). Above the list of institutions is a **+New** button for setting up a new institution, and a link to view transactions across both bank and payment processor.
+Alongside each institution is an [**upload**](account_upload.md) link for uploading new information from the institution, a [**transactions**](account_transactions.md) link to view the corresponding transactions register, and an **Edit** button for viewing/editing the [**bank record**](bank_record.md). Above the list of institutions is a **+New** button for setting up a new institution, and a link to view transactions across both bank and payment processor.
 
 The transactions list for the bank should be used to record checks when writing them. When they are later deposited the downloaded record from the bank will be automatically reconciled with the recorded accrual.
 

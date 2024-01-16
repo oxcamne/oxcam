@@ -165,8 +165,7 @@ members. You do not have to have paid memberships.
 1. The second mailer is for bulk emails, sent to mailing list or filtered sets of members. Smaller groups could re-use the same account as above, which may accommodate up to a few hundred addresses.
 Above that a paid email service such as mailgun.com needs to be used.
 
-1. There is a group of settings for the Stripe payment processor. These include public and private account keys, and product identifiers corresponding to the membership categories.
-The products are set up on the Stripe dashboard and define the membership annual dues. In the OxCamNE case Student membership must be manually renewed annually, whereas Full membership sets up an auto-renewing subscription.
+1. There is a group of settings for the Stripe payment processor, which is currently the only supported payment processor. These include public and private account keys, and product identifiers corresponding to the membership categories. Go [here](stripe.md) for more information on setting up and using Stripe.
 
 ### Start the database
 

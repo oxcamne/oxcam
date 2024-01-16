@@ -1599,7 +1599,7 @@ def bank_file(bank_id):
 	origin = 'since account start'
 
 	header = CAT(A('back', _href=URL('accounting')),
-				H5(f"{bank.Name} Transactions"),
+				H5(f"Upload {bank.Name} Transactions"),
 				XML(f"To download data since {markmin.markmin2html(f'``**{str(bkrecent.Timestamp.date()) if bkrecent else origin}**``:red')}:"), XML('<br>'),
 				A('Login to Society Account', _href=bank.Bankurl, _target='blank'), XML('<br>'),
 				XML(f"{markmin.markmin2html(bank.HowTo)}"))

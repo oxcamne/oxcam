@@ -33,13 +33,9 @@ $ git clone https://github.com/web2py/py4web.git
 $ cd py4web/apps
 $ git clone https://github.com/oxcamne/oxcam.git
 ...
-$ git clone https://github.com/oxcamne/m.git
-...
-$ git clone https://github.com/oxcamne/r.git
-...
 ```
 
-This creates the py4web folder (directory) and downloads the latest version of py4web along with a copy of it's git repository and then, within py4web's apps folder, the latest version of oxcam with a copy of its git repository, together with two small backward compatability apps that translate old links.
+This creates the py4web folder (directory) and downloads the latest version of py4web along with a copy of it's git repository and then, within py4web's apps folder, the latest version of oxcam with a copy of its git repository.
 
 We are following the procedure '[Installing from source (locally)](https://py4web.com/_documentation/static/en/chapter-03.html#installing-from-source-locally)' in the py4web documentation BUT executing ONLY the git clone command at this stage as we first want to setup the correct environment.
 

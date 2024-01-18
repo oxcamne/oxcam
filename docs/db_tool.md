@@ -31,4 +31,13 @@ For a real world example of using a left join:
 
 ![db_tool_example](images/db_tool_example.png)
 
-This examples shows member records marked as members who have no subscriptions to the 'Member Events' mailing list (id==1). Note the order of the two query clauses, which is logically irrelevant but causes the selected member records to be displayed rather than a list of null Email records.
+This example shows member records marked as members who have no subscriptions to the 'Member Events' mailing list (id==1). Note the order of the two query clauses, which is logically irrelevant but causes the selected member records to be displayed rather than a list of null Email records.
+
+Note that in the update field you can use 'row' to refer to the current record contents. So for example:
+
+```python
+query:  db.Emails.Mailings.contains(2)
+update: Mailings=row.Mailings.remove(2)
+```
+
+Might be used to remove all subscriptions to the mailing list with id==2.

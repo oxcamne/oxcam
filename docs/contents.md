@@ -8,9 +8,9 @@ All the files which are part of the oxcam app are found in the subfolder py4web/
 
 The overall structure and some of the files are derived from the _scaffold app which is part of the py4web distribution.
 
-The hidden .git folder and .gitignore and .gitattributes files reflect the fact that the app is cloned from a github repository.
+There are hidden .git folder and .gitignore and .gitattributes files reflecting the fact that the app is cloned from a github repository.
 
-The **databases** folder contains table description files, a sql.log file, and in the development environment the database itself (storage.db).
+The **databases** folder contains table description files, a sql.log file, and typically, the database itself (storage.db).
 
 The **docs** folder contains both the user guide and support guide markdown files and in an images sub-folder png files.
 
@@ -20,7 +20,7 @@ The **static** folder contains css files and other static content. It also conta
 
 I have not implemented any multi-language support so the **translations** folder is simply a copy of what is in the _scaffold application.
 
-**\__init__**.py is the startup script. It differs from the one in _scaffold mainly in that I have put the controllers into multiple files, controllers.py, tools.py, session.py, and website.py.
+**\__init__**.py is the startup script. It differs from the one in _scaffold mainly in that I have put the controllers into multiple files, controllers.py, tools.py, session.py, stripe_interface.py and website.py.
 
 **session.py** has the logic around login, email validation, and logout, and importantly the **@checkaccess** decorator which ensures users are logged in and controls access to administrative functions.
 
@@ -38,4 +38,4 @@ I have not implemented any multi-language support so the **translations** folder
 
 **utilities.py** includes a selection of shared functions used by the (page) controllers.
 
-**settings_private.py** contains Society specific definitions including such things as keys and passwords for email, Stripe, etc. Many of the settings vary, for example, between development and production instances. This file is not part of the repository, but is derived from the template **settings_private_template.py** which is.
+**settings_private.py** contains Society specific definitions including such things as keys and passwords for email, Stripe, etc. Many of the settings vary, for example, between development and production instances. This file is not part of the repository, but is derived from the template **settings_private_template.py** which is included in the repo.

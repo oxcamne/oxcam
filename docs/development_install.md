@@ -170,7 +170,6 @@ Is still experimental...
 Py4web: 1.20231029.2 on Python 3.10.12 (main, Jun 20 2023, 19:43:52) [Clang 14.0.3 (clang-1403.0.22.14.1)]
 
 
-[X] loaded r       
 [X] loaded _dashboard       
 [X] loaded _documentation       
 [X] loaded todo       
@@ -178,7 +177,6 @@ Py4web: 1.20231029.2 on Python 3.10.12 (main, Jun 20 2023, 19:43:52) [Clang 14.0
 [X] loaded _minimal       
 [X] loaded _scaffold       
 [X] loaded showcase       
-[X] loaded m       
 [X] loaded _websocket       
 [X] loaded oxcam       
     output fadebook       
@@ -190,6 +188,6 @@ Listening on http://127.0.0.1:8000/
 Hit Ctrl-C to quit.
 ```
 
-Now open the py4web dashboard at [http://127.0.0.1:8000/_dashboard](http://127.0.0.1:8000/_dashboard). You should see all the standard applications, plus oxcam, m, and r running. If any are flagged in red, there is a problem to investigate.
+Now open the py4web dashboard at [http://127.0.0.1:8000/_dashboard](http://127.0.0.1:8000/_dashboard). You should see all the standard applications, plus oxcam, running. If any are flagged in red, there is a problem to investigate.
 
 You can now run the oxcam app at [http://127.0.0.1:8000/oxcam](http://127.0.0.1:8000/oxcam). You should be asked to login by specifying your email and then taken to the db_restore tool and prompted to upload the database from a .csv file. You can download a current database backup from the production instance in Pythonanywhere, or use a backup file saved in the OxCamNE archive, or use db_oxcam_minimal.csv which is in the py4web/apps/oxcam directory.

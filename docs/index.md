@@ -2,7 +2,7 @@
 
 This database is accessed by alumni when registering for events, joining, renewing, or modifying any of their personal information or mailing list selections. Alumni will be using links on the web site or in email notices to register for events, join mailing lists or as members, and simply have to follow the instructions on the pages they visit.
 
-This guide is intended for the volunteer organizers helping to run the organization whose interactions with the database are more complicated. To return to this page from elsewhere in the guide click on the title.
+This guide is intended for the volunteer organizers helping to run the organization whose interactions with the database are more complex. To return to this page from elsewhere in the guide click on the title.
 
 The database includes:
 
@@ -16,7 +16,7 @@ The database includes:
 
 Organizers are assigned different access rights depending on their need to modify the database. All have the ability to search/view member information, event registrations, etc.
 
-Users are identified by email address. They login by specifying their email address, then clicking on a link containing a one-time security code sent to them to verify they own the email address.
+Users are identified by email address. They login by specifying their email address, then clicking on a link containing a one-time security code sent to them to verify that they own the email address.
 
 The landing page of the database application is reached at, for example, [https://oxcamne.pythonanywhere.com/oxcam](https://oxcamne.pythonanywhere.com/oxcam) for the OxCamNE database hosted on PythonAnywhere and looks like:
 

@@ -50,7 +50,7 @@ to navigate from page to page.
 At the very end of the page are several links for displaying/exporting member data from
 the database.
 
-*View Recent New Members* displays a grid of recent new/reinstated members in reverse chronological order, without regard for the member filter. This information normally finds its way into the Membership Secretary's report to which it will be copy/pasted.
+*View Recent New Members* displays a grid of recent new/reinstated members in reverse chronological order, without regard for the member filter. This is based on dues payments recorded in accounts,so does not include a member until their dues payment has been uploaded into accounts. This information normally finds its way into the Membership Secretary's report to which it will be copy/pasted.
 
 *Export Membership Analytics* is used by the Membership Secretary to analyze year to year membership demographics; it is also exported in raw .csv format.
 

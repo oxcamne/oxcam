@@ -1766,6 +1766,8 @@ def transactions(path=None):
 	session['url_prev'] = None	#no longer needed, save cookie space
 	query = session['query']
 	left = session['left']
+	if not query:
+		redirect(URL('accounting'))
 
 	bank_id_match=re.match('db.AccTrans.Bank==([0-9]+)$', query)
 	bank_id = int(bank_id_match.group(1)) if bank_id_match else None
@@ -2163,8 +2165,8 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 	form = Form(fields, validation=validate, formstyle=FormStyleBulma, keep_values=True)
 		
 	if form.accepted:
+		notes = f"{datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).strftime('%m/%d/%y')} {form.vars.get('notes')}" if form.vars.get('notes') else ''
 		if member:
-			notes = f"{datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).strftime('%m/%d/%y')} {form.vars.get('notes')}" if form.vars.get('notes') else ''
 
 			if member.Notes:
 				notes = member.Notes+'\n'+notes
@@ -2174,7 +2176,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 		else:
 			set_access = 'admin' if db(db.Members.id>0).count() == 0 else None
 			member_id = db.Members.insert(Firstname = form.vars['firstname'], 
-							Lastname = form.vars['lastname'], Access = set_access)
+							Lastname = form.vars['lastname'], Notes=notes, Access = set_access)
 			member = db.Members[member_id]
 			session['member_id'] = member_id
 			session['access'] = set_access

@@ -13,7 +13,7 @@ from .models import primary_email, member_name, res_tbc
 from .controllers import checkaccess, form_style
 from .utilities import notify_support, newpaiddate, msg_header, msg_send, event_confirm
 from py4web.utils.form import Form
-from .settings import STRIPE_SKEY, STRIPE_PKEY, \
+from .settings import CURRENCY_SYMBOL, STRIPE_SKEY, STRIPE_PKEY, \
 		STRIPE_PROD_FULL, STRIPE_PROD_STUDENT, PAGE_BANNER, HOME_URL, HELP_URL
 from yatl.helpers import H5, BEAUTIFY, CAT, XML
 from py4web.utils.factories import Inject
@@ -147,7 +147,7 @@ def stripe_view_card():
 	renewaldate = member.Pay_next.strftime('%b %d, %Y')
 	duesamount = decimal.Decimal(subscription.plan.amount)/100
 	header = CAT(H5('Membership Subscription'),
-	      XML(f"Your next renewal payment of ${duesamount} will be charged to {paymentmethod.card.brand.capitalize()} \
+	      XML(f"Your next renewal payment of {CURRENCY_SYMBOL}{duesamount} will be charged to {paymentmethod.card.brand.capitalize()} \
 ....{paymentmethod.card.last4} exp {paymentmethod.card.exp_month}/{paymentmethod.card.exp_year} on {renewaldate}.<br><br>"))
 	
 	form = Form([], submit_value='Update Card on File')
@@ -270,7 +270,7 @@ def stripe_checkout_success():
 		redirect(URL('index'))
 
 	subject = 'Registration Confirmation' if tickets_tbc>0 else 'Thank you for your membership payment'
-	message = f"{msg_header(member, subject)}<br><b>Received: ${dues+tickets_tbc}</b><br>"
+	message = f"{msg_header(member, subject)}<br><b>Received: {CURRENCY_SYMBOL}{dues+tickets_tbc}</b><br>"
 	
 	if dues>0:
 		next = None

@@ -23,7 +23,7 @@ import os
 from pathlib import Path
 from .common import db, auth, logger
 from .settings import SOCIETY_SHORT_NAME, STRIPE_SKEY, IS_PRODUCTION, ALLOWED_EMAILS, \
-	SUPPORT_EMAIL, LETTERHEAD, SOCIETY_NAME, DB_URL
+	SUPPORT_EMAIL, LETTERHEAD, SOCIETY_NAME, DB_URL, DATE_FORMAT
 from .utilities import member_greeting
 from .stripe_interface import stripe_subscription_cancelled
 from .models import primary_email
@@ -52,7 +52,7 @@ def daily_maintenance():
 		if (m.Paiddate - datetime.date.today()).days % interval == 0:
 			text = f"{LETTERHEAD.replace('&lt;subject&gt;', 'Renewal Reminder')}{member_greeting(m)}"
 			text += f"<p>This is a friendly reminder that your {SOCIETY_NAME} membership expiration \
-date is/was {m.Paiddate.strftime('%m/%d/%Y')}. Please renew by <a href={DB_URL}> logging in</a> \
+date is/was {m.Paiddate.strftime(DATE_FORMAT)}. Please renew by <a href={DB_URL}> logging in</a> \
 and selecting join/renew from the menu of choices, \
 or cancel membership to receive no futher reminders.</p><p>\
 We are very grateful for your membership support and hope that you will renew!</p>\

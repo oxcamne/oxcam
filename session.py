@@ -3,7 +3,7 @@ This file contains controllers used to manage the user's session
 """
 from py4web import URL, request, redirect, action, Field, response
 from .common import db, session, flash, logger, auth
-from .settings import SUPPORT_EMAIL, TIME_ZONE, LETTERHEAD, SOCIETY_SHORT_NAME, PAGE_BANNER, HOME_URL, HELP_URL
+from .settings import SUPPORT_EMAIL, TIME_ZONE, LETTERHEAD, SOCIETY_SHORT_NAME, PAGE_BANNER, HOME_URL, HELP_URL, DATE_FORMAT
 from .models import ACCESS_LEVELS, member_name
 from yatl.helpers import A, H6, XML, P, HTML, DIV
 from py4web.utils.form import Form, FormStyleBulma
@@ -104,7 +104,7 @@ def validate(id, token):
 	rows = db((db.Members.id == db.Emails.Member) & db.Emails.Email.ilike(user.email)).select(
 				db.Members.ALL, distinct=True)
 	header = H6("Please select which of you is signing in:")
-	members = [(row.id, member_name(row.id)+(' '+row.Membership+' member until '+(row.Paiddate.strftime('%m/%d/%Y') if row.Paiddate else '')  if row.Membership else '')) for row in rows]
+	members = [(row.id, member_name(row.id)+(' '+row.Membership+' member until '+(row.Paiddate.strftime(DATE_FORMAT) if row.Paiddate else '')  if row.Membership else '')) for row in rows]
 	form = Form([Field('member', 'integer', requires=IS_IN_SET(members))],
 	     formstyle=FormStyleBulma, csrf_protection=False)
 	if len(rows)<=1 or 'switch_email' in user.url:

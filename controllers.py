@@ -36,7 +36,7 @@ from .common import db, session, auth, flash
 from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
 	SOCIETY_NAME, MEMBERSHIP, MEMBER_CATEGORIES, MAIL_LISTS, TIME_ZONE,\
 	PAYMENT_PROCESSOR, PAGE_BANNER, HOME_URL, PUBLIC_URL, HELP_URL, IS_PRODUCTION,\
-	ALLOWED_EMAILS
+	ALLOWED_EMAILS, DATE_FORMAT, CURRENCY_SYMBOL
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
 	primary_matriculation, event_revenue, event_unpaid, res_tbc, res_status,\
@@ -122,7 +122,7 @@ def members(path=None):
 				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Email_Lists', '%(Listname)s', zero="mailing?"))),
 		Field('event', 'reference Events', 
 				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Events',
-				lambda r: f"{r.DateTime.strftime('%m/%d/%Y')} {r.Description[:25]}",
+				lambda r: f"{r.DateTime.strftime(DATE_FORMAT)} {r.Description[:25]}",
 				orderby = ~db.Events.DateTime, zero="event?")),
 				comment = "exclude/select confirmed event registrants (with/without mailing list selection) "),
 		Field('good_standing', 'boolean', comment='tick to limit to members in good standing'),
@@ -214,9 +214,9 @@ def members(path=None):
 					qdesc += f' {field} {operator} {value}.'
 			elif fieldtype == 'date' or fieldtype == 'datetime':
 				try:
-					date = datetime.datetime.strptime(value, '%m/%d/%Y').date()
+					date = datetime.datetime.strptime(value, DATE_FORMAT).date()
 				except:
-					errors = 'please use mm/dd/yyyy format for dates'
+					errors = f'please use {DATE_FORMAT} format for dates'
 				if not errors:
 					if not operator or operator == '=':
 						operator = '=='
@@ -434,7 +434,7 @@ def add_member_reservation(member_id):
 				)
 
 	form=Form([Field('event', 'reference db.Events',
-		  requires=IS_IN_DB(db, 'Events', lambda r: f"{r.DateTime.strftime('%m/%d/%Y')} {r.Description[:25]}",
+		  requires=IS_IN_DB(db, 'Events', lambda r: f"{r.DateTime.strftime(DATE_FORMAT)} {r.Description[:25]}",
 						orderby = ~db.Events.DateTime,
 		      			zero='Please select event for new reservation from dropdown.'))],
 		formstyle=FormStyleBulma)
@@ -610,7 +610,7 @@ def new_members(path=None):
 			return 'New'
 		if transaction.Timestamp.date() < transaction.Paiddate + datetime.timedelta(days=GRACE_PERIOD):
 			return 'Renewal'
-		return transaction.Paiddate.strftime("%m/%d/%Y")
+		return transaction.Paiddate.strftime(DATE_FORMAT)
 	
 	rows = rows.find(lambda r: classify(r) != 'Renewal')
 	ids = [r.id for r in rows]
@@ -622,7 +622,7 @@ def new_members(path=None):
 	    			Column("College", lambda row: primary_affiliation(row['Member'])),
 	    			Column("Matr", lambda row: primary_matriculation(row['Member'])),
 					Column("Status", lambda row: db.Members[row['Member']].Membership),
-					Column('Date', lambda row: row.Timestamp.strftime("%m/%d/%Y")),
+					Column('Date', lambda row: row.Timestamp.strftime(DATE_FORMAT)),
 					Column('Previous', lambda row: classify(row))],
 			deletable=False, details=False, editable=False, create=False,
 			grid_class_style=grid_style,
@@ -995,7 +995,7 @@ def reservation(ismember, member_id, event_id, path=None):
 				flash.set("Event is full: please Checkout to add all unconfirmed guests to the waitlist.")
 			elif event.Capacity and attend+adding==event.Capacity:
 				flash.set(f"Please note, this fills the event; if you add another guest all unconfirmed guests will be waitlisted.")
-			dues_tbc = f" (including ${session['dues']} membership dues)" if session.get('dues') else ''
+			dues_tbc = f" (including {CURRENCY_SYMBOL}{session['dues']} membership dues)" if session.get('dues') else ''
 			payment = (int(session.get('dues') or 0)) + confirmed_ticket_cost - (host_reservation.Paid or 0) - (host_reservation.Charged or 0)
 			if not waitlist:
 				payment += (provisional_ticket_cost or 0)
@@ -1007,7 +1007,7 @@ def reservation(ismember, member_id, event_id, path=None):
 				else:
 					header = CAT(header,  XML(f"Your place(s) are not allocated until you click the 'Checkout' button.<br>"))
 			if payment>0 and payment>int(session.get('dues') or 0):
-				header = CAT(header, XML(f"Your registration will be confirmed when your payment of ${payment}{dues_tbc} is received at Checkout.<br>"))
+				header = CAT(header, XML(f"Your registration will be confirmed when your payment of {CURRENCY_SYMBOL}{payment}{dues_tbc} is received at Checkout.<br>"))
 
 			fields = []
 			if survey:
@@ -1277,9 +1277,9 @@ def get_date_range():
 			form.errors.end = 'end should not be before start!'
 		
 	form=Form(
-		[Field('start', 'date', requires=[IS_NOT_EMPTY(),IS_DATE(format='%Y-%m-%d')],
+		[Field('start', 'date', requires=[IS_NOT_EMPTY(),IS_DATE()],
 			default = year_begin if request.query.get('range')=='ytd' else prev_year_begin if request.query.get('range')=='taxyear' else year_ago),
-		Field('end', 'date', requires=[IS_NOT_EMPTY(),IS_DATE(format='%Y-%m-%d')],
+		Field('end', 'date', requires=[IS_NOT_EMPTY(),IS_DATE()],
 			default = today if request.query.get('range')!='taxyear' else prev_year_end)]
 	)
 	
@@ -1604,7 +1604,7 @@ def bank_file(bank_id):
 				A('Login to Society Account', _href=bank.Bankurl, _target='blank'), XML('<br>'),
 				XML(f"{markmin.markmin2html(bank.HowTo)}"))
 	
-	footer = f"Current Balance = {'$%8.2f'%(bank.Balance)}"
+	footer = f"Current Balance = {f'{CURRENCY_SYMBOL}{bank.Balance:8.2f}'}"
 	
 	form = Form([Field('downloaded_file', 'upload', uploadfield = False),
 				Field('override', 'boolean', comment = ' tick to accept new transactions unconditionally, e.g. for new bank')],
@@ -1717,7 +1717,7 @@ def bank_file(bank_id):
 					CheckNumber = checknumber, Reference = reference, Accrual = False, Notes = notes)
 			if account==unalloc.id: unmatched += 1
 								
-		flash.set(f'{stored} new transactions processed, {unmatched} to allocate, new balance = ${bank.Balance}')
+		flash.set(f'{stored} new transactions processed, {unmatched} to allocate, new balance = {CURRENCY_SYMBOL}{bank.Balance}')
 	except Exception as e:
 		flash.set(f"{str(row)}: {str(e)}")
 		isok = False
@@ -2165,7 +2165,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 	form = Form(fields, validation=validate, formstyle=FormStyleBulma, keep_values=True)
 		
 	if form.accepted:
-		notes = f"{datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).strftime('%m/%d/%y')} {form.vars.get('notes')}" if form.vars.get('notes') else ''
+		notes = f"{datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).strftime(DATE_FORMAT)} {form.vars.get('notes')}" if form.vars.get('notes') else ''
 		if member:
 
 			if member.Notes:
@@ -2242,9 +2242,9 @@ def profile():
 	header = H5('Profile Information')
 	if member.Paiddate:
 		header = CAT(header,
-	       XML(f"Your membership {'expired' if member.Paiddate < datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date() else 'expires'} on {member.Paiddate.strftime('%m/%d/%Y')}"))
+	       XML(f"Your membership {'expired' if member.Paiddate < datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date() else 'expires'} on {member.Paiddate.strftime(DATE_FORMAT)}"))
 	if member.Pay_next:
-		header = CAT(header, XML(f" Renewal payment will be charged on {member.Pay_next.strftime('%m/%d/%Y')}."))
+		header = CAT(header, XML(f" Renewal payment will be charged on {member.Pay_next.strftime(DATE_FORMAT)}."))
 	header = CAT(header,
 	      XML(f"{'<br><br>' if member.Paiddate else ''}The information on this form, except as noted, is included \
 in our online Member Directory which is available through our home page to \
@@ -2320,7 +2320,7 @@ def cancel_subscription(member_id=None):
 		if not member.Paiddate:	#just joined but changed their mind?
 			member.update_record(Membership=None, Charged=None)
 
-		effective = max(member.Paiddate or datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date(), datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()).strftime('%m/%d/%Y')
+		effective = max(member.Paiddate or datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date(), datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()).strftime(DATE_FORMAT)
 		notification(member, 'Membership Cancelled', f'Your membership is cancelled effective {effective}.<br>Thank you for your past support of the Society.')
 		flash.set(f"{member_name(member.id) if member_id else 'your'} membership is cancelled effective {effective}.")
 		redirect(URL('members/select' if member_id else 'index'))

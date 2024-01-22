@@ -23,9 +23,13 @@ Configures the app for a particular alumni group/Society,
 and for a particular running instance, e.g. production or development
 Customize for your organization and instance
 """
-import datetime
+import datetime, locale
 from dateutil import tz
 from py4web.utils.mailer import Mailer
+
+locale.setlocale(locale.LC_ALL, '')
+DATE_FORMAT = locale.nl_langinfo(locale.D_FMT)
+CURRENCY_SYMBOL = locale.nl_langinfo(locale.CRNCYSTR)[1:]
 
 # database connection string:
 DB_URI = "sqlite://storage.db"

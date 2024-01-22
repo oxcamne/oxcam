@@ -3,7 +3,7 @@ This file defines the database models
 """
 
 from .common import db, Field
-from .settings import MEMBER_CATEGORIES, ACCESS_LEVELS, TIME_ZONE
+from .settings import MEMBER_CATEGORIES, ACCESS_LEVELS, TIME_ZONE, DATE_FORMAT
 from pydal.validators import IS_IN_DB, IS_EMPTY_OR, IS_IN_SET, IS_NOT_EMPTY, IS_DATE,\
 	IS_NOT_IN_DB, IS_MATCH, IS_EMAIL, IS_DECIMAL_IN_RANGE, IS_DATETIME, IS_INT_IN_RANGE
 from yatl.helpers import CAT, A
@@ -159,7 +159,7 @@ db.define_table('Events',
 	Field('Comment', 'string', comment="open ended question at Checkout."),
 	Field('Modified', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None),
        			update=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),
-	singular="Event", plural="Events", format=lambda r: f"{r.DateTime.strftime('%m/%d/%Y')} {r.Description[:25]}")
+	singular="Event", plural="Events", format=lambda r: f"{r.DateTime.strftime(DATE_FORMAT)} {r.Description[:25]}")
 
 def tickets_sold(event_id, ticket, member_id=None):
 	return db((db.Reservations.Event==event_id)&(db.Reservations.Ticket==ticket)&\
@@ -344,7 +344,7 @@ db.define_table('AccTrans',
 				requires=IS_IN_DB(db, 'Bank_Accounts.id', '%(Name)s')),	#e.g. PayPal, Cambridge Trust, ...
 	Field('Account', 'reference CoA', requires=IS_IN_DB(db, 'CoA.id', '%(Name)s')),
 	Field('Event', 'reference Events',
-				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Events.id', lambda r: f"{r.DateTime.strftime('%m/%d/%Y')} {r.Description[:25]}",
+				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Events.id', lambda r: f"{r.DateTime.strftime(DATE_FORMAT)} {r.Description[:25]}",
 				orderby=~db.Events.DateTime)), comment='leave blank if not applicable'),
 	Field('Member', 'reference Members',
 				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Members.id', lambda r: f"{r.Lastname}, {r.Firstname}",

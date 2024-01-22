@@ -3,8 +3,8 @@ This file contains functions shared by multiple controllers
 """
 from py4web import URL
 from .common import db, auth
-from .settings import TIME_ZONE, SUPPORT_EMAIL, LETTERHEAD, GRACE_PERIOD,\
-	DB_URL, SOCIETY_SHORT_NAME, PUBLIC_URL, SOCIETY_NAME, MEMBER_CATEGORIES
+from .settings import TIME_ZONE, SUPPORT_EMAIL, LETTERHEAD, GRACE_PERIOD, CURRENCY_SYMBOL,\
+	DB_URL, SOCIETY_SHORT_NAME, PUBLIC_URL, SOCIETY_NAME, MEMBER_CATEGORIES, DATE_FORMAT
 from .models import primary_email, res_tbc, res_totalcost, res_status, member_name
 from yatl.helpers import A, TABLE, TH, THEAD, H6, TR, TD, CAT, HTML, XML
 import datetime, re, markmin
@@ -70,7 +70,7 @@ def get_banks(startdatetime, enddatetime):
 
 def tdnum(value, query=None, left=None, th=False):
 	#return number as TD or TH
-	nums = f'${value:,.2f}' if value >= 0 else f'(${-value:,.2f})'
+	nums = f'{CURRENCY_SYMBOL}{value:,.2f}' if value >= 0 else f'({CURRENCY_SYMBOL}{-value:,.2f})'
 	numsq = A(nums, _href=URL('transactions', vars=dict(query=query,left=left))) if query else nums
 	return TH(numsq, _style=f'text-align:right{"; color:Red" if value <0 else ""}') if th==True else TD(numsq, _style=f'text-align:right{"; color:Red" if value <0 else ""}')
 
@@ -177,7 +177,7 @@ def member_profile(member):
 
 #Create the header for a member message, such as a confirmation
 def msg_header(member, subject):
-	body = f"\n\n-------------\n{datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).strftime('%m/%d/%y')}||\n"
+	body = f"\n\n-------------\n{datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).strftime(DATE_FORMAT)}||\n"
 	body += f"{(member.Title or '')+' '}{member.Firstname} {member.Lastname} {member.Suffix or ''}||\n"
 	if member.Address1:
 		body += f"{member.Address1}||\n"
@@ -216,14 +216,14 @@ def event_confirm(event_id, member_id, justpaid=0, event_only=False):
 		body += '%s, %s %s %s|'%(t.Lastname, t.Title or '', t.Firstname, t.Suffix or '')
 		body += (t.Affiliation.Name if t.Affiliation else '') +'|'
 		body += (t.Selection or '') + '|'
-		body += '$%6.2f'%(t.Unitcost or 0.00) + '|'
+		body += f'{CURRENCY_SYMBOL}{t.Unitcost or 0.00:6.2f}|'
 		body += f'``**{res_status(t.id)}**``:red\n' if t.Waitlist or t.Provisional else '\n'
 	if tbcdues > tbc:
-		body += 'Membership Dues|||$%6.2f\n'%(tbcdues - tbc)
-	body += '**Total cost**|||**$%6.2f**\n'%(cost + tbcdues - tbc)
-	body += '**Paid**|||**$%6.2f**\n'%((resvtns.first().Paid or 0)+(resvtns.first().Charged or 0)+justpaid)
+		body += f'Membership Dues|||{CURRENCY_SYMBOL}{tbcdues - tbc:6.2f}\n'
+	body += f'**Total cost**|||**{CURRENCY_SYMBOL}{cost + tbcdues - tbc:6.2f}**\n'
+	body += f'**Paid**|||**{CURRENCY_SYMBOL}{(resvtns.first().Paid or 0)+(resvtns.first().Charged or 0)+justpaid:6.2f}**\n'
 	if tbcdues>justpaid:
-		body += '**Net amount due**|||**$%6.2f**\n'%(tbcdues-justpaid)
+		body += f'**Net amount due**|||**{CURRENCY_SYMBOL}{tbcdues-justpaid:6.2f}**\n'
 	body += '------------------------\n'
 	if tbcdues>justpaid:
 		body += f"To pay online please visit {DB_URL}/registration/{event_id}"

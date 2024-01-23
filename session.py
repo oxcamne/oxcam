@@ -61,7 +61,8 @@ you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _h
 	if form.accepted:
 		log =f"login {request.remote_addr} {form.vars['email']} {session.get('url') or ''} {request.environ['HTTP_USER_AGENT']}"
 		logger.info(log)
-		redirect(URL('send_email_confirmation', vars=dict(email=form.vars['email'])))
+		redirect(URL('send_email_confirmation', vars=dict(email=form.vars['email'],
+						timestamp=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))))
 	return locals()
 
 #send email confirmation message
@@ -69,25 +70,28 @@ you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _h
 @preferred
 def send_email_confirmation():
 	access = None	#for layout.html
-	email = (request.query.get('email') or '').lower()
-	if not email:	#shouldn't happen, but can be generated perhaps by safelink mechanisms?
-		redirect(URL('login'))
-	user = db(db.users.email==email).select().first()
-	if user:
-		user.update_record(remote_addr = request.remote_addr)
-		if datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > user.when_issued + datetime.timedelta(minutes = 15):
-			user.update_record(tokens=None)	#clear old expired tokens
-	else:
-		user = db.users[db.users.insert(email=email, remote_addr = request.remote_addr)]
-	token = str(random.randint(10000,999999))
-	user.update_record(tokens= [token]+(user.tokens or []), url=session.get('url') or URL('index'),
-						email = email, when_issued = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))
-	link = URL('validate', user.id, token, scheme=True)
-	message = HTML(XML(f"{LETTERHEAD.replace('&lt;subject&gt;', ' ')}<br><br>\
+	timestamp = request.query.get('timestamp')
+	if timestamp and datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) < datetime.datetime.fromisoformat(timestamp) + datetime.timedelta(seconds=1):
+		#generate email unless this is a stale re-request from a browser
+		email = (request.query.get('email') or '').lower()
+		if not email:	#shouldn't happen, but can be generated perhaps by safelink mechanisms?
+			redirect(URL('login'))
+		user = db(db.users.email==email).select().first()
+		if user:
+			user.update_record(remote_addr = request.remote_addr)
+			if datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > user.when_issued + datetime.timedelta(minutes = 15):
+				user.update_record(tokens=None)	#clear old expired tokens
+		else:
+			user = db.users[db.users.insert(email=email, remote_addr = request.remote_addr)]
+		token = str(random.randint(10000,999999))
+		user.update_record(tokens= [token]+(user.tokens or []), url=session.get('url') or URL('index'),
+							email = email, when_issued = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))
+		link = URL('validate', user.id, token, scheme=True)
+		message = HTML(XML(f"{LETTERHEAD.replace('&lt;subject&gt;', ' ')}<br><br>\
 Please click {A(link, _href=link)} to continue to {SOCIETY_SHORT_NAME}.<br><br>\
 If the link doesn't work, please try copy & pasting it to your browser's address bar.<br><br>\
 If you are unable to login or have other questions, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}."))
-	auth.sender.send(to=email, sender=SUPPORT_EMAIL, reply_to=SUPPORT_EMAIL, subject='Please Confirm Email', body=message)
+		auth.sender.send(to=email, sender=SUPPORT_EMAIL, reply_to=SUPPORT_EMAIL, subject='Please Confirm Email', body=message)
 	header = DIV(P("Please click the link sent to your email to continue. If you don't see the validation message, please check your spam folder."),
 				P('This link is valid for 15 minutes. You may close this window.'))
 	return locals()

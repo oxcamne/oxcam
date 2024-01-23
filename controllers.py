@@ -563,7 +563,8 @@ To change your mailing list subscritions, use the <b>Edit</b> button."))
 		if ismember=='Y' and not form.vars.get('id'): #member adding new address
 			session['url'] = URL('switch_email', vars=dict(mailings=db.Emails.Mailings.default,
 										member_id=member_id))
-			redirect(URL('send_email_confirmation', vars=dict(email=form.vars['Email'])))
+			redirect(URL('send_email_confirmation', vars=dict(email=form.vars['Email'],
+							timestamp=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))))
 
 	grid = Grid(path, db.Emails.Member==member_id,
 	     	orderby=~db.Emails.Modified,

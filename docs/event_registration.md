@@ -24,7 +24,7 @@ Every individual guest reservation is in one of three states:
 
 - Provisional/unconfirmed: the host registering has not yet checked out. A place has not yet been allocated.
 
-- Waitlisted: the host has checked out, but a place was not available. An email
+- Waitlisted: the host has checked out, but a place was not available.
 
 - Confirmed: the host has checked out and a place has been allocated. An email confirmation is sent to the member once any necessary payment has been made.
 

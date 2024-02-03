@@ -71,8 +71,6 @@ alt="logo" style="float:left;width:100px" /></span></h4>'
 HOME_URL = 'https://sites.google.com/oxcamne.org/home/?authuser=1'
         #this version allows authorized users to edit
 HELP_URL = "https://sites.google.com/oxcamne.org/help-new/home?authuser=1"
-PUBLIC_URL = 'www.oxcamne.org'
-        #domain service re-routes to sites.google
 SUPPORT_EMAIL = 'secretary@oxcamne.org'
 # html letterhead for email/notices:
 LETTERHEAD = '<h2><span style="color: blue">\
@@ -112,24 +110,12 @@ and during following 3 weeks. So we set the grace period to cover 18+21 \
 days.
 """
 
-# email settings use in common.py to construct auth.sender which is used for all
-# transactional messages (low volume of messages)
+# email settings use in common.py to construct auth.sender which is used for all email traffic
 SMTP_SSL = False
 SMTP_SERVER = "smtp.gmail.com:587"
 SMTP_SENDER = "Oxford & Cambridge Society <oxcamne@oxcamne.org>"
 SMTP_LOGIN = "<--- gmail login with app password --->"
 SMTP_TLS = True
-
-#define the bulk email sender for mailing list use etc.
-# smaller organizations (up to a few hundred on mailing list) could even
-# use the same account as above
-BULK_SENDER =  Mailer(
-        server="smtp.mailgun.com:587",
-        sender="Oxford & Cambridge Society <oxcamne@oxcamne.org>",
-        login="postmaster@<---- domain SMTP login ---->",
-        tls=SMTP_TLS,
-        ssl=SMTP_SSL,
-)
 
 # payment processor (currently only stripe implemented):
 PAYMENT_PROCESSOR='stripe'  
@@ -143,11 +129,13 @@ STRIPE_PROD_STUDENT = "<--- Stripe product id -->"    #Annual, no autorenew
 
 Notes:
 
+1. As shown here, the locale is set to the server default settings. It could be set to any supported locale. The  locales supported on the server can be listed using the 'locale' terminal command. Setting the locale determines the date format used and the currency symbol.
+
 1. The database is configured to use SQLite - this probably provides adequate performance
 for all but the largest groups.
 
 1. Setting IS_PRODUCTION False only prevents the daily maintenance process from
-sending out notices such as membership dues reminders. Any test environment can still send out email, so care needs to be taken not to generate unexpected traffic.
+sending out notices such as membership dues reminders. Any test environment can still send out email, but will suppress all email except to ALLOWED_EMAILS.
 
 1. Set THREAD_SUPPORT True only if your environment supports threading. PythonAnywhere does not, but typically a desktop development environment does. If set True, then the email daemon is started in its own thread whenever py4web/oxcam is started, and in turn spawns the daily_maintenance job in its own thread at midnight.
 
@@ -164,10 +152,7 @@ themselves are set up in the database Email_Lists table.
 1. In the prototype membership categories are included for full and student
 members. You do not have to have paid memberships.
 
-1. There are two groups of settings for outgoing email, each of which configures an SMTP Mailer. The first is for transactional emails, such as login email verification, transaction confirms, and emails addressed explicitly. In the case of OxCamNE, this uses the Society's Google Workspace address, <oxcamne@oxcamne.org> using an app password.
-
-1. The second mailer is for bulk emails, sent to mailing list or filtered sets of members. Smaller groups could re-use the same account as above, which may accommodate up to a few hundred addresses.
-Above that a paid email service such as mailgun.com needs to be used.
+1. The email settings configure an SMTP Mailer. This is used for transactional emails, such as login email verification, transaction confirms, and emails addressed explicitly, as well as for bulk emails, sent to mailing list or filtered sets of members. OxCamNE uses an email service provider which, among other things, ensures that messages are authenticated by SPF and DKIM records. Small groups could use, e.g. a gmail address with an app password.
 
 1. There is a group of settings for the Stripe payment processor, which is currently the only supported payment processor. These include public and private account keys, and product identifiers corresponding to the membership categories. Go [here](stripe.md) for more information on setting up and using Stripe.
 

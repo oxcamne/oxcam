@@ -4,7 +4,7 @@ This file contains functions shared by multiple controllers
 from py4web import URL
 from .common import db, auth
 from .settings import TIME_ZONE, SUPPORT_EMAIL, LETTERHEAD, GRACE_PERIOD, CURRENCY_SYMBOL,\
-	DB_URL, SOCIETY_SHORT_NAME, PUBLIC_URL, SOCIETY_NAME, MEMBER_CATEGORIES, DATE_FORMAT
+	DB_URL, SOCIETY_SHORT_NAME, SOCIETY_NAME, MEMBER_CATEGORIES, DATE_FORMAT, SMTP_LOGIN
 from .models import primary_email, res_tbc, res_totalcost, res_status, member_name
 from yatl.helpers import A, TABLE, TH, THEAD, H6, TR, TD, CAT, HTML, XML
 import datetime, re, markmin
@@ -193,7 +193,7 @@ def msg_send(member,subject, message):
 	if not email:
 		return
 	message = HTML(XML(message))
-	auth.sender.send(to=email, sender=SUPPORT_EMAIL, reply_to=SUPPORT_EMAIL, subject=subject, body=message)
+	auth.sender.send(to=email, sender=SUPPORT_EMAIL, bcc=SUPPORT_EMAIL, reply_to=SUPPORT_EMAIL, subject=subject, body=message)
 	
 #create confirmation of event
 def event_confirm(event_id, member_id, justpaid=0, event_only=False):
@@ -244,3 +244,7 @@ def member_greeting(member):
 	else:
 		greeting = f"Dear {member.Firstname.partition(' ')[0]},<br>"
 	return greeting
+
+import hashlib
+def generate_hash(email):
+    return hashlib.sha1((email + SMTP_LOGIN).encode()).hexdigest()

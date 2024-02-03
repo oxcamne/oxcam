@@ -51,8 +51,6 @@ alt="logo" style="float:left;width:100px" /></span></h4>'
 HOME_URL = 'https://sites.google.com/oxcamne.org/home/?authuser=1'
 	#this version allows authorized users to edit
 HELP_URL = "https://sites.google.com/oxcamne.org/help-new/home?authuser=1"
-PUBLIC_URL = 'www.oxcamne.org'
-	#domain service re-routes to sites.google
 SUPPORT_EMAIL = 'secretary@oxcamne.org'
 # html letterhead for email/notices:
 LETTERHEAD = '<h2><span style="color: blue">\
@@ -92,24 +90,12 @@ and during following 3 weeks. So we set the grace period to cover 18+21 \
 days.
 """
 
-# email settings use in common.py to construct auth.sender which is used for all
-# transactional messages (low volume of messages)
+# email settings use in common.py to construct auth.sender which is used for all email traffic
 SMTP_SSL = False
 SMTP_SERVER = "smtp.gmail.com:587"
 SMTP_SENDER = "Oxford & Cambridge Society <oxcamne@oxcamne.org>"
 SMTP_LOGIN = "<--- gmail login with app password --->"
 SMTP_TLS = True
-
-#define the bulk email sender for mailing list use etc.
-# smaller organizations (up to a few hundred on mailing list) could even
-# use the same account as above
-BULK_SENDER =  Mailer(
-	server="smtp.mailgun.com:587",
-	sender="Oxford & Cambridge Society <oxcamne@oxcamne.org>",
-	login="postmaster@<---- domain SMTP login ---->",
-	tls=SMTP_TLS,
-	ssl=SMTP_SSL,
-)
 
 # payment processor (currently only stripe implemented):
 PAYMENT_PROCESSOR='stripe'  

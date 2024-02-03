@@ -58,7 +58,8 @@ or cancel membership to receive no futher reminders.</p><p>\
 We are very grateful for your membership support and hope that you will renew!</p>\
 If you have any questions, please contact {SUPPORT_EMAIL}"
 			if IS_PRODUCTION:
-				auth.sender.send(to=primary_email(m.id), reply_to=SUPPORT_EMAIL, sender=SUPPORT_EMAIL, subject='Renewal Reminder', body=HTML(XML(text)))
+				auth.sender.send(to=primary_email(m.id), reply_to=SUPPORT_EMAIL, sender=SUPPORT_EMAIL,
+					 bcc=SUPPORT_EMAIL, subject='Renewal Reminder', body=HTML(XML(text)))
 			logger.info(f"Renewal Reminder sent to {primary_email(m.id)}")
 
 	subs = db((db.Members.Pay_subs!=None)&(db.Members.Pay_subs!='Cancelled')).select()
@@ -70,7 +71,8 @@ If you have any questions, please contact {SUPPORT_EMAIL}"
 We hope you will <a href={DB_URL}> reinstate your membership</a>, \
 but in any case we are grateful for your past support!</p>\
 If you have any questions, please contact {SUPPORT_EMAIL}"
-				auth.sender.send(to=primary_email(m.id), reply_to=SUPPORT_EMAIL, sender=SUPPORT_EMAIL, subject='Membership Renewal Failure', body=HTML(XML(text)))
+				auth.sender.send(to=primary_email(m.id), reply_to=SUPPORT_EMAIL, sender=SUPPORT_EMAIL,
+					 bcc=SUPPORT_EMAIL, subject='Membership Renewal Failure', body=HTML(XML(text)))
 			logger.info(f"Membership Subscription Cancelled {primary_email(m.id)}")
 			m.update_record(Pay_subs = 'Cancelled', Pay_next=None, Modified=datetime.datetime.now())
 

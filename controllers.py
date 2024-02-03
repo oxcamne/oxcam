@@ -35,7 +35,7 @@ from yatl.helpers import H5, H6, XML, HTML, TABLE, TH, TD, THEAD, TR
 from .common import db, session, auth, flash
 from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
 	SOCIETY_NAME, MEMBERSHIP, MEMBER_CATEGORIES, MAIL_LISTS, TIME_ZONE,\
-	PAYMENT_PROCESSOR, PAGE_BANNER, HOME_URL, PUBLIC_URL, HELP_URL, IS_PRODUCTION,\
+	PAYMENT_PROCESSOR, PAGE_BANNER, HOME_URL, HELP_URL, IS_PRODUCTION,\
 	ALLOWED_EMAILS, DATE_FORMAT, CURRENCY_SYMBOL
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
@@ -46,7 +46,7 @@ from pydal.validators import IS_LIST_OF_EMAILS, IS_EMPTY_OR, IS_IN_DB, IS_IN_SET
 	IS_NOT_EMPTY, IS_DATE, IS_DECIMAL_IN_RANGE, IS_INT_IN_RANGE, IS_MATCH
 from .utilities import member_good_standing, ageband, newpaiddate,\
 	collegelist, tdnum, get_banks, financial_content, event_confirm, msg_header, msg_send,\
-	society_emails, emailparse, notification, notify_support, member_profile
+	society_emails, emailparse, notification, notify_support, member_profile, generate_hash
 from .session import checkaccess
 from .stripe_interface import stripe_update_email, stripe_update_card, stripe_switched_card,\
 	stripe_get_dues, stripe_process_charge, stripe_cancel_subscription
@@ -499,21 +499,21 @@ def switch_email():
 	session['url'] = URL('index')	#will be back link from emails page
 	redirect(URL(f"emails/Y/{member_id}/select"))
 
-@action('unsubscribe/<email_id:int>/<list_id:int>/<member_id:int>/<email_address>', method=['POST', 'GET'])
+@action('unsubscribe/<email_id:int>/<list_id:int>/<hash>', method=['POST', 'GET'])
 @preferred
-def unsubscribe(email_id, list_id, member_id, email_address):
+def unsubscribe(email_id, list_id, hash):
 	email = db.Emails[email_id]
 	list = db.Email_Lists[list_id]
-	if not email or email.Member != int(member_id) or list.id not in email.Mailings or email.Email!=email_address:
-		redirect(URL(f"emails/Y/{member_id}/select"))
+	if not email or generate_hash(email.Email)!=hash or list.id not in email.Mailings:
+		redirect(URL(f"emails/Y/{email.Member}/select"))
 	header = f"Please Confirm to unsubscribe '{email.Email}' from '{list.Listname}' mailing list."
 	form = Form([], csrf_protection=False, submit_value='Confirm', formstyle=FormStyleBulma)
 
 	if form.accepted:
 		email.Mailings.remove(list.id)
 		email.update_record(Mailings=email.Mailings)
-		header = f"{email_address} unsubscribed from '{list.Listname}'"
-		notify_support(member_id, 'Unsubscribe', header)
+		header = f"{email.Email} unsubscribed from '{list.Listname}'"
+		notify_support(email.Member, 'Unsubscribe', header)
 		header = "Thank you: "+header
 		form = None
 	return locals()
@@ -1882,7 +1882,7 @@ def composemail():
 			comment='Include spaces between multiple recipients',
    			requires=[IS_NOT_EMPTY(), IS_LIST_OF_EMAILS()]))
 	if not query or query_count==1:
-		fields.append(Field('bcc', 'string', requires=IS_LIST_OF_EMAILS()))
+		fields.append(Field('bcc', 'string', requires=IS_LIST_OF_EMAILS(), default=source[0]))
 	fields.append(Field('subject', 'string', requires=IS_NOT_EMPTY(), default=proto.Subject if proto else ''))
 	fields.append(Field('body', 'text', requires=IS_NOT_EMPTY(), default=proto.Body if proto else "<letterhead>\n<greeting>\n\n" if query else "<letterhead>\n\n",
 				comment=CAT("You can use placeholders <letterhead>, <subject>, <greeting>, <member>, <reservation>, <email>, ",

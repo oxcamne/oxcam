@@ -160,8 +160,7 @@ def members(path=None):
 					A('Email addresses and subscriptions', _href=URL(f'emails/N/{member_id}/select')), XML('<br>'),
 					A('Dues payments', _href=URL('transactions', vars=dict(query=f"(db.AccTrans.Account=={acdues})&(db.AccTrans.Member=={member_id})"))), XML('<br>'),
 					A('Send Email to Member', _href=URL('composemail',
-					 	vars=dict(query=f"db.Members.id=={member_id}", left='',
-		 					qdesc=member_name(member_id)))))
+					 	vars=dict(query=f"db.Members.id=={member_id}", qdesc=member_name(member_id)))))
 			
 			if member_good_standing(member, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()):
 				header = CAT(header, XML('<br>'),
@@ -247,7 +246,7 @@ def members(path=None):
 		if qdesc:
 			header = CAT(header,
 				A(f"Send Notice to {qdesc}", _href=URL('composemail',
-					vars=dict(query=query, left=left or '', qdesc=qdesc))), XML('<br>'))
+					vars=dict(query=query, left=left or None, qdesc=qdesc))), XML('<br>'))
 		header = CAT(header,
 	       XML("Use filter to select a mailing list or apply other filters.<br>Selecting an event selects \
 (or excludes from a mailing list) attendees.<br>You can filter on a member record field \
@@ -1029,8 +1028,8 @@ def reservation(ismember, member_id, event_id, path=None):
 					if not host_reservation else "Please enter your guest's details:")
 	elif path=='select':
 		header = CAT(header, A('send email', _href=(URL('composemail', vars=dict(
-			query=f"(db.Members.id=={member_id})&(db.Members.id==db.Reservations.Member)&(db.Reservations.Event=={event_id})",
-			qdesc=member_name(member_id), left="db.Emails.on(db.Emails.Member==db.Members.id)")))),
+			query=f"(db.Members.id=={member_id})&(db.Members.id==db.Reservations.Member)&(db.Reservations.Event=={event_id})&(db.Reservations.Host==True)",
+			qdesc=member_name(member_id))))),
 			XML(" (use "), "<reservation>", XML(" to include confirmation and payment link)<br>"),
 			A('view member record', _href=URL(f'members/edit/{member_id}')),
 			XML("<br>Top row is the member's own reservation, additional rows are guests.<br>\
@@ -1873,7 +1872,7 @@ def composemail():
 	proto = db(db.EMProtos.id == request.query.get('proto')).select().first()
 	fields =[Field('sender', 'string', requires=IS_IN_SET(source), default=source[0])]
 	if query:
-		query_count = len(db(eval(query)).select(left=eval(left) if left!='' else None, distinct=True))
+		query_count = len(db(eval(query)).select(left=eval(left) if left else None, distinct=True))
 		header = CAT(header, XML(f'To: {qdesc} ({query_count})'))
 		footer = A("Export bcc list for use in email", _href=URL('bcc_export',
 						vars=dict(query=query, left=left or '')))

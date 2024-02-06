@@ -68,7 +68,7 @@ def email_daemon():
 				bodyparts.append((VISIT_WEBSITE_INSTRUCTIONS, None))
 				bodyparts.append((None, 'unsubscribe'))
 				mailing_list = db.Email_Lists[mailing.group(1)]
-			rows = db(eval(notice.Query)).select(*select_fields, left=eval(notice.Left) if notice.Left!='' else None, distinct=True)
+			rows = db(eval(notice.Query)).select(*select_fields, left=eval(notice.Left) if notice.Left else None, distinct=True)
 			#because sending may take several minutes, for fairness send in random order
 			dispatch = random.sample(range(len(rows)), len(rows))
 			for i in dispatch:

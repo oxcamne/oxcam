@@ -15,6 +15,8 @@ Stripe. Members will have access to an online directory.
 
 A group can choose how much of the above to implement and can expand it's use over time.
 
+For questions, bug reports, feature requests etc. use the Issues forum in this repository (to post you need to register on github).
+
 The project includes an online [User Guide](https://oxcamne.github.io/oxcam).
 
 ## Prerequisites

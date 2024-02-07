@@ -1785,7 +1785,7 @@ def transactions(path=None):
 				form.errors['Member'] = "Please identify the member"
 			elif form.vars.get('Event'):
 				form.errors['Event'] = "Membership dues do not associate with an event."
-			elif transaction.Account!=acdues:
+			elif transaction.Account!=acdues and new_amount>0:	#e.g. recording check
 				member = db.Members[form.vars.get('Member')]
 				valid_dues = False
 				for membership in MEMBER_CATEGORIES:
@@ -1803,7 +1803,7 @@ def transactions(path=None):
 				form.errors['Member'] = "Please identify the member"
 			elif not form.vars.get('Event'):
 				form.errors['Event'] = "Please identify the event"
-			elif transaction.Account!=acdues:
+			elif transaction.Account!=actkts and new_amount>0:	#e.g. recording check
 				tbc = res_tbc(form.vars.get('Member'), form.vars.get('Event'))
 				if not tbc or tbc < new_amount:
 					form.errors['Member'] = "Unexpected ticket payment"

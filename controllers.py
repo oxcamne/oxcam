@@ -2056,14 +2056,12 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 		if datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.Booking_Closed:
 			flash.set('Booking is closed, but you may join the wait list.')
 		session['event_id'] = event_id
-		session['membership'] = None	#gets set if membership dues to be collected
-		session['dues'] = None
 	else:
 		event = None
 		if not request.query.get('join_or_renew'):
 			session['event_id'] = None
-			session['membership'] = None
-			session['dues'] = None
+	session['membership'] = None
+	session['dues'] = None
 			
 	affinity = None
 	clist = collegelist(event.Sponsors if event_id and event.Sponsors else [])
@@ -2144,6 +2142,17 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 						requires=IS_IN_SET(MEMBER_CATEGORIES, zero='please select your membership category')))
 		fields.append(Field('notes', 'string'))
 
+	if not member:
+		fields.append(Field('please_indicate_how_you_heard_of_us', 'string',
+			requires=IS_IN_SET([
+				'Internet Search',
+				'Word of Mouth',
+				'Social Media',
+				'University Alumni Web Site',
+				'Cambridge in America/Oxford North America',
+				'Other'
+			])))
+
 	def validate(form):
 		if form.vars.get('affiliation') and not db.Colleges[form.vars.get('affiliation')].Oxbridge: #sponsor member
 			if form.vars.get('join_or_renew'):
@@ -2176,7 +2185,8 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 		else:
 			set_access = 'admin' if db(db.Members.id>0).count() == 0 else None
 			member_id = db.Members.insert(Firstname = form.vars['firstname'], 
-							Lastname = form.vars['lastname'], Notes=notes, Access = set_access)
+							Lastname = form.vars['lastname'], Notes=notes, Access = set_access,
+							Source = form.vars.get('please_indicate_how_you_heard_of_us'))
 			member = db.Members[member_id]
 			session['member_id'] = member_id
 			session['access'] = set_access

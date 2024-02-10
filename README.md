@@ -10,12 +10,15 @@ It can be deployed on low cost cloud services such as PythonAnywhere or Linode (
 list, etc.
 - One or more paid membership categories can be implemented, either sending renewal reminders
 or using autopay subscriptions, and collecting dues payments through a payment processor such as
-Stripe. Members will have access to an online directory.
+Stripe. Members are provided access to an online directory.
 - By uploading transaction files (in .csv format) from banks and payment processors oxcam can maintain comprehensive accounts.
+- It can provide dynamic content for the group's web site, for example [about](https://www.oxcamne.org/about), [past_events](https://www.oxcamne.org/history/past-events).
 
 A group can choose how much of the above to implement and can expand it's use over time.
 
 The project includes an online [User Guide](https://oxcamne.github.io/oxcam).
+
+For questions, bug reports, feature requests etc. use the Issues forum (to post you need to register on github).
 
 ## Prerequisites
 

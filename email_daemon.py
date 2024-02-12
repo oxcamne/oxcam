@@ -58,7 +58,7 @@ def email_daemon():
 			bodyparts = emailparse(notice.Body, notice.Subject, notice.Query)
 			attachment = pickle.loads(notice.Attachment) if notice.Attachment else None
 			select_fields = [db.Members.id]
-			list_unsubscribe = None
+			list_unsubscribe_uri = None
 			if 'Reservations.Event' in notice.Query:	#refers to Reservation
 				select_fields.append(db.Reservations.Event)
 			mailing = re.search(r"Mailings\.contains\((\d+)\)", notice.Query)
@@ -90,13 +90,14 @@ def email_daemon():
 					elif part[1] == 'reservation':
 						body += event_confirm(row.get(db.Reservations.Event), member.id)
 					elif part[1] == 'unsubscribe':
-						list_unsubscribe = f"{notice.Scheme}unsubscribe/{row.get(db.Emails.id)}/{mailing_list.id}/{generate_hash(to)}"
-						body += f"<br><br><a href={list_unsubscribe}>Unsubscribe</a> from '{mailing_list.Listname}' mailing list."
+						list_unsubscribe_uri = f"{notice.Scheme}unsubscribe/{row.get(db.Emails.id)}/{mailing_list.id}/{generate_hash(to)}"
+						body += f"<br><br><a href={list_unsubscribe_uri}>Unsubscribe</a> from '{mailing_list.Listname}' mailing list."
 				retry_seconds = 2
 				while True:
 					try:
 						auth.sender.send(to=to, subject=notice.Subject, sender=notice.Sender, reply_to=notice.Sender,
-					   		list_unsubscribe=f"{SUPPORT_EMAIL}?subject=unsubscribe_{mailing_list.Listname.replace(' ','_')}" if mailing else None,
+					   		list_unsubscribe=f"<mailto:{SUPPORT_EMAIL}?subject=unsubscribe_{mailing_list.Listname.replace(' ','_')}>,<{list_unsubscribe_uri}>" if mailing else None,
+							list_unsubscribe_post="List-Unsubscribe=One-Click" if mailing else None,
 		       				bcc=eval(notice.Bcc), body=HTML(XML(body)), attachments=attachment)
 						break
 					except Exception as e:

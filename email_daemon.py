@@ -106,7 +106,8 @@ def email_daemon():
 						time.sleep(retry_seconds)
 						retry_seconds += 2
 						if retry_seconds==20:	#give up after about 3 minutes
-							raise RuntimeError("send failure") from e
+							logger.info(f"send failure {e} discarding message")
+							break
 			db(db.Email_Queue.id==notice.id).delete()
 			continue    #until queue empty
 		db.commit()

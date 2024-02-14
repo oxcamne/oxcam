@@ -96,8 +96,9 @@ def email_daemon():
 				while True:
 					try:
 						auth.sender.send(to=to, subject=notice.Subject, sender=notice.Sender, reply_to=notice.Sender,
-					   		list_unsubscribe=f"<mailto:{SUPPORT_EMAIL}?subject=unsubscribe_{mailing_list.Listname.replace(' ','_')}>,<{list_unsubscribe_uri}>" if mailing else None,
-							list_unsubscribe_post="List-Unsubscribe=One-Click" if mailing else None,
+					   		#TBD when py4web/mailer.py fixed
+					   		#list_unsubscribe=f"<{list_unsubscribe_uri}>,<mailto:{SUPPORT_EMAIL}?subject=unsubscribe_{mailing_list.Listname.replace(' ','_')}>" if mailing else None,
+							#list_unsubscribe_post="List-Unsubscribe=One-Click" if mailing else None,
 		       				bcc=eval(notice.Bcc), body=HTML(XML(body)), attachments=attachment)
 						break
 					except Exception as e:

@@ -475,7 +475,7 @@ is used on name badges etc."
 	grid = Grid(path, db.Affiliations.Member==member_id,
 	     	orderby=db.Affiliations.Modified,
 			columns=[db.Affiliations.College, db.Affiliations.Matr, db.Affiliations.Notes],
-			details=not write, editable=write, create=write, deletable=write,
+			details=not write, editable=write, create=write, deletable=write, show_id=True,
 			validation=affiliation_modified,
 			grid_class_style=grid_style,
 			formstyle=form_style,
@@ -504,7 +504,7 @@ def unsubscribe(email_id, list_id, hash):
 	email = db.Emails[email_id]
 	list = db.Email_Lists[list_id]
 	if not email or generate_hash(email.Email)!=hash or list.id not in email.Mailings:
-		redirect(URL(f"emails/Y/{email.Member}/select"))
+		redirect(URL('index'))
 	header = f"Please Confirm to unsubscribe '{email.Email}' from '{list.Listname}' mailing list."
 	form = Form([], csrf_protection=False, submit_value='Confirm', formstyle=FormStyleBulma)
 
@@ -570,7 +570,7 @@ To change your mailing list subscritions, use the <b>Edit</b> button."))
 			columns=[db.Emails.Email, db.Emails.Mailings],
 			details=not write, editable=write, create=write,
 			deletable=lambda row: write and (ismember!='Y' or row['id']!=db(db.Emails.Member == member_id).select(orderby=~db.Emails.Modified).first().id),
-			validation=validate,
+			validation=validate, show_id=True,
 			grid_class_style=grid_style,
 			formstyle=form_style,
 			)

@@ -91,7 +91,7 @@ def email_daemon():
 						body += event_confirm(row.get(db.Reservations.Event), member.id)
 					elif part[1] == 'unsubscribe':
 						list_unsubscribe_uri = f"{notice.Scheme}unsubscribe/{row.get(db.Emails.id)}/{mailing_list.id}/{generate_hash(to)}"
-						body += f"<br><br><a href={list_unsubscribe_uri}>Unsubscribe</a> from '{mailing_list.Listname}' mailing list."
+						body += f"<br><br><a href={list_unsubscribe_uri}?in_msg=Y>Unsubscribe</a> from '{mailing_list.Listname}' mailing list."
 				retry_seconds = 2
 				while True:
 					try:

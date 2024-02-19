@@ -2,12 +2,13 @@
 This file contains functions shared by multiple controllers
 """
 from py4web import URL
-from .common import db, auth
+from .common import db
 from .settings import TIME_ZONE, SUPPORT_EMAIL, LETTERHEAD, GRACE_PERIOD, CURRENCY_SYMBOL,\
-	DB_URL, SOCIETY_SHORT_NAME, SOCIETY_NAME, MEMBER_CATEGORIES, DATE_FORMAT, SMTP_LOGIN
+	DB_URL, SOCIETY_SHORT_NAME, MEMBER_CATEGORIES, DATE_FORMAT, SMTP_TRANS, STRIPE_SKEY, SOCIETY_NAME
 from .models import primary_email, res_tbc, res_totalcost, res_status, member_name
 from yatl.helpers import A, TABLE, TH, THEAD, H6, TR, TD, CAT, HTML, XML
-import datetime, re, markmin
+import datetime, re, markmin, smtplib
+from email.message import EmailMessage
 
 #check if member is in good standing at a particular date
 #if no MEMBER_CATEGORIES always return True
@@ -34,10 +35,48 @@ def ageband(year, matr):
 		ageband = 'unknown'
 	return ageband
 
+def email_sender(
+	connection = None,	#SMTP server connection if made by caller
+	host = SMTP_TRANS,	#specifies server and account to use if connection unspecified
+	subject = None,
+	sender = None,
+	to = None,
+	bcc = None,
+	body = None,
+	attachment = None,
+	attachment_filename = None,
+	list_unsubscribe = None,
+	list_unsubscribe_post = None
+):
+	if not connection:
+		smtp_server, port, login, password = host
+		server = smtplib.SMTP(smtp_server, port)
+		server.starttls()
+		server.login(login, password)
+	else:
+		server = connection
+
+	message = EmailMessage()
+	message['Subject'] = subject
+	message['From'] = sender
+	message['To'] = to
+	if bcc:
+		message['Bcc'] = bcc
+	if list_unsubscribe:
+		message['List_Unsubscribe'] = list_unsubscribe
+	if list_unsubscribe_post:
+		message['List_Unsubscribe_Post'] = list_unsubscribe_post
+	message.set_content(HTML(XML(body)).__str__(), subtype='html')
+	if attachment:
+		message.add_attachment(attachment, maintype='application', subtype='octet-stream', filename=attachment_filename)
+	server.send_message(message)
+	if not connection:
+		server.quit()
+		server.close()
+
 def notify_support(member_id, subject, body):
 	message = f"{member_name(member_id)} id {member_id}<br>{body}"
-	message = HTML(XML(message))
-	auth.sender.send(to=SUPPORT_EMAIL, sender=SUPPORT_EMAIL, subject=subject, body=message)
+	email_sender(to=SUPPORT_EMAIL, sender=SUPPORT_EMAIL, subject=subject, body=message)
 
 #notifications to Member & Support_Email of member actions
 def notification(member, subject, body):
@@ -192,8 +231,7 @@ def msg_send(member,subject, message):
 	email = primary_email(member.id)
 	if not email:
 		return
-	message = HTML(XML(message))
-	auth.sender.send(to=email, sender=SUPPORT_EMAIL, bcc=SUPPORT_EMAIL, reply_to=SUPPORT_EMAIL, subject=subject, body=message)
+	email_sender(to=email, sender=SUPPORT_EMAIL, bcc=SUPPORT_EMAIL, subject=subject, body=message)
 	
 #create confirmation of event
 def event_confirm(event_id, member_id, justpaid=0, event_only=False):
@@ -247,4 +285,4 @@ def member_greeting(member):
 
 import hashlib
 def generate_hash(email):
-    return hashlib.sha1((email + SMTP_LOGIN).encode()).hexdigest()
+    return hashlib.sha1((email + STRIPE_SKEY).encode()).hexdigest()

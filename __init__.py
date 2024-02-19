@@ -1,5 +1,5 @@
 # check compatibility
-import py4web
+import py4web, threading
 
 assert py4web.check_compatible("0.1.20190709.1")
 
@@ -17,8 +17,7 @@ __version__ = "0.0.0"
 __author__ = "dgmanns@gmail.com"
 __license__ = "BSDv3"
 
-if THREAD_SUPPORT:      #run the email daemon in it's own thread
+if THREAD_SUPPORT:      #run the email daemon in it's own thread 
     # NOTE Pythonanywhere doesn't support threading
-    from threading import Thread
-    t = Thread(target=email_daemon, daemon=True)
-    t.start()
+    thread = threading.Thread(target=email_daemon, daemon=True)
+    thread.start()

@@ -23,9 +23,8 @@ Configures the app for a particular alumni group/Society,
 and for a particular running instance, e.g. production or development
 Customize for your organization and instance
 """
-import datetime, locale
+import locale, smtplib
 from dateutil import tz
-from py4web.utils.mailer import Mailer
 
 locale.setlocale(locale.LC_ALL, '')
 DATE_FORMAT = locale.nl_langinfo(locale.D_FMT)
@@ -69,7 +68,7 @@ Oxford and Cambridge Society of New England</em> <img src="images/oxcamne_no_pad
 alt="logo" style="float:left;width:100px" /></span></h4>'
 # NOTE the logo image is in py4web/apps/oxcam/static/images
 HOME_URL = 'https://sites.google.com/oxcamne.org/home/?authuser=1'
-        #this version allows authorized users to edit
+	#this version allows authorized users to edit
 HELP_URL = "https://sites.google.com/oxcamne.org/help-new/home?authuser=1"
 SUPPORT_EMAIL = 'secretary@oxcamne.org'
 # html letterhead for email/notices:
@@ -78,7 +77,7 @@ LETTERHEAD = '<h2><span style="color: blue">\
 <img src="https://oxcamne.pythonanywhere.com/oxcam/static/images/oxcamne_no_pad.png" \
 alt="logo" style="float:left;width:100px" /></h2>\
 <h3><span style="color: blue"><em>&lt;subject&gt;</em></span></h3>'
-        #NOTE 'subject' replaced by full subject line in emails/notices
+	#NOTE 'subject' replaced by full subject line in emails/notices
 # html trailer for email notices:
 VISIT_WEBSITE_INSTRUCTIONS = "<br><br>Visit us at www.oxcamne.org or \
 https://www.instagram.com/oxcamne/ or www.facebook.com/oxcamne"
@@ -110,12 +109,11 @@ and during following 3 weeks. So we set the grace period to cover 18+21 \
 days.
 """
 
-# email settings use in common.py to construct auth.sender which is used for all email traffic
-SMTP_SSL = False
-SMTP_SERVER = "smtp.gmail.com:587"
-SMTP_SENDER = "Oxford & Cambridge Society <oxcamne@oxcamne.org>"
-SMTP_LOGIN = "<--- gmail login with app password --->"
-SMTP_TLS = True
+#SMTP host connection for transactional messages
+SMTP_TRANS = ('smtp.somewhere.com', 'port', 'username', 'password')
+
+#SMTP host connection for bulk messages
+SMTP_BULK = SMTP_TRANS
 
 # payment processor (currently only stripe implemented):
 PAYMENT_PROCESSOR='stripe'  
@@ -152,7 +150,7 @@ themselves are set up in the database Email_Lists table.
 1. In the prototype membership categories are included for full and student
 members. You do not have to have paid memberships.
 
-1. The email settings configure an SMTP Mailer. This is used for transactional emails, such as login email verification, transaction confirms, and emails addressed explicitly, as well as for bulk emails, sent to mailing list or filtered sets of members. OxCamNE uses an email service provider which, among other things, ensures that messages are authenticated by SPF and DKIM records. Small groups could use, e.g. a gmail address with an app password.
+1. The email settings configure two SMTP servers. One is used for transactional emails, such as login email verification, transaction confirms, and emails addressed explicitly, the other for bulk emails, sent to mailing list or filtered sets of members. OxCamNE uses an email service provider which, among other things, ensures that messages are authenticated by SPF and DKIM records. Small groups could use, e.g. a gmail address with an app password. In production, for transactional messages we use our google workspace account directly, whereas bulk messages are sent via our email service provider, mailgun.
 
 1. There is a group of settings for the Stripe payment processor, which is currently the only supported payment processor. These include public and private account keys, and product identifiers corresponding to the membership categories. Go [here](stripe.md) for more information on setting up and using Stripe.
 

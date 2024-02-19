@@ -1,13 +1,14 @@
 """
 This file contains controllers used to manage the user's session
 """
-from py4web import URL, request, redirect, action, Field, response
-from .common import db, session, flash, logger, auth
+from py4web import URL, request, redirect, action, Field
+from .common import db, session, flash, logger
 from .settings import SUPPORT_EMAIL, TIME_ZONE, LETTERHEAD, SOCIETY_SHORT_NAME, PAGE_BANNER, HOME_URL, HELP_URL, DATE_FORMAT
 from .models import ACCESS_LEVELS, member_name
-from yatl.helpers import A, H6, XML, P, HTML, DIV
+from .utilities import email_sender
+from yatl.helpers import A, H6, XML, P, DIV
 from py4web.utils.form import Form, FormStyleBulma
-from pydal.validators import IS_IN_SET, IS_NOT_EMPTY, IS_EMAIL
+from pydal.validators import IS_IN_SET, IS_EMAIL
 from py4web.utils.factories import Inject
 import datetime, random
 
@@ -87,11 +88,11 @@ def send_email_confirmation():
 		user.update_record(tokens= [token]+(user.tokens or []), url=session.get('url') or URL('index'),
 							email = email, when_issued = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))
 		link = URL('validate', user.id, token, scheme=True)
-		message = HTML(XML(f"{LETTERHEAD.replace('&lt;subject&gt;', ' ')}<br><br>\
+		message = f"{LETTERHEAD.replace('&lt;subject&gt;', ' ')}<br><br>\
 Please click {A(link, _href=link)} to continue to {SOCIETY_SHORT_NAME}.<br><br>\
 If the link doesn't work, please try copy & pasting it to your browser's address bar.<br><br>\
-If you are unable to login or have other questions, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}."))
-		auth.sender.send(to=email, sender=SUPPORT_EMAIL, reply_to=SUPPORT_EMAIL, subject='Please Confirm Email', body=message)
+If you are unable to login or have other questions, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}."
+		email_sender(to=email, sender=SUPPORT_EMAIL, subject='Please Confirm Email', body=message)
 	header = DIV(P("Please click the link sent to your email to continue. If you don't see the validation message, please check your spam folder."),
 				P('This link is valid for 15 minutes. You may close this window.'))
 	return locals()

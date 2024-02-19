@@ -290,6 +290,7 @@ db.define_table('Email_Queue',	#used for notices or messages targetted via membe
 	Field('Subject'),
 	Field('Body', 'text'),			#unexpanded body
 	Field('Attachment', 'blob'),	#pickled Mailer.Attachment
+	Field('Attachment_Filename'),
 	Field('Sender'),
 	Field('Bcc'),
 	Field('Query', 'text'),	#query used to locate targets

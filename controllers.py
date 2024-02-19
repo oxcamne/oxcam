@@ -31,8 +31,8 @@ grid_style = GridClassStyleBulma
 form_style = FormStyleBulma
 
 from py4web import action, request, response, redirect, URL, Field
-from yatl.helpers import H5, H6, XML, HTML, TABLE, TH, TD, THEAD, TR
-from .common import db, session, auth, flash
+from yatl.helpers import H5, H6, XML, TABLE, TH, TD, THEAD, TR
+from .common import db, session, flash
 from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
 	SOCIETY_NAME, MEMBERSHIP, MEMBER_CATEGORIES, MAIL_LISTS, TIME_ZONE,\
 	PAYMENT_PROCESSOR, PAGE_BANNER, HOME_URL, HELP_URL, IS_PRODUCTION,\
@@ -44,7 +44,7 @@ from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name
 	selections_made, survey_choices
 from pydal.validators import IS_LIST_OF_EMAILS, IS_EMPTY_OR, IS_IN_DB, IS_IN_SET,\
 	IS_NOT_EMPTY, IS_DATE, IS_DECIMAL_IN_RANGE, IS_INT_IN_RANGE, IS_MATCH
-from .utilities import member_good_standing, ageband, newpaiddate,\
+from .utilities import email_sender, member_good_standing, ageband, newpaiddate,\
 	collegelist, tdnum, get_banks, financial_content, event_confirm, msg_header, msg_send,\
 	society_emails, emailparse, notification, notify_support, member_profile, generate_hash
 from .session import checkaccess
@@ -53,7 +53,6 @@ from .stripe_interface import stripe_update_email, stripe_update_card, stripe_sw
 from py4web.utils.factories import Inject
 import datetime, re, markmin, csv, decimal, io, pickle
 from io import StringIO
-from py4web.utils.mailer import Mailer
 
 preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
 
@@ -1642,7 +1641,7 @@ def bank_file(bank_id):
 
 #in the file, transactions may be in chronological order or the reverse (Stripe), so store them all in memory
 #before processing. We first read from the file, to determine that there is overlap with previously processed files
-#(at least one previously stored transaction in the file).
+#(at least one previously stored transaction in the file). 
 	file_transactions = []
 	
 	try:
@@ -1901,6 +1900,11 @@ def composemail():
 				for em in to:
 					if not em in ALLOWED_EMAILS:
 						form2.errors['to'] = f"{em} is not an allowed address in this environment"
+			if form2.vars.get('bcc'):
+				bcc = re.compile('[^,;\s]+').findall(form2.vars['bcc'])
+				for em in bcc:
+					if not em in ALLOWED_EMAILS:
+						form2.errors['bcc'] = f"{em} is not an allowed address in this environment"
 
 	form2 = Form(fields, form_name="message_form", keep_values=True, validation=validate,
 					submit_value = 'Send', formstyle=FormStyleBulma)
@@ -1922,8 +1926,7 @@ def composemail():
 				flash.set("Template stored: "+ form2.vars['subject'])
 
 		bcc = re.compile('[^,;\s]+').findall(form2.vars.get('bcc') or '')
-		if not IS_PRODUCTION:
-			bcc = [em for em in bcc if em.lower() in ALLOWED_EMAILS]
+
 		try:
 			bodyparts = emailparse(form2.vars['body'], form2.vars['subject'], query)
 		except Exception as e:
@@ -1931,28 +1934,26 @@ def composemail():
 			bodyparts = None
 
 		if form2.vars.get('attachment'):
-			attachment = Mailer.Attachment(form2.vars.get('attachment').file,
-				  filename=form2.vars.get('attachment').filename)
+			attachment = form2.vars.get('attachment').file.read()
+			attachment_filename =form2.vars.get('attachment').filename
 		else:
-			attachment = None
+			attachment = attachment_filename = None
 
 		if bodyparts:
 			if query:
 				db.Email_Queue.insert(Subject=form2.vars['subject'], Body=form2.vars['body'], Sender=sender,
-			 		Attachment=pickle.dumps(attachment), 
+			 		Attachment=pickle.dumps(attachment), Attachment_Filename=attachment_filename,
 					Bcc=bcc, Query=query, Left=left, Qdesc=qdesc,
 					Scheme=URL('index', scheme=True).replace('index', ''))
 				flash.set(f"email notice sent to '{qdesc}' ({query_count})")
 			else:
 				to = re.compile('[^,;\s]+').findall(form2.vars['to'])
-				if not IS_PRODUCTION:
-					to = [em for em in to if em.lower() in ALLOWED_EMAILS]
 				body = ''
 				for part in bodyparts:
-					body += part[0]		
+					body += part[0]
 				flash.set(f"Email sent to: {to} ({len(to)})")
-				auth.sender.send(to=to, sender=sender, reply_to=sender, subject=form2.vars['subject'], 
-		     		bcc=bcc, body=HTML(XML(body)), attachments=attachment)
+				email_sender(subject=form2.vars['subject'], sender=sender, to=to, bcc=bcc,
+				 	body=body, attachment=attachment, attachment_filename=attachment_filename)
 			redirect(session['url_prev'])
 	return locals()
 

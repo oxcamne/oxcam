@@ -21,13 +21,12 @@ It can also be run in development using a launch.json configuration:
 import datetime
 import os
 from pathlib import Path
-from .common import db, auth, logger
+from .common import db, logger
 from .settings import SOCIETY_SHORT_NAME, STRIPE_SKEY, IS_PRODUCTION, ALLOWED_EMAILS, \
 	SUPPORT_EMAIL, LETTERHEAD, SOCIETY_NAME, DB_URL, DATE_FORMAT
-from .utilities import member_greeting
+from .utilities import member_greeting, email_sender
 from .stripe_interface import stripe_subscription_cancelled
 from .models import primary_email
-from yatl.helpers import HTML, XML
 
 def daily_maintenance():
 	os.chdir(Path(__file__).resolve().parent.parent.parent) #working directory py4web
@@ -58,8 +57,8 @@ or cancel membership to receive no futher reminders.</p><p>\
 We are very grateful for your membership support and hope that you will renew!</p>\
 If you have any questions, please contact {SUPPORT_EMAIL}"
 			if IS_PRODUCTION:
-				auth.sender.send(to=primary_email(m.id), reply_to=SUPPORT_EMAIL, sender=SUPPORT_EMAIL,
-					 bcc=SUPPORT_EMAIL, subject='Renewal Reminder', body=HTML(XML(text)))
+				email_sender(to=primary_email(m.id), sender=SUPPORT_EMAIL,
+					 bcc=SUPPORT_EMAIL, subject='Renewal Reminder', body=text)
 			logger.info(f"Renewal Reminder sent to {primary_email(m.id)}")
 
 	subs = db((db.Members.Pay_subs!=None)&(db.Members.Pay_subs!='Cancelled')).select()
@@ -71,8 +70,8 @@ If you have any questions, please contact {SUPPORT_EMAIL}"
 We hope you will <a href={DB_URL}> reinstate your membership</a>, \
 but in any case we are grateful for your past support!</p>\
 If you have any questions, please contact {SUPPORT_EMAIL}"
-				auth.sender.send(to=primary_email(m.id), reply_to=SUPPORT_EMAIL, sender=SUPPORT_EMAIL,
-					 bcc=SUPPORT_EMAIL, subject='Membership Renewal Failure', body=HTML(XML(text)))
+				email_sender(to=primary_email(m.id), sender=SUPPORT_EMAIL,
+					 bcc=SUPPORT_EMAIL, subject='Membership Renewal Failure', body=text)
 			logger.info(f"Membership Subscription Cancelled {primary_email(m.id)}")
 			m.update_record(Pay_subs = 'Cancelled', Pay_next=None, Modified=datetime.datetime.now())
 

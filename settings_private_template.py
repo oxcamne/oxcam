@@ -3,9 +3,8 @@ Configures the app for a particular alumni group/Society,
 and for a particular running instance, e.g. production or development
 Customize for your organization and instance
 """
-import datetime, locale
+import locale, smtplib
 from dateutil import tz
-from py4web.utils.mailer import Mailer
 
 locale.setlocale(locale.LC_ALL, '')
 DATE_FORMAT = locale.nl_langinfo(locale.D_FMT)
@@ -90,12 +89,11 @@ and during following 3 weeks. So we set the grace period to cover 18+21 \
 days.
 """
 
-# email settings use in common.py to construct auth.sender which is used for all email traffic
-SMTP_SSL = False
-SMTP_SERVER = "smtp.gmail.com:587"
-SMTP_SENDER = "Oxford & Cambridge Society <oxcamne@oxcamne.org>"
-SMTP_LOGIN = "<--- gmail login with app password --->"
-SMTP_TLS = True
+#SMTP host connection for transactional messages
+SMTP_TRANS = ('smtp.somewhere.com', 'port', 'username', 'password')
+
+#SMTP host connection for bulk messages
+SMTP_BULK = SMTP_TRANS
 
 # payment processor (currently only stripe implemented):
 PAYMENT_PROCESSOR='stripe'  

@@ -48,7 +48,7 @@ Oxford and Cambridge Society of New England</em> <img src="images/oxcamne_no_pad
 alt="logo" style="float:left;width:100px" /></span></h4>'
 # NOTE the logo image is in py4web/apps/oxcam/static/images
 HOME_URL = 'https://sites.google.com/oxcamne.org/home/?authuser=1'
-	#this version allows authorized users to edit
+    #this version allows authorized users to edit
 HELP_URL = "https://sites.google.com/oxcamne.org/help-new/home?authuser=1"
 SUPPORT_EMAIL = 'secretary@oxcamne.org'
 # html letterhead for email/notices:
@@ -57,7 +57,7 @@ LETTERHEAD = '<h2><span style="color: blue">\
 <img src="https://oxcamne.pythonanywhere.com/oxcam/static/images/oxcamne_no_pad.png" \
 alt="logo" style="float:left;width:100px" /></h2>\
 <h3><span style="color: blue"><em>&lt;subject&gt;</em></span></h3>'
-	#NOTE 'subject' replaced by full subject line in emails/notices
+    #NOTE 'subject' replaced by full subject line in emails/notices
 # html trailer for email notices:
 VISIT_WEBSITE_INSTRUCTIONS = "<br><br>Visit us at www.oxcamne.org or \
 https://www.instagram.com/oxcamne/ or www.facebook.com/oxcamne"

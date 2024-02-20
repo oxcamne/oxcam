@@ -68,7 +68,7 @@ Oxford and Cambridge Society of New England</em> <img src="images/oxcamne_no_pad
 alt="logo" style="float:left;width:100px" /></span></h4>'
 # NOTE the logo image is in py4web/apps/oxcam/static/images
 HOME_URL = 'https://sites.google.com/oxcamne.org/home/?authuser=1'
-	#this version allows authorized users to edit
+    #this version allows authorized users to edit
 HELP_URL = "https://sites.google.com/oxcamne.org/help-new/home?authuser=1"
 SUPPORT_EMAIL = 'secretary@oxcamne.org'
 # html letterhead for email/notices:
@@ -77,7 +77,7 @@ LETTERHEAD = '<h2><span style="color: blue">\
 <img src="https://oxcamne.pythonanywhere.com/oxcam/static/images/oxcamne_no_pad.png" \
 alt="logo" style="float:left;width:100px" /></h2>\
 <h3><span style="color: blue"><em>&lt;subject&gt;</em></span></h3>'
-	#NOTE 'subject' replaced by full subject line in emails/notices
+    #NOTE 'subject' replaced by full subject line in emails/notices
 # html trailer for email notices:
 VISIT_WEBSITE_INSTRUCTIONS = "<br><br>Visit us at www.oxcamne.org or \
 https://www.instagram.com/oxcamne/ or www.facebook.com/oxcamne"
@@ -145,12 +145,12 @@ well as including organization specific information.
 
 1. A single mailing list is assumed. An organization can operate multiple
 mailing lists. MAIL_LISTS is simply an html description, the mailing lists
-themselves are set up in the database Email_Lists table.
+themselves are set up in the database Email_Lists table. A mailing list should be defined and present in the database even it is not going to be used.
 
 1. In the prototype membership categories are included for full and student
-members. You do not have to have paid memberships.
+members. If you do not have paid memberships MEMBER_CATEGORIES should be an empty list, '[]'.
 
-1. The email settings configure two SMTP servers. One is used for transactional emails, such as login email verification, transaction confirms, and emails addressed explicitly, the other for bulk emails, sent to mailing list or filtered sets of members. OxCamNE uses an email service provider which, among other things, ensures that messages are authenticated by SPF and DKIM records. Small groups could use, e.g. a gmail address with an app password. In production, for transactional messages we use our google workspace account directly, whereas bulk messages are sent via our email service provider, mailgun.
+1. The email settings configure two SMTP servers. One is used for transactional emails, such as login email verification, transaction confirms, and emails addressed explicitly, the other for bulk emails, sent to mailing list or filtered sets of members. OxCamNE uses an email service provider which, among other things, ensures that messages are authenticated by SPF and DKIM records. Small groups could use, e.g. a gmail address with an app password. In production, for transactional messages we use our google workspace account directly, whereas bulk messages are sent via our email service provider, mailgun. These settings should be present even if you are not using mailing list functionality.
 
 1. There is a group of settings for the Stripe payment processor, which is currently the only supported payment processor. These include public and private account keys, and product identifiers corresponding to the membership categories. Go [here](stripe.md) for more information on setting up and using Stripe.
 

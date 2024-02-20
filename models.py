@@ -47,6 +47,7 @@ def email_lists(id):
 db.define_table('Email_Lists',
 	Field('Listname', 'string'),
 	Field('Member', 'boolean', default=False, comment=" if true joining Society joins this list"),
+	Field('Daemon', 'datetime'),	#on first list, records start time of current Email Daemon
 	format='%(Listname)s')
 db.Email_Lists.Listname.requires=[IS_NOT_EMPTY(), IS_NOT_IN_DB(db, 'Email_Lists.Listname')]
 

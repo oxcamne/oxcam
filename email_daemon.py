@@ -29,7 +29,7 @@ import time, os, random, pickle, datetime, re, smtplib
 from pathlib import Path
 from .common import db,logger
 from .settings import VISIT_WEBSITE_INSTRUCTIONS, TIME_ZONE, THREAD_SUPPORT, IS_PRODUCTION,\
-	ALLOWED_EMAILS, SUPPORT_EMAIL, SMTP_BULK
+	ALLOWED_EMAILS, SUPPORT_EMAIL, SMTP_BULK, DATE_FORMAT
 from .utilities import member_profile, event_confirm, member_greeting, emailparse, generate_hash, email_sender
 from .models import primary_email
 from .daily_maintenance import daily_maintenance
@@ -86,14 +86,21 @@ def send_notice(notice):
 			break
 
 def email_daemon():
-
 	path = Path(__file__).resolve().parent.parent.parent
 	os.chdir(path)		 #working directory py4web
-	print(str(path)+' email_daemon running')
 	old_now = None
 	daily_maintenance_thread = None
+	#record start time:
+	start_time = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
+	email_list = db(db.Email_Lists.id>0).select().first()
+	email_list.update_record(Daemon = start_time)
+	db.commit()
+	print(f"{str(path)} email_daemon {start_time.strftime(DATE_FORMAT+' %H:%M')} running")
 
-	while True:
+	while True:	#until reload
+		email_list = db(db.Email_Lists.id>0).select().first()
+		if email_list.Daemon > start_time:
+			break	#exit this thread if reloaded
 		now = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
 
 		if THREAD_SUPPORT:
@@ -110,4 +117,4 @@ def email_daemon():
 			continue    #until queue empty
 		old_now = now
 		time.sleep(5)
-	pass	#exiting
+	print(f"{str(path)} email_daemon {start_time.strftime(DATE_FORMAT+' %H:%M')} exiting")

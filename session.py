@@ -124,7 +124,7 @@ def validate(id, token):
 	session['email'] = user.email
 	session['filter'] = None
 	session['access'] = None
-	session['member_id'] = 0
+	session['member_id'] = None
 	session['back'] = []
 	if member_id:
 		session['member_id'] = int(member_id)

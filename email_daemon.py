@@ -53,6 +53,7 @@ def send_notice(notice):
 	#because sending may take several minutes, for fairness send in random order
 	dispatch = random.sample(range(len(rows)), len(rows))
 
+	sent = 0
 	for i in dispatch:
 		row = rows[i]
 		body = ''
@@ -75,15 +76,27 @@ def send_notice(notice):
 				list_unsubscribe_uri = f"{notice.Scheme}unsubscribe/{row.get(db.Emails.id)}/{mailing_list.id}/{generate_hash(to)}"
 				body += f"<br><br><a href={list_unsubscribe_uri}?in_msg=Y>Unsubscribe</a> from '{mailing_list.Listname}' mailing list."
 
-		try:
-			email_sender(host=SMTP_BULK, subject=notice.Subject, sender=notice.Sender, to=to, bcc=eval(notice.Bcc),
-				body=body, attachment=attachment, attachment_filename=notice.Attachment_Filename,
-				list_unsubscribe=f"<{list_unsubscribe_uri}>,<mailto:{SUPPORT_EMAIL}?subject=unsubscribe_{mailing_list.Listname.replace(' ','_')}>" if mailing else None,
-				list_unsubscribe_post="List-Unsubscribe=One-Click" if mailing else None,
+		retry_delay = 2
+		while True:
+			try:
+				email_sender(host=SMTP_BULK, subject=notice.Subject, sender=notice.Sender, to=to, bcc=eval(notice.Bcc),
+					body=body, attachment=attachment, attachment_filename=notice.Attachment_Filename,
+					list_unsubscribe=f"<{list_unsubscribe_uri}>,<mailto:{SUPPORT_EMAIL}?subject=unsubscribe_{mailing_list.Listname.replace(' ','_')}>" if mailing else None,
+					list_unsubscribe_post="List-Unsubscribe=One-Click" if mailing else None,
+				)
+				sent += 1
+				exception = None
+				break
+			except Exception as exception:
+				if retry_delay == 256:
+					break	#give up after 510 seconds trying.
+				retry_delay *= 2	#double delay each attempt
+		
+		if exception:
+			email_sender(subject="Email Notice Send Failure", sender=notice.Sender, to=notice.Sender, bcc=SUPPORT_EMAIL,
+				body=f"{notice.Subject} sent to {sent} of {len(rows)} failure: {exception}"
 			)
-		except Exception as e:
-			logger.info(f"notice '{notice.Subject}' {e}:discarded")
-			break
+			return
 
 def email_daemon():
 	path = Path(__file__).resolve().parent.parent.parent

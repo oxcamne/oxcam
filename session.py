@@ -29,7 +29,7 @@ def checkaccess(requiredaccess):
 			session['url']=request.url
 			if session.get('back') and len(session['back'])>0 and request.url==session['back'][-1]:
 				session['back'].pop()
-			if not session.get('logged_in') == True:    #not logged in
+			if not (session.get('logged_in') == True and db(db.Members.id==session.get('member_id')).count()>0):    #not logged in, or member deleted
 				if db(db.Colleges.id>0).count()==0:
 					session['url']=URL('db_restore')
 				redirect(URL('login'))

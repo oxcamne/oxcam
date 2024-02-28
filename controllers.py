@@ -31,7 +31,7 @@ grid_style = GridClassStyleBulma
 form_style = FormStyleBulma
 
 from py4web import action, request, response, redirect, URL, Field
-from yatl.helpers import H5, H6, XML, TABLE, TH, TD, THEAD, TR
+from yatl.helpers import H5, H6, XML, TABLE, TH, TD, THEAD, TR, HTML
 from .common import db, session, flash
 from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
 	SOCIETY_NAME, MEMBERSHIP, MEMBER_CATEGORIES, MAIL_LISTS, TIME_ZONE,\
@@ -2103,6 +2103,8 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 				member.update_record(Pay_subs = None, Pay_next = None)
 	else:
 		member = None
+		support = f'<a href="mailto:{SUPPORT_EMAIL}">{SUPPORT_EMAIL}</a>'
+		flash.set(f"If you already have a member record, please {A('relogin', _href=URL('login'))} with the email you used before or contact {support}.", sanitize=False)
 		
 	header = H5('Event Registration: Your Information' if event 
 				else 'Mailing List Registration' if request.query.get('mail_lists')

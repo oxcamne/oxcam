@@ -13,6 +13,8 @@ On your server open a bash terminal session at the py4web 'apps' directory, issu
 
 This clones the software into a new directory apps/oxcam, and ensures that necessary Python packages are installed. You may need to precede 'pip' with 'python ' or 'python3 ' depending on your environment.
 
+Note that if you are installing on Pythonanywhere, you can open a bash terminal session (they call this a console) from various places on their site, and that from the 'Files' tab you can edit files, such as the settings file described below.
+
 ### Configure the software for your organization
 
 You next need to create a 'settings_private.py' file in apps/oxcam. Customize the contents from the code below, which is taken from the OxCamNE environment (with sensitive keys removed). A copy of this is included in the kit as settings_private_template.py which you can copy or rename:

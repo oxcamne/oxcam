@@ -77,6 +77,7 @@ def send_notice(notice):
 				body += f"<br><br><a href={list_unsubscribe_uri}?in_msg=Y>Unsubscribe</a> from '{mailing_list.Listname}' mailing list."
 
 		retry_delay = 2
+		exception = None
 		while True:
 			try:
 				email_sender(host=SMTP_BULK, subject=notice.Subject, sender=notice.Sender, to=to, bcc=eval(notice.Bcc),
@@ -85,16 +86,17 @@ def send_notice(notice):
 					list_unsubscribe_post="List-Unsubscribe=One-Click" if mailing else None,
 				)
 				sent += 1
-				exception = None
 				break
-			except Exception as exception:
+			except Exception as e:
+				exception = e
 				if retry_delay == 256:
 					break	#give up after 510 seconds trying.
+				time.sleep(retry_delay)
 				retry_delay *= 2	#double delay each attempt
 		
 		if exception:
 			email_sender(subject="Email Notice Send Failure", sender=notice.Sender, to=notice.Sender, bcc=SUPPORT_EMAIL,
-				body=f"{notice.Subject} sent to {sent} of {len(rows)} failure: {exception}"
+				body=f'"{notice.Subject}" sent to {sent} of {len(rows)} failure: {exception}'
 			)
 			return
 

@@ -50,6 +50,7 @@ docs/_build
 !db_oxcam_minimal.csv
 settings_private.py
 databases/*
+static/images/*
 !.gitattributes
 !.gitignore
 ./uploads

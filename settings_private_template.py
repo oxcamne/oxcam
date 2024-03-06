@@ -15,14 +15,14 @@ DB_URI = "sqlite://storage.db"
 """
 SQLite is built into Py4web and should be adequate except for large groups.
 On PythonAnywhere you can alternatively use MySQL, e.g.:
-DB_URI = "mysql://oxcamne:<--- database password here --->@oxcamne.mysql.pythonanywhere-services.com/oxcamne$default"
+DB_URI = "mysql://your_username:<--- database password here --->@your_username.mysql.pythonanywhere-services.com/oxcamne$default"
 DB_POOL_SIZE = 10
 """
 
 # set True only for live production instance
 IS_PRODUCTION = True
-#if False, email is suppressed except to the following:
-ALLOWED_EMAILS = ['dgmanns@gmail.com', 'secretary@oxcamne.org', 'david.manns@trinity.cantab.net']
+#if False, email is suppressed except to the following listed emails:
+ALLOWED_EMAILS = []
 
 # if True, run email daemon & daily maintenance in server threads
 THREAD_SUPPORT = False
@@ -38,29 +38,29 @@ TIME_ZONE = tz.gettz('America/New_York')
 
 # Customize the following group for your organization:
 # URL for this oxcam database server:
-DB_URL = "https://oxcamne.pythonanywhere.com/oxcam"
+DB_URL = "https://"
 # organization name and domain/short_name, etc:
-SOCIETY_NAME = 'Oxford & Cambridge Society of New England'
-SOCIETY_SHORT_NAME = 'OxCamNE'
+SOCIETY_NAME = 'your_group_name'
+SOCIETY_SHORT_NAME = 'your_group_short_name'
 # html web page banner Customize:
 PAGE_BANNER = '<h4><span style="color: blue"><em>\
-Oxford and Cambridge Society of New England</em> <img src="images/oxcamne_no_pad.png" \
+your_group_name</em> <img src="images/your_icon_file" \
 alt="logo" style="float:left;width:100px" /></span></h4>'
 # NOTE the logo image is in py4web/apps/oxcam/static/images
-HOME_URL = 'https://sites.google.com/oxcamne.org/home/?authuser=1'
+HOME_URL = 'https:/your_home_page'
     #this version allows authorized users to edit
-HELP_URL = "https://sites.google.com/oxcamne.org/help-new/home?authuser=1"
-SUPPORT_EMAIL = 'secretary@oxcamne.org'
+HELP_URL = "https://your_help_site"
+SUPPORT_EMAIL = 'your_support_email'
 # html letterhead for email/notices:
 LETTERHEAD = '<h2><span style="color: blue">\
-<em>Oxford and Cambridge Society of New England</em></span> \
-<img src="https://oxcamne.pythonanywhere.com/oxcam/static/images/oxcamne_no_pad.png" \
+<em>your_group_name</em></span> \
+<img src="https://your_oxcam_server/oxcam/static/images/your_icon_file" \
 alt="logo" style="float:left;width:100px" /></h2>\
 <h3><span style="color: blue"><em>&lt;subject&gt;</em></span></h3>'
     #NOTE 'subject' replaced by full subject line in emails/notices
 # html trailer for email notices:
-VISIT_WEBSITE_INSTRUCTIONS = "<br><br>Visit us at www.oxcamne.org or \
-https://www.instagram.com/oxcamne/ or www.facebook.com/oxcamne"
+VISIT_WEBSITE_INSTRUCTIONS = "<br><br>Visit us at your_web_site or \
+your_social_mediaåç"
 
 # html description for mailing list selection
 # must correspond to mail lists defined in database Email_Lists table.

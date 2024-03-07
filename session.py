@@ -51,10 +51,12 @@ def checkaccess(requiredaccess):
 @action('login', method=['POST', 'GET'])
 @preferred
 def login():
-	user = db(db.users.remote_addr==request.remote_addr).select().first()
+	user = db(db.users.remote_addr==request.remote_addr).select(orderby=~db.Emails.id|~db.users.when_issued,
+			left=db.Emails.on(db.Emails.Email==db.users.email)).first()
+			#most recent email used at this ip, precedence to email associated with a record
 	form = Form([Field('email', 'string',
 				requires=IS_EMAIL(),
-				default = user.email if user else session.get('email'))],
+				default = user.users.email if user else session.get('email'))],
 				formstyle=FormStyleBulma)
 	header = P(XML(f"Please specify your email to login.<br />If you have signed in previously, please use the \
 same email as this identifies your record.<br />You can change your email after logging in via 'My account'.<br />If \

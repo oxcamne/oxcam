@@ -25,19 +25,51 @@ Configures the app for a particular alumni group/Society,
 and for a particular running instance, e.g. production or development
 Customize for your organization and instance
 """
-import locale, smtplib
-from dateutil import tz
 
+# organization name and domain/short_name, etc:
+SOCIETY_NAME = 'your_group_name'
+SOCIETY_SHORT_NAME = 'your_group_short_name'    #ideally, the domain name omitting the .xxx part
+                #also use as your username if using Pythonanywhere server
+SOCIETY_LOGO = 'your_logo_file' #should be placed in py4web/apps/oxcam/static/images directory
+# html web page banner Customize:
+PAGE_BANNER = f'<h4><span style="color: blue"><em>{SOCIETY_NAME}</em>\
+<img src="images/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" /></span></h4>'
+# NOTE the logo image is in py4web/apps/oxcam/static/images
+HOME_URL = 'your_home_page_url'
+    #this version allows authorized users to edit
+HELP_URL = 'your_help_web_site_url' #site may embed the database help site https://oxcamne.github.io/oxcam
+DB_URL = f'your_database_server_url'   #e.g. https://{SOCIETY_SHORT_NAME}.pythonanywhere.com/oxcam
+SUPPORT_EMAIL = 'your_support_email'
+# html letterhead for email/notices:
+LETTERHEAD = f'<h2><span style="color: blue"><em>{SOCIETY_NAME}</em></span> \
+<img src="{DB_URL}/static/images/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" />\
+</h2><h3><span style="color: blue"><em>&lt;subject&gt;</em></span></h3>'
+    #NOTE 'subject' replaced by full subject line in emails/notices
+# html trailer for email notices:
+VISIT_WEBSITE_INSTRUCTIONS = f"<br><br>Visit us at {HOME_URL} or your_social_media"
+
+#localization settings
+import locale
+from dateutil import tz
 locale.setlocale(locale.LC_ALL, '')
+"""
+as above, takes the default settings for the server. You can check what this is using a 
+command line terminal on the server using the "locale" command.
+Use "locale -a" to see list of supported locale's.
+You can specify by replacing the empty '' above with the preferred locale
+"""
 DATE_FORMAT = locale.nl_langinfo(locale.D_FMT)
 CURRENCY_SYMBOL = locale.nl_langinfo(locale.CRNCYSTR)[1:]
+#don't currently deal with currency symbols that follow the amount
+TIME_ZONE = tz.gettz('America/New_York')
+#see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 
 # database connection string:
 DB_URI = "sqlite://storage.db"
 """
-SQLite is built into Py4web and should be adequate except for large groups.
+SQLite is built into Py4web and should be adequate except for extremely large groups.
 On PythonAnywhere you can alternatively use MySQL, e.g.:
-DB_URI = "mysql://your_username:<--- database password here --->@your_username.mysql.pythonanywhere-services.com/oxcamne$default"
+DB_URI = f"mysql://{SOCIETY_SHORT_NAME}:<--- database password here --->@{SOCIETY_SHORT_NAME}.mysql.pythonanywhere-services.com/{SOCIETY_SHORT_NAME}$default"
 DB_POOL_SIZE = 10
 """
 
@@ -54,35 +86,6 @@ THREAD_SUPPORT = False
 
 # access levels for group administrators do not change
 ACCESS_LEVELS = ['read', 'write', 'accounting', 'admin']
-
-#see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
-TIME_ZONE = tz.gettz('America/New_York')
-
-# Customize the following group for your organization:
-# URL for this oxcam database server:
-DB_URL = "https://"
-# organization name and domain/short_name, etc:
-SOCIETY_NAME = 'your_group_name'
-SOCIETY_SHORT_NAME = 'your_group_short_name'
-# html web page banner Customize:
-PAGE_BANNER = '<h4><span style="color: blue"><em>\
-your_group_name</em> <img src="images/your_icon_file" \
-alt="logo" style="float:left;width:100px" /></span></h4>'
-# NOTE the logo image is in py4web/apps/oxcam/static/images
-HOME_URL = 'https:/your_home_page'
-    #this version allows authorized users to edit
-HELP_URL = "https://your_help_site"
-SUPPORT_EMAIL = 'your_support_email'
-# html letterhead for email/notices:
-LETTERHEAD = '<h2><span style="color: blue">\
-<em>your_group_name</em></span> \
-<img src="https://your_oxcam_server/oxcam/static/images/your_icon_file" \
-alt="logo" style="float:left;width:100px" /></h2>\
-<h3><span style="color: blue"><em>&lt;subject&gt;</em></span></h3>'
-    #NOTE 'subject' replaced by full subject line in emails/notices
-# html trailer for email notices:
-VISIT_WEBSITE_INSTRUCTIONS = "<br><br>Visit us at your_web_site or \
-your_social_mediaåç"
 
 # html description for mailing list selection
 # must correspond to mail lists defined in database Email_Lists table.

@@ -924,7 +924,7 @@ def reservation(ismember, member_id, event_id, path=None):
 	host_reservation = all_guests.first()
 	tickets = db(db.Event_Tickets.Event==event_id).select()
 	event_tickets = [t.Ticket for t in tickets if \
-				(not t.Count or t.Qualify or tickets_sold(event_id, t.Ticket, member_id)<t.Count) and\
+				(not t.Count or t.Qualify or host_reservation or not t.Waiting) and\
 				(not host_reservation or t.Allow_as_guest==True)]
 	tickets_available = {}
 	for t in tickets:
@@ -961,7 +961,7 @@ def reservation(ismember, member_id, event_id, path=None):
 				if row.Ticket in tickets_available:
 					tickets_available[row.Ticket] -= 1
 					if tickets_available[row.Ticket] == 0:
-						flash.set(f"There are no further {row.Ticket} tickets available after this.")
+						flash.set(f"There are no further {row.Ticket} tickets for additional guests.")
 					elif tickets_available[row.Ticket] < 0:
 						flash.set(f"There insufficient {row.Ticket} tickets available: please Checkout to add all unconfirmed guests to the waitlist.")
 						waitlist = True
@@ -1055,11 +1055,10 @@ Moving member on/off waitlist will also affect all guests."))
 		
 	if tickets:
 		if ismember!='Y':	#empty for comps
-			db.Reservations.Ticket.requires=IS_EMPTY_OR(IS_IN_SET(event_tickets))
+			db.Reservations.Ticket.requires=IS_EMPTY_OR(IS_IN_SET(event_tickets if len(event_tickets)>0 else tickets))
 		else:
 			db.Reservations.Ticket.requires=IS_IN_SET(event_tickets, zero='please select the appropriate ticket')
-			db.Reservations.Ticket.default = host_reservation.Ticket if host_reservation and host_reservation.Ticket in event_tickets\
-				else event_tickets[0]
+			db.Reservations.Ticket.default = host_reservation.Ticket if host_reservation else event_tickets[0] if len(event_tickets)==1 else None
 	else:
 		db.Reservations.Ticket.writable = db.Reservations.Ticket.readable = False
 	
@@ -1151,7 +1150,7 @@ Moving member on/off waitlist will also affect all guests."))
 		elif form2.accepted:
 			host_reservation.update_record(Survey=form2.vars.get('survey'), Comment=form2.vars.get('comment'))
 			for row in all_guests.find(lambda row: row.Provisional==True):
-				if row.Ticket in tickets_available and tickets_available[row.Ticket] < 0:
+				if row.Ticket in tickets_available and tickets_available[row.Ticket] <= 0:
 					tickets.find(lambda t: t.Ticket==row.Ticket).first().update_record(Waiting=True)
 				row.update_record(Provisional=False, Waitlist=waitlist)
 

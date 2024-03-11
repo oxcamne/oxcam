@@ -108,13 +108,14 @@ def email_daemon():
 	#record start time:
 	start_time = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
 	email_list = db(db.Email_Lists.id>0).select().first()
-	email_list.update_record(Daemon = start_time)
+	if email_list:
+		email_list.update_record(Daemon = start_time)
 	db.commit()
 	print(f"{str(path)} email_daemon {start_time.strftime(DATE_FORMAT+' %H:%M')} running")
 
 	while True:	#until reload
 		email_list = db(db.Email_Lists.id>0).select().first()
-		if email_list.Daemon > start_time:
+		if email_list and email_list.Daemon > start_time:
 			break	#exit this thread if reloaded
 		now = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
 

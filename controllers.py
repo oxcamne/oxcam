@@ -602,7 +602,7 @@ def new_members(path=None):
 	access = session['access']	#for layout.html
 	acdues = db(db.CoA.Name == "Membership Dues").select().first().id
 
-	rows = db((db.AccTrans.Account==acdues) & (db.AccTrans.Member!=None)).select(orderby=~db.AccTrans.Timestamp)
+	rows = db((db.AccTrans.Account==acdues) & (db.AccTrans.Member!=None) & (db.AccTrans.Amount>0)).select(orderby=~db.AccTrans.Timestamp)
 
 	def classify(transaction):
 		if not transaction.Paiddate:

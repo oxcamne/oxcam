@@ -24,4 +24,4 @@ The **Checknumber**, **Amount**, **Type**, and **Source** fields all specify whi
 
 **Notes** is a list of one or more column names. The contents of these column(s) are concatenated and stored in the transaction record.
 
-**Howto** documents (in [markmin](http://www.web2py.com/examples/static/markmin.html) format) the instructions for downloading transactions from the institution.
+**Howto** documents (in [markdown](https://www.markdownguide.org/basic-syntax/) format) the instructions for downloading transactions from the institution.

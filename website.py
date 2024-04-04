@@ -9,7 +9,7 @@ The actions in this file are pages embedded in the Society's public website
 from py4web import action
 from .common import db
 from yatl.helpers import H5, A, TABLE, TR, TD, CAT, XML
-import datetime, markmin
+import datetime, markdown
 from .models import primary_affiliation
 from .utilities import society_emails
 
@@ -34,7 +34,7 @@ def history():
 @action.uses("message_embed.html", db)
 def about():
 	def oxcamaddr(r):
-		return XML(str(markmin.markmin2html(', '.join(society_emails(r.id))))[3:-4])	#remove <p>...,</p>
+		return XML(str(markdown.markdown(', '.join([f'[{e}](mailto:{e})' for e in society_emails(r.id)])))[3:-4])	#remove <p>...,</p>
 			
 	rows = db(db.Members.Committees.ilike('%advisory%')).select(orderby=db.Members.Lastname|db.Members.Firstname)
 				

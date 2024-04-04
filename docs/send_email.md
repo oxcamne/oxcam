@@ -18,7 +18,7 @@ The Sender field allows you select which address to use if you have multiple rol
 
 The message body can use various metadata elements, such as \<letterhead>,  \<greeting> which include the Society letterhead and a personalized greeting (more or less formal depending on whether the member included a title when joining).  The metadata \<member> is replaced by the member's directory information, and in context \<reservation> will show details of a reservation.
 
-Markmin can  be used to apply some formatting and to include links and graphics. The page includes a link to documentation of markmin. Pairs of curly braces '{{..}}"can be used to embed arbitrary HTML source content copied from web pages.
+Markdown can  be used to apply some formatting and to include links and graphics. The page includes a link to documentation of Markdown. Pairs of curly braces '{{..}}"can be used to embed arbitrary HTML source content copied from web pages.
 
 You can also select a file to be sent as an attachment, such as a PDF, spreadsheet, image or word document.
 

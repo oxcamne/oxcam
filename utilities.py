@@ -7,7 +7,7 @@ from .settings import TIME_ZONE, SUPPORT_EMAIL, LETTERHEAD, GRACE_PERIOD, CURREN
 	DB_URL, SOCIETY_SHORT_NAME, MEMBER_CATEGORIES, DATE_FORMAT, SMTP_TRANS, STRIPE_SKEY, SOCIETY_NAME
 from .models import primary_email, res_tbc, res_totalcost, res_status, member_name
 from yatl.helpers import A, TABLE, TH, THEAD, H6, TR, TD, CAT, HTML, XML
-import datetime, re, markmin, smtplib
+import datetime, re, smtplib, markdown
 from email.message import EmailMessage
 
 #check if member is in good standing at a particular date
@@ -192,39 +192,37 @@ def emailparse(body, subject, query=None):
 		if m.group(3)!='':
 			bodyparts = bodyparts+emailparse(m.group(3), subject, query)
 		return bodyparts
-	return [(body.replace('\r\n', '<br>'), None)]
+	return [(markdown.markdown(body), None)]
 	
 #display member profile
 def member_profile(member):
-	body = '------------------------\n'
-	body += '**Name:**|' + f"{member.Lastname}, {member.Title or ''} {member.Firstname} {member.Suffix or ''}" + '\n'
+	rows=[TR(TH('Name:', _style="text-align:left"), TD( f"{member.Lastname}, {member.Title or ''} {member.Firstname} {member.Suffix or ''}"))]
 	affiliations = db(db.Affiliations.Member == member.id).select(orderby = db.Affiliations.Modified)
-	body += '**Affiliations:**'
+	first = True
 	for aff in affiliations:
-		body += '|' + aff.College.Name + ' ' + str(aff.Matr or '') + '\n'
-	body += '\n**Address line 1:**|' + (member.Address1 or '') + '\n'
-	body += '**Address line 2:**|' + (member.Address2 or '') + '\n'
-	body += '**Town/City:**|' + (member.City or '') + '\n'
-	body += '**State:**|' + (member.State or '') + '\n'
-	body += '**Zip:**|' + (member.Zip or '') + '\n'
-	body += '**Home phone:**|' + (member.Homephone or '') + '\n'
-	body += '**Work phone:**|' + (member.Workphone or '') + '\n'
-	body += '**Mobile:**|' + (member.Cellphone or '') + ' (not in directory)\n'
-	body += '**Email:**|' + (primary_email(member.id) or '') + (' (not in directory)\n' if member.Privacy==True else '\n')
-	body += '------------------------\n'
-	return markmin.markmin2html(body)
+		rows.append(TR(TH('Affiliation:'if first else '', _style="text-align:left"), TD(aff.College.Name + ' ' + str(aff.Matr or ''))))
+		first = False
+	rows.append(TR(TH('Address line 1:', _style="text-align:left"), TD(member.Address1 or '')))
+	rows.append(TR(TH('Address line 2:', _style="text-align:left"), TR(member.Address2 or '')))
+	rows.append(TR(TH('Town/City:', _style="text-align:left"), TD(member.City or '')))
+	rows.append(TR(TH('State:', _style="text-align:left"), TD(member.State or '')))
+	rows.append(TR(TH('Zip:', _style="text-align:left"), TD(member.Zip or '')))
+	rows.append(TR(TH('Home phone:', _style="text-align:left"), TD(member.Homephone or '')))
+	rows.append(TR(TH('Work phone:', _style="text-align:left"), TD(member.Workphone or '')))
+	rows.append(TR(TH('Mobile:', _style="text-align:left"), TD((member.Cellphone or '')+' (not in directory)')))
+	rows.append(TR(TH('Email:', _style="text-align:left"), TD((primary_email(member.id) or '') + (' (not in directory)' if member.Privacy==True else ''))))
+	return TABLE(*rows).__str__()
 
 #Create the header for a member message, such as a confirmation
 def msg_header(member, subject):
-	body = f"\n\n-------------\n{datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).strftime(DATE_FORMAT)}||\n"
-	body += f"{(member.Title or '')+' '}{member.Firstname} {member.Lastname} {member.Suffix or ''}||\n"
+	body = f"\n\n<p>{datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).strftime(DATE_FORMAT)}<br>"
+	body += f"{(member.Title or '')+' '}{member.Firstname} {member.Lastname} {member.Suffix or ''}<br>"
 	if member.Address1:
-		body += f"{member.Address1}||\n"
+		body += f"{member.Address1}\<br>"
 	if member.Address2:
-		body += f"{member.Address2}||\n"
-	body += f"{member.City or ''} {member.State or ''} {member.Zip or ''}||\n"
-	body += '-------------' 
-	return LETTERHEAD.replace('&lt;subject&gt;', subject)+markmin.markmin2html(body)
+		body += f"{member.Address2}<br>"
+	body += f"{member.City or ''} {member.State or ''} {member.Zip or ''}<br></p>"
+	return LETTERHEAD.replace('&lt;subject&gt;', subject)+body
 	
 #sanitize and send invoice or confirm
 def msg_send(member,subject, message):
@@ -236,39 +234,40 @@ def msg_send(member,subject, message):
 #create confirmation of event
 def event_confirm(event_id, member_id, justpaid=0, event_only=False):
 	event = db.Events[event_id]
+	member = db.Members[member_id]
 	resvtns = db((db.Reservations.Event==event_id)&(db.Reservations.Member==member_id)).select(
 					orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname)
-	body = '------------------------\n'
-	body += '**Event:**|' + (event.Description or '') + '\n'
-	body += '**Venue:**|' + (event.Venue or '') + '\n'
-	body += '**Date:**|' + event.DateTime.strftime("%A %B %d, %Y") + '\n'
-	body += '**Time:**|' + event.DateTime.strftime("%I:%M%p") + '\n'
-	body += '------------------------\n'
-	if event_only or not resvtns: return markmin.markmin2html(body)
+	rows=[TR(TH('Event:', _style="text-align:left"), TD( f"{member.Lastname}, {member.Title or ''} {member.Firstname} {member.Suffix or ''}"))]
+	rows.append(TR(TH('Venue:', _style="text-align:left"), TD(event.Venue or '')))
+	rows.append(TR(TH('Date:', _style="text-align:left"), TD(event.DateTime.strftime("%A %B %d, %Y"))))
+	rows.append(TR(TH('Time:', _style="text-align:left"), TD(event.DateTime.strftime("%I:%M%p"))))
+	body = TABLE(*rows).__str__()
+	if event_only or not resvtns:
+		return body
 	tbc = res_tbc(member_id, event_id) or 0
 	tbcdues = res_tbc(member_id, event_id, True) or 0
 	cost = res_totalcost(member_id, event_id) or 0
-	body += '------------------------\n'
-	body += '**Name**|**Affiliation**|**Selection**|**Ticket Cost**\n'
+	rows=[TR(TH('Name', TH('Affiliation'), TH('Selection'), TH('Ticket Cost'), TH('')))]
 	for t in resvtns:
-		body += '%s, %s %s %s|'%(t.Lastname, t.Title or '', t.Firstname, t.Suffix or '')
-		body += (t.Affiliation.Name if t.Affiliation else '') +'|'
-		body += (t.Selection or '') + '|'
-		body += f'{CURRENCY_SYMBOL}{t.Unitcost or 0.00:6.2f}|'
-		body += f'``**{res_status(t.id)}**``:red\n' if t.Waitlist or t.Provisional else '\n'
+		rows.append(TR(TD(f"{t.Lastname}, {t.Firstname}",
+						TD(t.Affiliation.Name if t.Affiliation else ''),
+						TD(t.Selection or ''),
+						TD(f'{CURRENCY_SYMBOL}{t.Unitcost or 0.00:6.2f}'),
+						TH(f'{res_status(t.id)}' if t.Waitlist or t.Provisional else '')
+		)))
 	if tbcdues > tbc:
-		body += f'Membership Dues|||{CURRENCY_SYMBOL}{tbcdues - tbc:6.2f}\n'
-	body += f'**Total cost**|||**{CURRENCY_SYMBOL}{cost + tbcdues - tbc:6.2f}**\n'
-	body += f'**Paid**|||**{CURRENCY_SYMBOL}{(resvtns.first().Paid or 0)+(resvtns.first().Charged or 0)+justpaid:6.2f}**\n'
+		rows.append(TR(TH('Membership Dues', _style="text-align:left"), TD(''), TD(''), TH(f'{CURRENCY_SYMBOL}{tbcdues - tbc:6.2f}', _style="text-align:left")))
+	rows.append(TR(TH('Total Cost', _style="text-align:left"), TD(''), TD(''), TH(f'{CURRENCY_SYMBOL}{cost + tbcdues - tbc:6.2f}', _style="text-align:left")))
+	rows.append(TR(TH('Paid', _style="text-align:left"), TD(''), TD(''), TH(f'{CURRENCY_SYMBOL}{(resvtns.first().Paid or 0)+(resvtns.first().Charged or 0)+justpaid:6.2f}', _style="text-align:left")))
 	if tbcdues>justpaid:
-		body += f'**Net amount due**|||**{CURRENCY_SYMBOL}{tbcdues-justpaid:6.2f}**\n'
-	body += '------------------------\n'
+		rows.append(TR(TH('Net amount due', _style="text-align:left"), TD(''), TD(''), TH(f'{CURRENCY_SYMBOL}{tbcdues-justpaid:6.2f}', _style="text-align:left")))
+	body += TABLE(*rows).__str__()
 	if tbcdues>justpaid:
-		body += f"To pay online please visit {DB_URL}/registration/{event_id}"
+		body += f"To pay online please visit {DB_URL}/registration/{event_id}<br>"
 						#scheme=True doesn't pick up the domain in the email_daemon!
 	elif event.Notes and not resvtns[0].Waitlist and not resvtns[0].Provisional:
-		body += '\n\n%s\n'%event.Notes
-	return markmin.markmin2html(body)
+		body += f"<br>{event.Notes}<br>"
+	return body
 
 def society_emails(member_id):
 	return [row['Email'] for row in db((db.Emails.Member == member_id) & \
@@ -278,9 +277,9 @@ def society_emails(member_id):
 def member_greeting(member):
 	if member.Title:
 		title = member.Title[4:] if member.Title.startswith('The ') else member.Title
-		greeting = f"Dear {title} {member.Firstname if title.find('Sir')>=0 else member.Lastname},<br>"
+		greeting = f"Dear {title} {member.Firstname if title.find('Sir')>=0 else member.Lastname},"
 	else:
-		greeting = f"Dear {member.Firstname.partition(' ')[0]},<br>"
+		greeting = f"Dear {member.Firstname.partition(' ')[0]},"
 	return greeting
 
 import hashlib

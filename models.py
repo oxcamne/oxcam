@@ -329,7 +329,7 @@ db.define_table('Bank_Accounts',
 	Field('Type', 'string', comment=" Column name containing transaction type (Stripe)"),
 	Field('Source', 'string', comment=" Column name containing transaction source (Stripe)"),	
 	Field('Notes', 'string', comment=" List of column names to be recorded in Notes of AccTrans record"),
-	Field('HowTo', 'text', comment=CAT(" Instructions for downloading file, in ", A("Markmin", _href='http://www.web2py.com/examples/static/markmin.html', _target='markmin'), " format")),
+	Field('HowTo', 'text', comment=CAT(" Instructions for downloading file, in ", A('Markdown', _href='https://www.markdownguide.org/basic-syntax/', _target='Markdown'), " format")),
 	singular="Bank_Account", plural="Banks", format='%(Name)s')
 db.Bank_Accounts.Name.requires = [IS_NOT_EMPTY(), IS_NOT_IN_DB(db, 'Bank_Accounts.Name')]
 

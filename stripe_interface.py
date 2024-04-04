@@ -270,7 +270,7 @@ def stripe_checkout_success():
 		redirect(URL('index'))
 
 	subject = 'Registration Confirmation' if tickets_tbc>0 else 'Thank you for your membership payment'
-	message = f"{msg_header(member, subject)}<br><b>Received: {CURRENCY_SYMBOL}{dues+tickets_tbc}</b><br>"
+	message = f"{msg_header(member, subject)}<b>Received: {CURRENCY_SYMBOL}{dues+tickets_tbc}</b><br>"
 	
 	if dues>0:
 		next = None

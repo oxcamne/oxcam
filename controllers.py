@@ -51,7 +51,7 @@ from .session import checkaccess
 from .stripe_interface import stripe_update_email, stripe_update_card, stripe_switched_card,\
 	stripe_get_dues, stripe_process_charge, stripe_cancel_subscription
 from py4web.utils.factories import Inject
-import datetime, re, markmin, csv, decimal, io, pickle
+import datetime, re, csv, decimal, io, pickle, markdown
 from io import StringIO
 
 preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
@@ -715,7 +715,7 @@ def tickets(event_id, path=None):
 
 	grid = Grid(path, db.Event_Tickets.Event==event_id,
 			columns=[db.Event_Tickets.Ticket, db.Event_Tickets.Price, db.Event_Tickets.Qualify, db.Event_Tickets.Count,
-				Column('Sold', lambda t: tickets_sold(event_id, t.Ticket))],
+				db.Event_Tickets.Waiting, Column('Sold', lambda t: tickets_sold(event_id, t.Ticket))],
 			details=not write, create=write, editable=write, deletable=write,
 			validation=validation,
 			grid_class_style=grid_style,
@@ -1165,7 +1165,7 @@ Moving member on/off waitlist will also affect all guests."))
 					host_reservation.update_record(Checkout=None)
 					subject = 'Registration Confirmation'
 					message = msg_header(member, subject)
-					message += '<br><b>Your registration is now confirmed:</b><br>'
+					message += '<b>Your registration is now confirmed:</b><br>'
 					message += event_confirm(event.id, member.id, 0)
 					msg_send(member, subject, message)
 					flash.set('Thank you. Confirmation has been sent by email.')
@@ -1599,9 +1599,9 @@ def bank_file(bank_id):
 
 	header = CAT(A('back', _href=URL('accounting')),
 				H5(f"Upload {bank.Name} Transactions"),
-				XML(f"To download data since {markmin.markmin2html(f'``**{str(bkrecent.Timestamp.date()) if bkrecent else origin}**``:red')}:"), XML('<br>'),
+				XML(markdown.markdown(f"To download data since **{str(bkrecent.Timestamp.date()) if bkrecent else origin}**:")),
 				A('Login to Society Account', _href=bank.Bankurl, _target='blank'), XML('<br>'),
-				XML(f"{markmin.markmin2html(bank.HowTo)}"))
+				XML(f"{markdown.markdown(bank.HowTo)}"))
 	
 	footer = f"Current Balance = {f'{CURRENCY_SYMBOL}{bank.Balance:8.2f}'}"
 	
@@ -1885,8 +1885,8 @@ def composemail():
 	fields.append(Field('body', 'text', requires=IS_NOT_EMPTY(), default=proto.Body if proto else "<letterhead>\n<greeting>\n\n" if query else "<letterhead>\n\n",
 				comment=CAT("You can use placeholders <letterhead>, <subject>, <greeting>, <member>, <reservation>, <email>, ",
 				"<support_email>, <society_short_name>, <society_name>, or <public_url>, depending on the context. ",
-				"You can also include html content thus: {{content}}. Email is formatted using ",
-				A('Markmin', _href='http://www.web2py.com/examples/static/markmin.html', _target='Markmin'), '.')))
+				"You can also include html content thus: {{content}}. Text may be formatted, and images and links included, using ",
+				A('Markdown', _href='https://www.markdownguide.org/basic-syntax/', _target='Markdown'), '.')))
 	fields.append(Field('save', 'boolean', default=proto!=None, comment='store/update template'))
 	fields.append(Field('attachment', 'upload', uploadfield=False))
 	if proto:

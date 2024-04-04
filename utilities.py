@@ -266,7 +266,7 @@ def event_confirm(event_id, member_id, justpaid=0, event_only=False):
 		body += f"To pay online please visit {DB_URL}/registration/{event_id}<br>"
 						#scheme=True doesn't pick up the domain in the email_daemon!
 	elif event.Notes and not resvtns[0].Waitlist and not resvtns[0].Provisional:
-		body += f"<br>{event.Notes}<br>"
+		body += markdown.markdown(event.Notes)
 	return body
 
 def society_emails(member_id):

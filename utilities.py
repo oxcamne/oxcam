@@ -63,9 +63,9 @@ def email_sender(
 	if bcc:
 		message['Bcc'] = bcc
 	if list_unsubscribe:
-		message['List_Unsubscribe'] = list_unsubscribe
+		message['List-Unsubscribe'] = list_unsubscribe
 	if list_unsubscribe_post:
-		message['List_Unsubscribe_Post'] = list_unsubscribe_post
+		message['List-Unsubscribe-Post'] = list_unsubscribe_post
 	message.set_content(HTML(XML(body)).__str__(), subtype='html')
 	if attachment:
 		message.add_attachment(attachment, maintype='application', subtype='octet-stream', filename=attachment_filename)

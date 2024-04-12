@@ -58,6 +58,7 @@ def email_sender(
 
 	message = EmailMessage()
 	message['Subject'] = subject
+	message['From'] = sender
 	message['Reply-To'] = sender
 	message['To'] = to
 	if bcc:

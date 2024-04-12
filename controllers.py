@@ -1910,7 +1910,7 @@ def composemail():
 					submit_value = 'Send', formstyle=FormStyleBulma)
 			
 	if form2.accepted:
-		sender = f"{SOCIETY_NAME} <{form2.vars['sender']}>"
+		sender = form2.vars['sender']
 		if proto:
 			if form2.vars['delete']:
 				db(db.EMProtos.id == proto.id).delete()

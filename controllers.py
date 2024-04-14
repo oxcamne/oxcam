@@ -509,7 +509,8 @@ def unsubscribe(email_id, list_id, hash):
 
 	if form.accepted:
 		email.Mailings.remove(list.id)
-		email.update_record(Mailings=email.Mailings)
+		email.update_record(Mailings=email.Mailings, Modified=email.Modified)
+			#don't update Modified, don't change primary email
 		header = f"{email.Email} unsubscribed from '{list.Listname}'"
 		notify_support(email.Member, 'Unsubscribe', header)
 		header = "Thank you: "+header
@@ -1194,9 +1195,9 @@ def doorlist_export(event_id):
 				
 			for guest in guests:
 				selection = db((db.Event_Selections.Event==event_id)&(db.Event_Selections.Selection==guest.Selection)).select().first()
-				selection_short = selection.Short_name if selection else guest.Selection or ''
+				selection_short = selection.Short_name or selection.Selection if selection else guest.Selection or ''
 				ticket = db((db.Event_Tickets.Event==event_id)&(db.Event_Tickets.Ticket==guest.Ticket)).select().first()
-				ticket_short = ticket.Short_name if ticket else guest.Ticket or ''
+				ticket_short = ticket.Short_name or ticket.Ticket if ticket else guest.Ticket or ''
 				writer.writerow([host.Reservations.Lastname, host.Reservations.Firstname, guest.Notes or '',
 									guest.Lastname, guest.Firstname, guest.Affiliation.Name if guest.Affiliation else '',
 									primary_matriculation(guest.Member) or '' if host.Reservations.id==guest.id else '',

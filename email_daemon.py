@@ -82,7 +82,7 @@ def send_notice(notice):
 			try:
 				email_sender(host=SMTP_BULK, subject=notice.Subject, sender=notice.Sender, to=to, bcc=eval(notice.Bcc),
 					body=body, attachment=attachment, attachment_filename=notice.Attachment_Filename,
-					list_unsubscribe=f"<mailto:{SUPPORT_EMAIL}?subject=unsubscribe_{mailing_list.Listname.replace(' ','_')}>,<{list_unsubscribe_uri}>" if mailing else None,
+					list_unsubscribe=f"<{list_unsubscribe_uri}>" if mailing else None,
 					list_unsubscribe_post="List-Unsubscribe=One-Click" if mailing else None,
 				)
 				sent += 1

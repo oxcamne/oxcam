@@ -922,6 +922,8 @@ def reservation(ismember, member_id, event_id, path=None):
 
 	member = db.Members[member_id]
 	event = db.Events[event_id]
+	affinity = db(db.Affiliations.Member == member_id).select(orderby=db.Affiliations.Modified).first()
+	sponsor = not affinity.College.Oxbridge if affinity else False
 	all_guests = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)).select(orderby=~db.Reservations.Host)
 	host_reservation = all_guests.first()
 	tickets = db(db.Event_Tickets.Event==event_id).select()
@@ -1025,7 +1027,7 @@ def reservation(ismember, member_id, event_id, path=None):
 				form2 = Form(fields, formstyle=FormStyleBulma, keep_values=True, submit_value='Checkout')
 		elif path=='new':
 			header = CAT(header,
-				f"Please enter your own selection{' (you will be able to enter guests on next screen)' if (event.Guests or 2)>1 else ''}:"\
+				f"Please enter your own details{' (you will be able to enter guests on next screen)' if (event.Guests or 2)>1 else ''}:"\
 					if not host_reservation else "Please enter your guest's details:")
 	elif path=='select':
 		header = CAT(header, A('send email', _href=(URL('composemail', vars=dict(
@@ -1056,7 +1058,7 @@ Moving member on/off waitlist will also affect all guests."))
 		db.Reservations.Selection.writable = db.Reservations.Selection.readable = False
 		
 	if tickets:
-		if ismember!='Y':	#empty for comps
+		if ismember!='Y':	#leave empty for comps
 			db.Reservations.Ticket.requires=IS_EMPTY_OR(IS_IN_SET(event_tickets if len(event_tickets)>0 else tickets))
 		else:
 			db.Reservations.Ticket.requires=IS_IN_SET(event_tickets, zero='please select the appropriate ticket')
@@ -1092,7 +1094,7 @@ Moving member on/off waitlist will also affect all guests."))
 				db.Reservations.Paid.writable=db.Reservations.Paid.readable=True
 				db.Reservations.Charged.writable=db.Reservations.Charged.readable=True
 				db.Reservations.Checkout.writable=db.Reservations.Checkout.readable=True
-			elif tickets:
+			elif tickets and not sponsor:
 				for t in event_tickets:
 					if is_good_standing:
 						if t.lower().startswith(membership.lower()):

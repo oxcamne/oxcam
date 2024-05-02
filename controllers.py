@@ -920,14 +920,16 @@ def reservation(ismember, member_id, event_id, path=None):
 			redirect(URL('accessdenied'))
 		write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 
-	member = db.Members[member_id]
 	event = db.Events[event_id]
+	member = db.Members[member_id]
+	is_good_standing = member_good_standing(member, event.DateTime.date())
 	affinity = db(db.Affiliations.Member == member_id).select(orderby=db.Affiliations.Modified).first()
 	sponsor = not affinity.College.Oxbridge if affinity else False
 	all_guests = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)).select(orderby=~db.Reservations.Host)
 	host_reservation = all_guests.first()
 	tickets = db(db.Event_Tickets.Event==event_id).select()
 	event_tickets = [t.Ticket for t in tickets if \
+				(is_good_standing != t.Ticket.lower().startswith('non-member')) and\
 				(not t.Count or t.Qualify or host_reservation or not t.Waiting) and\
 				(not host_reservation or t.Allow_as_guest==True)]
 	tickets_available = {}
@@ -939,7 +941,6 @@ def reservation(ismember, member_id, event_id, path=None):
 	survey = db(db.Event_Survey.Event==event_id).select()
 	event_survey = [s.Item for s in survey]
 	session['event_id'] = event_id
-	is_good_standing = member_good_standing(member, event.DateTime.date())
 
 	if is_good_standing:
 		membership = member.Membership
@@ -987,8 +988,8 @@ def reservation(ismember, member_id, event_id, path=None):
 
 	if ismember=='Y':
 		if path=='select':
-			if not host_reservation:
-				redirect(URL(f'reservation/Y/{member_id}/{event_id}/new'))
+			if not host_reservation:	#allow changes, e.g. join Society
+				redirect(URL(f'registration/{event_id}'))
 			attend = event_attend(event_id) or 0
 			if datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.Booking_Closed:
 				waitlist = True
@@ -2090,7 +2091,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 						session['dues'] = str(checkout.get('dues')) if checkout.get('dues') else None
 				redirect(URL(f'reservation/Y/{member_id}/{event_id}/'))	#go add guests and/or checkout
 			if member_good_standing(member, event.DateTime.date()) or sponsor \
-					or ((affinity or member.Membership)and not event.Members_only):
+					or ((affinity or member.Membership) and not event.Members_only and not event.Allow_join):
 				#members in good standing at time of event, or, members of sponsor organizations, or
 				#membership-eligible and event open to all alums then no need to gather member information
 				redirect(URL(f'reservation/Y/{member_id}/{event_id}/new'))	#go create this member's reservation

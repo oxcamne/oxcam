@@ -928,9 +928,8 @@ def reservation(ismember, member_id, event_id, path=None):
 	all_guests = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)).select(orderby=~db.Reservations.Host)
 	host_reservation = all_guests.first()
 	tickets = db(db.Event_Tickets.Event==event_id).select()
-	event_tickets = [t.Ticket for t in tickets if \
+	event_tickets = [f"{t.Ticket}{' (Waitlisting)' if t.Waiting else ''}" for t in tickets if \
 				(is_good_standing != t.Ticket.lower().startswith('non-member')) and\
-				(not t.Count or t.Qualify or host_reservation or not t.Waiting) and\
 				(not host_reservation or t.Allow_as_guest==True)]
 	tickets_available = {}
 	for t in tickets:
@@ -1060,7 +1059,7 @@ Moving member on/off waitlist will also affect all guests."))
 		
 	if tickets:
 		if ismember!='Y':	#leave empty for comps
-			db.Reservations.Ticket.requires=IS_EMPTY_OR(IS_IN_SET(event_tickets if len(event_tickets)>0 else tickets))
+			db.Reservations.Ticket.requires=IS_EMPTY_OR(IS_IN_SET(tickets))
 		else:
 			db.Reservations.Ticket.requires=IS_IN_SET(event_tickets, zero='please select the appropriate ticket')
 			db.Reservations.Ticket.default = host_reservation.Ticket if host_reservation else event_tickets[0] if len(event_tickets)==1 else None

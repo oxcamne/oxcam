@@ -117,3 +117,41 @@ def db_backup():
 	db.export_to_csv_file(stream)
 	return locals()
 
+#temporary to convert all reservations to reference event subtables
+@action("db_convert", method=['GET'])
+@preferred
+def db_convert():
+	access = session['access']	#for layout.html
+	rows = db(db.Reservations.id>0).select()
+	for r in rows:
+
+		if r.Unitcost:
+			ticket_name = r.Ticket or f"{r.Unitcost:.2f}"
+			ticket = db((db.Event_Tickets.Ticket==ticket_name)&(db.Event_Tickets.Event==r.Event)).select().first()
+			if ticket and ticket.Price!=r.Unitcost:
+				raise Exception(f"mismatched ticket price {r.id}")
+			if ticket:
+				r.update_record(Ticket_Ref=ticket.id, Ticket=ticket_name, Modified=r.Modified)
+			else:
+				id = db.Event_Tickets.insert(Event=r.Event, Ticket=ticket_name, Price= r.Unitcost,
+								 Allow_as_guest=True)
+				r.update_record(Ticket_Ref=id, Ticket=ticket_name, Modified=r.Modified)
+
+		if r.Selection:
+			selection = db((db.Event_Selections.Selection==r.Selection)&(db.Event_Selections.Event==r.Event)).select().first()
+			if selection:
+				r.update_record(Selection_Ref=selection.id, Modified=r.Modified)
+			else:
+				id = db.Event_Selections.insert(Event=r.Event, Selection=r.Selection)
+				r.update_record(Selection_Ref=id, Modified=r.Modified)
+
+		if r.Survey:
+			survey = db((db.Event_Survey.Item==r.Survey)&(db.Event_Survey.Event==r.Event)).select().first()
+			if survey:
+				r.update_record(Survey_Ref=survey.id, Modified=r.Modified)
+			else:
+				id = db.Event_Survey.insert(Event=r.Event, Item=r.Survey)
+				r.update_record(Survey_Ref=id, Modified=r.Modified)
+
+	header = 'reservations converted'
+	return locals()

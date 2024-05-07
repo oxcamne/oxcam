@@ -928,9 +928,9 @@ def reservation(ismember, member_id, event_id, path=None):
 	all_guests = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)).select(orderby=~db.Reservations.Host)
 	host_reservation = all_guests.first()
 	tickets = db(db.Event_Tickets.Event==event_id).select()
-	event_tickets = [f"{t.Ticket}{' (Waitlisting)' if t.Waiting else ''}" for t in tickets if \
-				(is_good_standing != t.Ticket.lower().startswith('non-member')) and\
-				(not host_reservation or t.Allow_as_guest==True)]
+	event_tickets = [t.Ticket for t in tickets if ismember!='Y' or\
+				((is_good_standing != t.Ticket.lower().startswith('non-member')) and\
+				(not host_reservation or t.Allow_as_guest==True))]
 	tickets_available = {}
 	for t in tickets:
 		if t.Count:
@@ -967,7 +967,7 @@ def reservation(ismember, member_id, event_id, path=None):
 					if tickets_available[row.Ticket] == 0:
 						flash.set(f"There are no further {row.Ticket} tickets for additional guests.")
 					elif tickets_available[row.Ticket] < 0:
-						flash.set(f"There insufficient {row.Ticket} tickets available: please Checkout to add all unconfirmed guests to the waitlist.")
+						flash.set(f"Insufficient {row.Ticket} tickets available: please Edit to select a different ticket type or Checkout to add unconfirmed guests to the waitlist.")
 						waitlist = True
 			else:
 				confirmed += 1
@@ -1059,7 +1059,7 @@ Moving member on/off waitlist will also affect all guests."))
 		
 	if tickets:
 		if ismember!='Y':	#leave empty for comps
-			db.Reservations.Ticket.requires=IS_EMPTY_OR(IS_IN_SET(tickets))
+			db.Reservations.Ticket.requires=IS_EMPTY_OR(IS_IN_SET(event_tickets, zero='please select the appropriate ticket'))
 		else:
 			db.Reservations.Ticket.requires=IS_IN_SET(event_tickets, zero='please select the appropriate ticket')
 			db.Reservations.Ticket.default = host_reservation.Ticket if host_reservation else event_tickets[0] if len(event_tickets)==1 else None

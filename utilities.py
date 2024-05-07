@@ -219,7 +219,7 @@ def msg_header(member, subject):
 	body = f"\n\n<p>{datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).strftime(DATE_FORMAT)}<br>"
 	body += f"{(member.Title or '')+' '}{member.Firstname} {member.Lastname} {member.Suffix or ''}<br>"
 	if member.Address1:
-		body += f"{member.Address1}\<br>"
+		body += f"{member.Address1}<br>"
 	if member.Address2:
 		body += f"{member.Address2}<br>"
 	body += f"{member.City or ''} {member.State or ''} {member.Zip or ''}<br></p>"

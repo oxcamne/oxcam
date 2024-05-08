@@ -154,7 +154,7 @@ db.define_table('Events',
 			requires=IS_EMPTY_OR(IS_IN_DB(db(db.Colleges.Oxbridge!=True), db.Colleges.id, '%(Name)s', multiple=True)),
 			comment=' Select co-sponsors to allow members to register.Members. Use ctrl-click to select multiple, e.g. for AUABN'),
 	Field('Venue', 'string', requires=IS_NOT_EMPTY()),
-	Field('Capacity', 'integer'),
+	Field('Capacity', 'integer', requires=IS_EMPTY_OR(IS_INT_IN_RANGE(1))),
 	Field('Waiting', 'boolean', comment="set once overall capacity limit breached"),
 	Field('Speaker', 'string'),
 	Field('Notes', 'text', comment=CAT("included on registration confirmation, supports ", A('Markdown', _href='https://www.markdownguide.org/basic-syntax/', _target='Markdown'), " format")),
@@ -174,13 +174,14 @@ db.define_table('Event_Tickets',
 	   comment="can specify membership, e.g. full/student/non-member"),
 	Field('Short_name', comment="short name for doorlist"),	#short name for use in doorlist
 	Field('Price', 'decimal(5,2)', requires=IS_DECIMAL_IN_RANGE(0)),
-	Field('Count', 'integer', requires=IS_EMPTY_OR(IS_INT_IN_RANGE(0)),
+	Field('Count', 'integer', requires=IS_EMPTY_OR(IS_INT_IN_RANGE(1)),
 	   comment="to limit number of tickets at this price"),
 	Field('Waiting', 'boolean', comment="set when limit for this ticket type breached"),
 	Field('Qualify',
 	   comment="use if qualification required in notes"),
 	Field('Allow_as_guest', 'boolean', default=True,
-	   comment="clear if ticket can't apply to a guest")
+	   comment="clear if ticket can't apply to a guest"),
+	format='%(Ticket)s'
 )
 
 def selections_made(event_id, selection):
@@ -190,7 +191,8 @@ def selections_made(event_id, selection):
 db.define_table('Event_Selections',
 	Field('Event', 'reference Events', writable=False),
 	Field('Selection', requires=IS_NOT_EMPTY(), comment="for form dropdown"),
-	Field('Short_name', requires=IS_NOT_EMPTY(), comment="for doorlist")
+	Field('Short_name', requires=IS_NOT_EMPTY(), comment="for doorlist"),
+	format='%(Selection)s'
 )
 
 def survey_choices(event_id, choice):
@@ -201,6 +203,7 @@ db.define_table('Event_Survey',
 	Field('Event', 'reference Events', writable=False),
 	Field('Item', requires=IS_NOT_EMPTY(),
 	   comment="first is question, remainder answer choices"),
+	format='%(Item)s'
 )
 
 db.define_table('Affiliations',
@@ -261,12 +264,15 @@ db.define_table('Reservations',
 	Field('Suffix', 'string', default='', writable=False, readable=False),
 	Field('Affiliation', 'reference Colleges', writable=True, default=None,	#primary affiliation
 			requires=IS_EMPTY_OR(IS_IN_DB(db, db.Colleges.id, '%(Name)s', orderby=db.Colleges.Name))),
+	Field('Ticket_Ref', 'reference Event_Tickets'),
+	Field('Selection_Ref', 'reference Event_Selections'),
+	Field('Survey_Ref', 'reference Event_Survey'),
 	Field('Ticket', 'string'),
 	Field('Selection', 'string'), #field was previously Menuchoice
-	Field('Notes', 'string'),	#host name specified, or justifying ticket selection
-	Field('Survey', 'string', readable=False, writable=False),	#answer to multiple choice question
-	Field('Comment', 'string', readable=False, writable=False),	#answer to open ended question
 	Field('Unitcost', 'decimal(5,2)', requires=IS_EMPTY_OR(IS_DECIMAL_IN_RANGE(0, 1000))),
+	Field('Survey', 'string', readable=False, writable=False),	#answer to multiple choice question
+	Field('Notes', 'string'),	#host name specified, or justifying ticket selection
+	Field('Comment', 'string', readable=False, writable=False),	#answer to open ended question
 	Field('Provisional', 'boolean', default=False, readable=False, writable=False),
 													#incomplete reservation: checkout not started, places not allocated
 	Field('Waitlist', 'boolean', default=False),	#now meaningfull in each individual reservation

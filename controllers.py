@@ -776,11 +776,12 @@ def survey(event_id, path=None):
 
 	event=db.Events[event_id]
 	db.Event_Survey.Event.default=event_id
+	modifiable = write and db((db.Reservations.Event==event_id)&(db.Reservations.Survey_Ref!=None)).count()==0
 
 	header = CAT(A('back', _href=session['url_prev']),
 	      		H5('Event Survey'),
 	      		H6(event.Description),
-				"Note, changes made here are not reflected in any existing reservations!")
+				"Note, survey cannot be modified once at least one response is recorded")
 
 	def validation(form):
 		if not form.vars.get('id'):	#new selection
@@ -794,7 +795,7 @@ def survey(event_id, path=None):
 	grid = Grid(path, db.Event_Survey.Event==event_id,
 			columns=[db.Event_Survey.Item,
 				Column('chosen', lambda t: survey_choices(event_id, t.Item) if survey_choices(event_id, t.Item)>0 else '')],
-			details=not write, create=write, editable=write, deletable=write,
+			details=not modifiable, create=write, editable=modifiable, deletable=modifiable,
 			validation=validation,
 			grid_class_style=grid_style,
 			formstyle=form_style,
@@ -938,7 +939,7 @@ def reservation(ismember, member_id, event_id, path=None):
 	selections = db(db.Event_Selections.Event==event_id).select()
 	event_selections = [s.Selection for s in selections]
 	survey = db(db.Event_Survey.Event==event_id).select()
-	event_survey = [s.Item for s in survey]
+	event_survey = [(s.id, s.Item) for s in survey[1:]]
 	session['event_id'] = event_id
 
 	if is_good_standing:
@@ -1014,9 +1015,9 @@ def reservation(ismember, member_id, event_id, path=None):
 
 			fields = []
 			if survey:
-				fields.append(Field('survey', requires=IS_IN_SET(event_survey[1:], zero=event_survey[0],
+				fields.append(Field('survey', requires=IS_IN_SET(event_survey, zero=survey[0].Item,
 									error_message='Please make a selection'),
-									default = host_reservation.Survey))
+									default = host_reservation.Survey_Ref))
 			if event.Comment:
 				fields.append(Field('comment', 'string', comment=event.Comment,
 									default = host_reservation.Comment))
@@ -1152,7 +1153,7 @@ Moving member on/off waitlist will also affect all guests."))
 		elif adding==0 and payment==0:
 			form2 = ''	#don't need the Checkout form
 		elif form2.accepted:
-			host_reservation.update_record(Survey=form2.vars.get('survey'), Comment=form2.vars.get('comment'))
+			host_reservation.update_record(Survey_Ref=form2.vars.get('survey'), Comment=form2.vars.get('comment'))
 			for row in all_guests.find(lambda row: row.Provisional==True):
 				if row.Ticket in tickets_available and tickets_available[row.Ticket] <= 0:
 					tickets.find(lambda t: t.Ticket==row.Ticket).first().update_record(Waiting=True)

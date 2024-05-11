@@ -5,7 +5,7 @@ from py4web import URL
 from .common import db
 from .settings import TIME_ZONE, SUPPORT_EMAIL, LETTERHEAD, GRACE_PERIOD, CURRENCY_SYMBOL,\
 	DB_URL, SOCIETY_SHORT_NAME, MEMBER_CATEGORIES, DATE_FORMAT, SMTP_TRANS, STRIPE_SKEY, SOCIETY_NAME
-from .models import primary_email, res_tbc, res_totalcost, res_status, member_name
+from .models import primary_email, res_tbc, res_totalcost, res_status, member_name, res_selection, res_unitcost
 from yatl.helpers import A, TABLE, TH, THEAD, H6, TR, TD, CAT, HTML, XML
 import datetime, re, smtplib, markdown
 from email.message import EmailMessage
@@ -252,8 +252,8 @@ def event_confirm(event_id, member_id, justpaid=0, event_only=False):
 	for t in resvtns:
 		rows.append(TR(TD(f"{t.Lastname}, {t.Firstname}",
 						TD(t.Affiliation.Name if t.Affiliation else ''),
-						TD(t.Selection or ''),
-						TD(f'{CURRENCY_SYMBOL}{t.Unitcost or 0.00:6.2f}'),
+						TD(res_selection(t.id)),
+						TD(f'{CURRENCY_SYMBOL}{res_unitcost(t.id):6.2f}'),
 						TH(f'{res_status(t.id)}' if t.Waitlist or t.Provisional else '')
 		)))
 	if tbcdues > tbc:

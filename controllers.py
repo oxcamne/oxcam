@@ -41,7 +41,7 @@ from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
 	primary_matriculation, event_revenue, event_unpaid, res_tbc, res_status,\
 	res_conf, res_totalcost, res_wait, res_prov, bank_accrual, tickets_sold,\
-	selections_made, survey_choices
+	res_unitcost, res_selection
 from pydal.validators import IS_LIST_OF_EMAILS, IS_EMPTY_OR, IS_IN_DB, IS_IN_SET,\
 	IS_NOT_EMPTY, IS_DATE, IS_DECIMAL_IN_RANGE, IS_INT_IN_RANGE, IS_MATCH
 from .utilities import email_sender, member_good_standing, ageband, newpaiddate,\
@@ -701,7 +701,7 @@ def tickets(event_id, path=None):
 	header = CAT(A('back', _href=session['url_prev']),
 	      		H5('Event Tickets'),
 	      		H6(event.Description),
-				"Note, changes made here are not reflected in any existing reservations!")
+				"Note, be careful of modifying tickets once used in any reservations!")
 
 	def validation(form):
 		if not form.vars.get('id'):	#new ticket type
@@ -716,11 +716,12 @@ def tickets(event_id, path=None):
 
 	grid = Grid(path, db.Event_Tickets.Event==event_id,
 			columns=[db.Event_Tickets.Ticket, db.Event_Tickets.Price, db.Event_Tickets.Qualify, db.Event_Tickets.Count,
-				db.Event_Tickets.Waiting, Column('Sold', lambda t: tickets_sold(event_id, t.Ticket))],
-			details=not write, create=write, editable=write, deletable=write,
+				db.Event_Tickets.Waiting, Column('Sold', lambda t: tickets_sold(t.id))],
+			details=not write, create=write, editable=write,
+			deletable= lambda t: write and db(db.Reservations.Ticket_==t.id).count()==0,
 			validation=validation,
 			grid_class_style=grid_style,
-			formstyle=form_style,
+			formstyle=form_style, show_id=True
 			)
 	return locals()
 	
@@ -756,11 +757,12 @@ def selections(event_id, path=None):
 
 	grid = Grid(path, db.Event_Selections.Event==event_id,
 			columns=[db.Event_Selections.Selection,
-				Column('selected', lambda t: selections_made(event_id, t.Selection))],
-			details=not write, create=write, editable=write, deletable=write,
+				Column('selected', lambda t: db((db.Reservations.Selection_==t.id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).count())],
+			details=not write, create=write, editable=write,
+			deletable= lambda t: write and db(db.Reservations.Selection_==t.id).count()==0,
 			validation=validation,
 			grid_class_style=grid_style,
-			formstyle=form_style,
+			formstyle=form_style, show_id=True
 			)
 	return locals()
 	
@@ -776,12 +778,12 @@ def survey(event_id, path=None):
 
 	event=db.Events[event_id]
 	db.Event_Survey.Event.default=event_id
-	modifiable = write and db((db.Reservations.Event==event_id)&(db.Reservations.Survey_Ref!=None)).count()==0
+	modifiable = write and db((db.Reservations.Event==event_id)&(db.Reservations.Survey_!=None)).count()==0
 
 	header = CAT(A('back', _href=session['url_prev']),
 	      		H5('Event Survey'),
 	      		H6(event.Description),
-				"Note, survey cannot be modified once at least one response is recorded")
+				"Note, survey elements cannot be modified once chosen")
 
 	def validation(form):
 		if not form.vars.get('id'):	#new selection
@@ -792,13 +794,19 @@ def survey(event_id, path=None):
 			flash.set("Error(s) in form, please check")
 			return
 
+	def count(id):
+		count = db((db.Reservations.Survey_==id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).count()
+		return count if count>0 else ''
+	
 	grid = Grid(path, db.Event_Survey.Event==event_id,
 			columns=[db.Event_Survey.Item,
-				Column('chosen', lambda t: survey_choices(event_id, t.Item) if survey_choices(event_id, t.Item)>0 else '')],
-			details=not modifiable, create=write, editable=modifiable, deletable=modifiable,
+				Column('chosen', lambda t: count(t.id))],
+			details=False, create=write,
+			editable=lambda t: write and db(db.Reservations.Survey_==t.id).count()==0,
+			deletable=lambda t: write and db(db.Reservations.Survey_==t.id).count()==0,
 			validation=validation,
 			grid_class_style=grid_style,
-			formstyle=form_style,
+			formstyle=form_style, show_id=True
 			)
 	return locals()
 
@@ -923,25 +931,7 @@ def reservation(ismember, member_id, event_id, path=None):
 
 	event = db.Events[event_id]
 	member = db.Members[member_id]
-	is_good_standing = member_good_standing(member, event.DateTime.date())
-	affinity = db(db.Affiliations.Member == member_id).select(orderby=db.Affiliations.Modified).first()
-	sponsor = not affinity.College.Oxbridge if affinity else False
-	all_guests = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)).select(orderby=~db.Reservations.Host)
-	host_reservation = all_guests.first()
-	tickets = db(db.Event_Tickets.Event==event_id).select()
-	event_tickets = [t.Ticket for t in tickets if ismember!='Y' or\
-				((is_good_standing != t.Ticket.lower().startswith('non-member')) and\
-				(not host_reservation or t.Allow_as_guest==True))]
-	tickets_available = {}
-	for t in tickets:
-		if t.Count:
-			tickets_available[t.Ticket] = t.Count - tickets_sold(event_id, t.Ticket) if not t.Waiting else 0
-	selections = db(db.Event_Selections.Event==event_id).select()
-	event_selections = [s.Selection for s in selections]
-	survey = db(db.Event_Survey.Event==event_id).select()
-	event_survey = [(s.id, s.Item) for s in survey[1:]]
-	session['event_id'] = event_id
-
+	is_good_standing = member_good_standing(member, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date())
 	if is_good_standing:
 		membership = member.Membership
 	elif ismember=='Y':
@@ -949,30 +939,48 @@ def reservation(ismember, member_id, event_id, path=None):
 		if membership:		#joining as part of event registration
 			is_good_standing = True
 
+	affinity = db(db.Affiliations.Member == member_id).select(orderby=db.Affiliations.Modified).first()
+	sponsor = not affinity.College.Oxbridge if affinity else False
+	all_guests = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)).select(orderby=~db.Reservations.Host)
+	host_reservation = all_guests.first()
+	tickets = db(db.Event_Tickets.Event==event_id).select()
+	event_tickets = [(t.id, f"{t.Ticket}{' (waitlisting)' if t.Waiting else ''}") for t in tickets if \
+				ismember!='Y' or\
+				((is_good_standing != t.Ticket.lower().startswith('non-member')) and\
+				(not host_reservation or t.Allow_as_guest==True))]
+	tickets_available = {}
+	for t in tickets:
+		if t.Count:
+			tickets_available[t.Ticket] = t.Count - tickets_sold(t.id) if not t.Waiting else 0
+	selections = db(db.Event_Selections.Event==event_id).select()
+	event_selections = [(s.id, s.Selection) for s in selections]
+	survey = db(db.Event_Survey.Event==event_id).select()
+	event_survey = [(s.id, s.Item) for s in survey[1:]]
+	session['event_id'] = event_id
+
 	confirmed_ticket_cost = 0
 	provisional_ticket_cost = 0
 	adding = 0
 	confirmed = 0
 	waitlist = event.Waiting
 	for row in all_guests:
-		if row.Ticket:
-			t = tickets.find(lambda t: t.Ticket==row.Ticket).first()
-			row.update_record(Unitcost=t.Price, Modified=row.Modified)
-							#preserve Modified, else update changes it
+		if not row.Ticket_:
+			continue
+		ticket = db.Event_Tickets[row.Ticket_]
 		if not row.Waitlist:
 			if row.Provisional:
 				adding += 1
-				provisional_ticket_cost += row.Unitcost or 0
-				if row.Ticket in tickets_available:
-					tickets_available[row.Ticket] -= 1
-					if tickets_available[row.Ticket] == 0:
-						flash.set(f"There are no further {row.Ticket} tickets for additional guests.")
-					elif tickets_available[row.Ticket] < 0:
-						flash.set(f"Insufficient {row.Ticket} tickets available: please Edit to select a different ticket type or Checkout to add unconfirmed guests to the waitlist.")
+				provisional_ticket_cost += ticket.Price
+				if ticket.Ticket in tickets_available:
+					tickets_available[ticket.Ticket] -= 1
+					if tickets_available[ticket.Ticket] == 0:
+						flash.set(f"There are no further {ticket.Ticket} tickets for additional guests.")
+					elif tickets_available[ticket.Ticket] < 0:
+						flash.set(f"Insufficient {ticket.Ticket} tickets available: please Edit to select a different ticket type or Checkout to add unconfirmed guests to the waitlist.")
 						waitlist = True
 			else:
 				confirmed += 1
-				confirmed_ticket_cost += row.Unitcost or 0
+				confirmed_ticket_cost += ticket.Price
 	
 	back = URL(f'reservation/{ismember}/{member_id}/{event_id}/select')
 	caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev'] or '').group(1)
@@ -1014,10 +1022,10 @@ def reservation(ismember, member_id, event_id, path=None):
 				header = CAT(header, XML(f"Your registration will be confirmed when your payment of {CURRENCY_SYMBOL}{payment}{dues_tbc} is received at Checkout.<br>"))
 
 			fields = []
-			if survey:
+			if len(survey)>0:
 				fields.append(Field('survey', requires=IS_IN_SET(event_survey, zero=survey[0].Item,
 									error_message='Please make a selection'),
-									default = host_reservation.Survey_Ref))
+									default = host_reservation.Survey_))
 			if event.Comment:
 				fields.append(Field('comment', 'string', comment=event.Comment,
 									default = host_reservation.Comment))
@@ -1054,30 +1062,28 @@ Moving member on/off waitlist will also affect all guests."))
 					Modified=host_reservation.Modified) 
 			
 	if selections:
-		db.Reservations.Selection.requires=IS_IN_SET(event_selections, zero='please make a selection')
+		db.Reservations.Selection_.requires=IS_IN_SET(event_selections, zero='please make a selection')
 	else:
-		db.Reservations.Selection.writable = db.Reservations.Selection.readable = False
+		db.Reservations.Selection_.writable = db.Reservations.Selection_.readable = False
 		
 	if tickets:
 		if ismember!='Y':	#leave empty for comps
-			db.Reservations.Ticket.requires=IS_EMPTY_OR(IS_IN_SET(event_tickets, zero='please select the appropriate ticket'))
+			db.Reservations.Ticket_.requires=IS_EMPTY_OR(IS_IN_SET(event_tickets, zero='please select the appropriate ticket'))
 		else:
-			db.Reservations.Ticket.requires=IS_IN_SET(event_tickets, zero='please select the appropriate ticket')
-			db.Reservations.Ticket.default = host_reservation.Ticket if host_reservation else event_tickets[0] if len(event_tickets)==1 else None
+			db.Reservations.Ticket_.requires=IS_IN_SET(event_tickets, zero='please select the appropriate ticket')
+			db.Reservations.Ticket_.default = host_reservation.Ticket_ if host_reservation else event_tickets[0][0] if len(event_tickets)==1 else None
 	else:
-		db.Reservations.Ticket.writable = db.Reservations.Ticket.readable = False
+		db.Reservations.Ticket_.writable = db.Reservations.Ticket_.readable = False
 	
-	db.Reservations.Event.writable=db.Reservations.Event.readable=False
 	if ismember!='Y':
 		db.Reservations.Provisional.writable = db.Reservations.Provisional.readable = True
 	db.Reservations.Member.readable = False
 
 	if path and path != 'select' and not path.startswith('delete'):	#editing or creating reservation
-		db.Reservations.Unitcost.writable=db.Reservations.Unitcost.readable=False
 		if ismember=='Y':
 			db.Reservations.Modified.readable = db.Reservations.Modified.writable = False
 		else:
-			db.Reservations.Survey.readable = True
+			db.Reservations.Survey_.readable = True
 			db.Reservations.Comment.readable = True
 		if host_reservation and (path=='new' or host_reservation.id!=int(path[path.find('/')+1:])):
 			#this is a new guest reservation, or we are revising a guest reservation
@@ -1098,12 +1104,12 @@ Moving member on/off waitlist will also affect all guests."))
 			elif tickets and not sponsor:
 				for t in event_tickets:
 					if is_good_standing:
-						if t.lower().startswith(membership.lower()):
-							db.Reservations.Ticket.default = t
-							db.Reservations.Ticket.writable = False
-					elif t.lower().startswith('non-member'):
-						db.Reservations.Ticket.default = t
-						db.Reservations.Ticket.writable = False
+						if t[1].lower().startswith(membership.lower()):
+							db.Reservations.Ticket_.default = t[0]
+							db.Reservations.Ticket_.writable = False
+					elif t[1].lower().startswith('non-member'):
+						db.Reservations.Ticket_.default = t[0]
+						db.Reservations.Ticket_.writable = False
 
 			affinity = db(db.Affiliations.Member==member_id).select(orderby=db.Affiliations.Modified).first()
 			if affinity:
@@ -1111,20 +1117,21 @@ Moving member on/off waitlist will also affect all guests."))
 				db.Reservations.Affiliation.writable = False
 
 			if ismember=='Y' and path=='new' and not selections and \
-				(len(event_tickets)<=1 or db.Reservations.Ticket.writable==False):
+				(len(event_tickets)<=1 or db.Reservations.Ticket_.writable==False):
 				#no choices needed, create the Host reservation and display checkout screen
 				db.Reservations.insert(Member=member_id, Event=event_id, Host=True,
 			   		Firstname=member.Firstname, Lastname=member.Lastname, Affiliation=affinity.College if affinity else None,
-					Ticket=db.Reservations.Ticket.default)
+					Ticket_=db.Reservations.Ticket_.default)
 				redirect(URL(f"reservation/Y/{member_id}/{event_id}/select"))
 	
 	def validate(form):
 		if form.vars.get('Waitlist') and form.vars.get('Provisional'):
 			form.errors['Waitlist'] = "Waitlist and Provisional should not both be set"
-		if ismember=='Y' and db.Reservations.Ticket.writable==True and form.vars.get('Ticket') != db.Reservations.Ticket.default:
-			t = tickets.find(lambda t: t.Ticket==form.vars.get('Ticket')).first()
-			if t.Qualify and (not form.vars.get('Notes') or form.vars.get('Notes').strip()==''):
-				form.errors['Notes']=t.Qualify	#documentation required
+		if ismember=='Y' and db.Reservations.Ticket_.writable==True and \
+				form.vars.get('Ticket_')!='' and int(form.vars.get('Ticket_')) != db.Reservations.Ticket_.default:
+			ticket = db.Event_Tickets[form.vars.get('Ticket_')]
+			if ticket.Qualify and (not form.vars.get('Notes') or form.vars.get('Notes').strip()==''):
+				form.errors['Notes']=ticket.Qualify	#documentation required
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
@@ -1136,8 +1143,9 @@ Moving member on/off waitlist will also affect all guests."))
 
 	grid = Grid(path, (db.Reservations.Member==member.id)&(db.Reservations.Event==event.id),
 			orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname,
-			columns=[db.Reservations.Lastname, db.Reservations.Firstname, 
-					db.Reservations.Notes, db.Reservations.Selection, db.Reservations.Unitcost,
+			columns=[db.Reservations.Lastname, db.Reservations.Firstname, db.Reservations.Notes,
+					Column('Selection', lambda row: res_selection(row.id)),
+					Column('Price', lambda row: res_unitcost(row.id)),
 					Column('Status', lambda row: res_status(row.id))],
 			headings=['Last', 'First', 'Notes', 'Selection', 'Price', 'Status'],
 			deletable=lambda row: write and (len(all_guests)==1 or row['id'] != host_reservation.id) \
@@ -1153,11 +1161,14 @@ Moving member on/off waitlist will also affect all guests."))
 		elif adding==0 and payment==0:
 			form2 = ''	#don't need the Checkout form
 		elif form2.accepted:
-			host_reservation.update_record(Survey_Ref=form2.vars.get('survey'), Comment=form2.vars.get('comment'))
-			for row in all_guests.find(lambda row: row.Provisional==True):
-				if row.Ticket in tickets_available and tickets_available[row.Ticket] <= 0:
-					tickets.find(lambda t: t.Ticket==row.Ticket).first().update_record(Waiting=True)
-				row.update_record(Provisional=False, Waitlist=waitlist)
+			host_reservation.update_record(Survey_=form2.vars.get('survey'), Comment=form2.vars.get('comment'))
+			for row in all_guests:
+				if row.Provisional==True:
+					if row.Ticket_:
+						ticket = db.Event_Tickets[row.Ticket_]
+						if ticket.Ticket in tickets_available and tickets_available[ticket.Ticket] <= 0:
+							ticket.update_record(Waiting=True)
+					row.update_record(Provisional=False, Waitlist=waitlist)
 
 			if waitlist:
 				flash.set(f"{'You' if confirmed==0 else 'Your additional guest(s)'} have been added to the waitlist.")
@@ -1197,17 +1208,18 @@ def doorlist_export(event_id):
 				orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname)
 				
 			for guest in guests:
-				selection = db((db.Event_Selections.Event==event_id)&(db.Event_Selections.Selection==guest.Selection)).select().first()
-				selection_short = selection.Short_name or selection.Selection if selection else guest.Selection or ''
-				ticket = db((db.Event_Tickets.Event==event_id)&(db.Event_Tickets.Ticket==guest.Ticket)).select().first()
-				ticket_short = ticket.Short_name or ticket.Ticket if ticket else guest.Ticket or ''
+				ticket = db.Event_Tickets[guest.Ticket_] if guest.Ticket_ else None
+				ticket_name = ticket.Short_name or ticket.Ticket if ticket else ''
+				selection = db.Event_Selections[guest.Selection_] if guest.Selection_ else None
+				selection_name = selection.Short_name or selection.Selection if selection else ''
+				survey = db.Event_Survey[guest.Survey_].Item if guest.Survey_ else ''
 				writer.writerow([host.Reservations.Lastname, host.Reservations.Firstname, guest.Notes or '',
 									guest.Lastname, guest.Firstname, guest.Affiliation.Name if guest.Affiliation else '',
 									primary_matriculation(guest.Member) or '' if host.Reservations.id==guest.id else '',
-									selection_short, '', ticket_short,
+									selection_name, '', ticket_name,
 									primary_email(guest.Member) if host.Reservations.id==guest.id else '',
 									host.Members.Cellphone if host.Reservations.id==guest.id else '',
-									guest.Survey or '', guest.Comment or ''])
+									survey, guest.Comment or ''])
 	except Exception as e:
 		flash.set(e)
 		redirect(session['url_prev'])
@@ -2085,12 +2097,12 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 			if member_reservation:
 				if member_reservation.Checkout:	#checked out but didn't complete payment
 					checkout = eval(member_reservation.Checkout)
-					if not member_good_standing(member, event.DateTime.date()):
+					if not member_good_standing(member, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()):
 						#still need dues, so signal
 						session['membership'] = checkout.get('membership')
 						session['dues'] = str(checkout.get('dues')) if checkout.get('dues') else None
 				redirect(URL(f'reservation/Y/{member_id}/{event_id}/'))	#go add guests and/or checkout
-			if member_good_standing(member, event.DateTime.date()) or sponsor \
+			if member_good_standing(member, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()) or sponsor \
 					or ((affinity or member.Membership) and not event.Members_only and not event.Allow_join):
 				#members in good standing at time of event, or, members of sponsor organizations, or
 				#membership-eligible and event open to all alums then no need to gather member information

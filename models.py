@@ -127,11 +127,12 @@ def event_revenue(event_id):	#revenue from confirmed tickets
 	
 def event_unpaid(event_id):	#unpaid from confirmed reservations
 	rows = db((db.Reservations.Event==event_id)&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)).\
-			select(db.Reservations.Unitcost, db.Reservations.Paid, db.Reservations.Charged)
+			select(db.Reservations.Paid, db.Reservations.Charged, db.Event_Tickets.Price,
+		  		left=db.Event_Tickets.on(db.Event_Tickets.id==db.Reservations.Ticket_))
 	cost = paid = 0
 	for r in rows:
-		cost += (r.Unitcost or 0)
-		paid += (r.Paid or 0) + (r.Charged or 0)
+		cost += r.Event_Tickets.Price if r.Event_Tickets.Price else 0
+		paid += (r.Reservations.Paid or 0) + (r.Reservations.Charged or 0)
 	return cost - paid if cost-paid != 0 else None
 
 def event_wait(event_id):
@@ -163,10 +164,8 @@ db.define_table('Events',
        			update=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),
 	singular="Event", plural="Events", format=lambda r: f"{r.DateTime.strftime(DATE_FORMAT)} {r.Description[:25]}")
 
-def tickets_sold(event_id, ticket, member_id=None):
-	return db((db.Reservations.Event==event_id)&(db.Reservations.Ticket==ticket)&\
-		   	((db.Reservations.Provisional==False)|(db.Reservations.Member==member_id))&\
-			(db.Reservations.Waitlist==False)).count()
+def tickets_sold(ticket_id):
+	return db((db.Reservations.Ticket_==ticket_id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).count()
 
 db.define_table('Event_Tickets',
 	Field('Event', 'reference Events', writable=False),
@@ -184,20 +183,12 @@ db.define_table('Event_Tickets',
 	format='%(Ticket)s'
 )
 
-def selections_made(event_id, selection):
-	return db((db.Reservations.Event==event_id)&(db.Reservations.Selection==selection)&\
-		   	(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).count()
-
 db.define_table('Event_Selections',
 	Field('Event', 'reference Events', writable=False),
 	Field('Selection', requires=IS_NOT_EMPTY(), comment="for form dropdown"),
 	Field('Short_name', requires=IS_NOT_EMPTY(), comment="for doorlist"),
 	format='%(Selection)s'
 )
-
-def survey_choices(event_id, choice):
-	return db((db.Reservations.Event==event_id)&(db.Reservations.Survey==choice)&\
-		   	(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).count()
 
 db.define_table('Event_Survey',
 	Field('Event', 'reference Events', writable=False),
@@ -218,20 +209,23 @@ db.define_table('Affiliations',
 
 def res_totalcost(member_id, event_id):	#cost of confirmed places
 	resvtns = db((db.Reservations.Member==member_id)&(db.Reservations.Event==event_id)\
-				&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)).select(db.Reservations.Unitcost)
+				&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)).select(db.Event_Tickets.Price,
+					left=db.Event_Tickets.on(db.Event_Tickets.id==db.Reservations.Ticket_))
 	v=0
-	for r in resvtns: v+=(r.Unitcost or 0)
+	for r in resvtns:
+		v+=(r.Price or 0)
 	return v if v!=0 else None
 
 def res_tbc(member_id, event_id, dues=False):	#cost of confirmed still tbc
 	resvtns = db((db.Reservations.Member==member_id)&(db.Reservations.Event==event_id)\
-				&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)).select(db.Reservations.Unitcost,
-								db.Reservations.Paid, db.Reservations.Charged, db.Reservations.Checkout)
+				&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)).select(db.Event_Tickets.Price,
+					db.Reservations.Paid, db.Reservations.Charged, db.Reservations.Checkout,
+					left=db.Event_Tickets.on(db.Event_Tickets.id==db.Reservations.Ticket_))
 	v=0
 	for r in resvtns: 
-		v+=(r.Unitcost or 0)-(r.Paid or 0)-(r.Charged or 0)
-		if dues==True and r.Checkout:
-			v += decimal.Decimal(eval(r.Checkout).get('dues', '0') or 0)
+		v+=(r.Event_Tickets.Price or 0)-(r.Reservations.Paid or 0)-(r.Reservations.Charged or 0)
+		if dues==True and r.Reservations.Checkout:
+			v += decimal.Decimal(eval(r.Reservations.Checkout).get('dues', '0') or 0)
 	return v if v!=0 else None
 
 def res_wait(member_id, event_id):
@@ -251,12 +245,20 @@ def res_status(reservation_id):
 	r= db.Reservations[reservation_id]
 	return 'waitlisted' if r.Waitlist else 'unconfirmed' if r.Provisional else ''
 
+def res_unitcost(reservation_id):
+	r= db.Reservations[reservation_id]
+	return db.Event_Tickets[r.Ticket_].Price if r.Ticket_ else 0
+
+def res_selection(reservation_id):
+	r= db.Reservations[reservation_id]
+	return db.Event_Selections[r.Selection_].Selection if r.Selection_ else ''
+
 #table includes primary reservation records plus guest records for each guest.
 #Member(host) must have record in Members.
 #Primary reservation record has Host==True
 db.define_table('Reservations',
 	Field('Member', 'reference Members', writable=False),
-	Field('Event', 'reference Events', writable=False),
+	Field('Event', 'reference Events', readable=False, writable=False),
 	Field('Host', 'boolean', default=True, writable=False, readable=False), #indicates primary (member's) reservation
 	Field('Title', 'string', default='', writable=False, readable=False),
 	Field('Firstname', 'string', default='', requires = IS_NOT_EMPTY(), writable=False),
@@ -264,13 +266,13 @@ db.define_table('Reservations',
 	Field('Suffix', 'string', default='', writable=False, readable=False),
 	Field('Affiliation', 'reference Colleges', writable=True, default=None,	#primary affiliation
 			requires=IS_EMPTY_OR(IS_IN_DB(db, db.Colleges.id, '%(Name)s', orderby=db.Colleges.Name))),
-	Field('Ticket_Ref', 'reference Event_Tickets'),
-	Field('Selection_Ref', 'reference Event_Selections'),
-	Field('Survey_Ref', 'reference Event_Survey'),
-	Field('Ticket', 'string'),
-	Field('Selection', 'string'), #field was previously Menuchoice
-	Field('Unitcost', 'decimal(5,2)', requires=IS_EMPTY_OR(IS_DECIMAL_IN_RANGE(0, 1000))),
-	Field('Survey', 'string', readable=False, writable=False),	#answer to multiple choice question
+	Field('Ticket_', 'reference Event_Tickets'),
+	Field('Selection_', 'reference Event_Selections'),
+	Field('Survey_', 'reference Event_Survey', readable=False, writable=False),
+#	Field('Ticket', 'string', writable=False, readable=False),
+#	Field('Selection', 'string', writable=False, readable=False), #field was previously Menuchoice
+#	Field('Unitcost', 'decimal(5,2)', writable=False, readable=False),
+#	Field('Survey', 'string', readable=False, writable=False),	#answer to multiple choice question
 	Field('Notes', 'string'),	#host name specified, or justifying ticket selection
 	Field('Comment', 'string', readable=False, writable=False),	#answer to open ended question
 	Field('Provisional', 'boolean', default=False, readable=False, writable=False),

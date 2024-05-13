@@ -125,7 +125,7 @@ def db_convert():
 	rows = db(db.Reservations.id>0).select()
 	for r in rows:
 
-		if r.Ticket:
+		if r.Ticket or r.Unitcost:
 			ticket_name = r.Ticket or f"{r.Unitcost:.2f}"
 			ticket = db((db.Event_Tickets.Ticket==ticket_name)&(db.Event_Tickets.Event==r.Event)).select().first()
 			if ticket and ticket.Price!=r.Unitcost:

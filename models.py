@@ -117,31 +117,42 @@ db.define_table('Emails',
        			update=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),
 	singular="Email", plural="Emails", format='%(Email)s')
 	
-def event_revenue(event_id):	#revenue from confirmed tickets
-	rows = db(db.Reservations.Event==event_id).\
-			select(db.Reservations.Paid, db.Reservations.Charged)
-	paid = 0
-	for r in rows:
-		paid += (r.Paid or 0) + (r.Charged or 0)
-	return paid if paid != 0 else None
-	
-def event_unpaid(event_id):	#unpaid from confirmed reservations
-	rows = db((db.Reservations.Event==event_id)&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)).\
-			select(db.Reservations.Paid, db.Reservations.Charged, db.Event_Tickets.Price,
+def event_revenue(event_id, member_id=None):	#revenue from confirmed tickets
+	actkts = db(db.CoA.Name == "Ticket sales").select().first().id
+
+	query = (db.Reservations.Event==event_id)
+	if member_id:
+		query = (db.Reservations.Member==member_id)&query
+	reservations = db(query).select(db.Reservations.Charged)
+	charged = sum([res.Charged or 0 for res in reservations]) if reservations else 0
+
+	query = (db.AccTrans.Event==event_id)&(db.AccTrans.Account==actkts)
+	if member_id:
+		query = (db.AccTrans.Member==member_id)&query
+	payments = db(query).select(db.AccTrans.Amount)
+	paid = sum([pay.Amount or 0 for pay in payments]) if payments else 0
+
+	return charged + paid
+
+def event_cost(event_id, member_id=None):
+	query = (db.Reservations.Event==event_id)&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)
+	if member_id:
+		query = (db.Reservations.Member==member_id)&query
+	reservations = db(query).select(db.Event_Tickets.Price,
 		  		left=db.Event_Tickets.on(db.Event_Tickets.id==db.Reservations.Ticket_))
-	cost = paid = 0
-	for r in rows:
-		cost += r.Event_Tickets.Price if r.Event_Tickets.Price else 0
-		paid += (r.Reservations.Paid or 0) + (r.Reservations.Charged or 0)
-	return cost - paid if cost-paid != 0 else None
+	cost = sum([res.Price or 0 for res in reservations]) if reservations else 0
+	return cost
+
+def event_unpaid(event_id, member_id=None):	#unpaid from confirmed reservations
+	return event_cost(event_id, member_id) - event_revenue(event_id, member_id)
 
 def event_wait(event_id):
 	wait = db((db.Reservations.Event==event_id)&(db.Reservations.Waitlist==True)).count()
-	return wait if wait != 0 else None
+	return wait
 
 def event_attend(event_id):
 	attend = db((db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).count()
-	return attend if attend != 0 else None	
+	return attend
 
 db.define_table('Events',
 	Field('Page', 'string', requires=IS_NOT_EMPTY(), comment=" Link to event page"),
@@ -207,39 +218,23 @@ db.define_table('Affiliations',
        			update=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),
 	singular="Affiliation", plural="Affiliations")
 
-def res_totalcost(member_id, event_id):	#cost of confirmed places
-	resvtns = db((db.Reservations.Member==member_id)&(db.Reservations.Event==event_id)\
-				&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)).select(db.Event_Tickets.Price,
-					left=db.Event_Tickets.on(db.Event_Tickets.id==db.Reservations.Ticket_))
-	v=0
-	for r in resvtns:
-		v+=(r.Price or 0)
-	return v if v!=0 else None
-
-def res_tbc(member_id, event_id, dues=False):	#cost of confirmed still tbc
-	resvtns = db((db.Reservations.Member==member_id)&(db.Reservations.Event==event_id)\
-				&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)).select(db.Event_Tickets.Price,
-					db.Reservations.Paid, db.Reservations.Charged, db.Reservations.Checkout,
-					left=db.Event_Tickets.on(db.Event_Tickets.id==db.Reservations.Ticket_))
-	v=0
-	for r in resvtns: 
-		v+=(r.Event_Tickets.Price or 0)-(r.Reservations.Paid or 0)-(r.Reservations.Charged or 0)
-		if dues==True and r.Reservations.Checkout:
-			v += decimal.Decimal(eval(r.Reservations.Checkout).get('dues', '0') or 0)
-	return v if v!=0 else None
+def res_dues(member_id, event_id, dues=False):	#dues payment associated with reservation
+	host_reservation = db((db.Reservations.Event==event_id)&(db.Reservations.Member==member_id)).select(
+							orderby=~db.Reservations.Host).first()
+	return decimal.Decimal(eval(host_reservation.Checkout).get('dues') or 0) if host_reservation and host_reservation.Checkout else 0
 
 def res_wait(member_id, event_id):
 	wait = db((db.Reservations.Member==member_id)&(db.Reservations.Event==event_id)&(db.Reservations.Waitlist==True)).count()
-	return wait if wait!=0 else None
+	return wait
 
 def res_prov(member_id, event_id):
 	prov = db((db.Reservations.Member==member_id)&(db.Reservations.Event==event_id)&(db.Reservations.Provisional==True)).count()
-	return prov if prov!=0 else None
+	return prov
 
 def res_conf(member_id, event_id):
 	conf = db((db.Reservations.Member==member_id)& (db.Reservations.Waitlist==False) &\
 			(db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)).count()
-	return conf if conf!=0 else None
+	return conf
 
 def res_status(reservation_id):
 	r= db.Reservations[reservation_id]
@@ -269,10 +264,14 @@ db.define_table('Reservations',
 	Field('Ticket_', 'reference Event_Tickets'),
 	Field('Selection_', 'reference Event_Selections'),
 	Field('Survey_', 'reference Event_Survey', readable=False, writable=False),
+
+	#Following group of fields now obsolete
 	Field('Ticket', 'string', writable=False, readable=False),
 	Field('Selection', 'string', writable=False, readable=False), #field was previously Menuchoice
 	Field('Unitcost', 'decimal(5,2)', writable=False, readable=False),
 	Field('Survey', 'string', readable=False, writable=False),	#answer to multiple choice question
+	Field('Paid', 'decimal(8,2)', readable=False, writable=False),
+
 	Field('Notes', 'string'),	#host name specified, or justifying ticket selection
 	Field('Comment', 'string', readable=False, writable=False),	#answer to open ended question
 	Field('Provisional', 'boolean', default=False, readable=False, writable=False),
@@ -280,10 +279,9 @@ db.define_table('Reservations',
 	Field('Waitlist', 'boolean', default=False),	#now meaningfull in each individual reservation
 	
 	#following fields meaningfull only on the member's own reservation (Host==True)
-	Field('Paid', 'decimal(8,2)', readable=False, writable=False,
-				requires=IS_EMPTY_OR(IS_DECIMAL_IN_RANGE(0, 10000))), #total paid, confirmed by download from Stripe, Bank
 	Field('Charged', 'decimal(6,2)', readable=False, writable=False),	#payment made, not yet downloaded from Stripe
 	Field('Checkout', 'string', readable=False, writable=False),	#session.vars of incomplete checkout
+
 	Field('Created', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),
 	Field('Modified', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None),
        			update=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),

@@ -5,7 +5,8 @@ from py4web import URL
 from .common import db
 from .settings import TIME_ZONE, SUPPORT_EMAIL, LETTERHEAD, GRACE_PERIOD, CURRENCY_SYMBOL,\
 	DB_URL, SOCIETY_SHORT_NAME, MEMBER_CATEGORIES, DATE_FORMAT, SMTP_TRANS, STRIPE_SKEY, SOCIETY_NAME
-from .models import primary_email, res_tbc, res_totalcost, res_status, member_name, res_selection, res_unitcost
+from .models import primary_email, event_cost, res_status, member_name, res_selection,\
+	res_unitcost, event_revenue, event_unpaid, res_dues
 from yatl.helpers import A, TABLE, TH, THEAD, H6, TR, TD, CAT, HTML, XML
 import datetime, re, smtplib, markdown
 from email.message import EmailMessage
@@ -245,9 +246,9 @@ def event_confirm(event_id, member_id, justpaid=0, event_only=False):
 	body = TABLE(*rows).__str__()
 	if event_only or not resvtns:
 		return body
-	tbc = res_tbc(member_id, event_id) or 0
-	tbcdues = res_tbc(member_id, event_id, True) or 0
-	cost = res_totalcost(member_id, event_id) or 0
+	tbc = event_unpaid(event_id, member_id)
+	dues = res_dues(member_id, event_id)
+	cost = event_cost(event_id, member_id)
 	rows=[TR(TH('Name', TH('Affiliation'), TH('Selection'), TH('Ticket Cost'), TH('')))]
 	for t in resvtns:
 		rows.append(TR(TD(f"{t.Lastname}, {t.Firstname}",
@@ -256,14 +257,15 @@ def event_confirm(event_id, member_id, justpaid=0, event_only=False):
 						TD(f'{CURRENCY_SYMBOL}{res_unitcost(t.id):6.2f}'),
 						TH(f'{res_status(t.id)}' if t.Waitlist or t.Provisional else '')
 		)))
-	if tbcdues > tbc:
-		rows.append(TR(TH('Membership Dues', _style="text-align:left"), TD(''), TD(''), TH(f'{CURRENCY_SYMBOL}{tbcdues - tbc:6.2f}', _style="text-align:left")))
-	rows.append(TR(TH('Total Cost', _style="text-align:left"), TD(''), TD(''), TH(f'{CURRENCY_SYMBOL}{cost + tbcdues - tbc:6.2f}', _style="text-align:left")))
-	rows.append(TR(TH('Paid', _style="text-align:left"), TD(''), TD(''), TH(f'{CURRENCY_SYMBOL}{(resvtns.first().Paid or 0)+(resvtns.first().Charged or 0)+justpaid:6.2f}', _style="text-align:left")))
-	if tbcdues>justpaid:
-		rows.append(TR(TH('Net amount due', _style="text-align:left"), TD(''), TD(''), TH(f'{CURRENCY_SYMBOL}{tbcdues-justpaid:6.2f}', _style="text-align:left")))
+	if dues>0:
+		rows.append(TR(TH('Membership Dues', _style="text-align:left"), TD(''), TD(''), TH(f'{CURRENCY_SYMBOL}{dues:6.2f}', _style="text-align:left")))
+	rows.append(TR(TH('Total Cost', _style="text-align:left"), TD(''), TD(''), TH(f'{CURRENCY_SYMBOL}{cost + dues:6.2f}', _style="text-align:left")))
+	rows.append(TR(TH('Paid', _style="text-align:left"), TD(''), TD(''),
+				TH(f'{CURRENCY_SYMBOL}{event_revenue(event_id, member_id)+(resvtns.first().Charged or 0)+justpaid:6.2f}', _style="text-align:left")))
+	if tbc + dues>justpaid:
+		rows.append(TR(TH('Net amount due', _style="text-align:left"), TD(''), TD(''), TH(f'{CURRENCY_SYMBOL}{tbc+dues-justpaid:6.2f}', _style="text-align:left")))
 	body += TABLE(*rows).__str__()
-	if tbcdues>justpaid:
+	if tbc + dues>justpaid:
 		body += f"To pay online please visit {DB_URL}/registration/{event_id}<br>"
 						#scheme=True doesn't pick up the domain in the email_daemon!
 	elif event.Notes and not resvtns[0].Waitlist and not resvtns[0].Provisional:

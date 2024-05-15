@@ -39,8 +39,8 @@ from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
 	ALLOWED_EMAILS, DATE_FORMAT, CURRENCY_SYMBOL
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
-	primary_matriculation, event_revenue, event_unpaid, res_tbc, res_status,\
-	res_conf, res_totalcost, res_wait, res_prov, bank_accrual, tickets_sold,\
+	primary_matriculation, event_revenue, event_unpaid, res_status,\
+	res_conf, event_cost, res_wait, res_prov, bank_accrual, tickets_sold,\
 	res_unitcost, res_selection
 from pydal.validators import IS_LIST_OF_EMAILS, IS_EMPTY_OR, IS_IN_DB, IS_IN_SET,\
 	IS_NOT_EMPTY, IS_DATE, IS_DECIMAL_IN_RANGE, IS_INT_IN_RANGE, IS_MATCH
@@ -414,8 +414,8 @@ def member_reservations(member_id, path=None):
 	    			Column('event', lambda row: A(row.Reservations.Event.Description[0:23], _href=URL(f"reservation/N/{member_id}/{row.Reservations.Event}"))),
 				    Column('wait', lambda row: res_wait(row.Reservations.Member, row.Reservations.Event) or ''),
 				    Column('conf', lambda row: res_conf(row.Reservations.Member, row.Reservations.Event) or ''),
-				    Column('cost', lambda row: res_totalcost(row.Reservations.Member, row.Reservations.Event) or ''),
-				    Column('tbc', lambda row: res_tbc(row.Reservations.Member, row.Reservations.Event, True) or '')],
+				    Column('cost', lambda row: event_cost(row.Reservations.Event, row.Reservations.Member) or ''),
+				    Column('tbc', lambda row: event_unpaid(row.Reservations.Event, row.Reservations.Member) or '')],
 			grid_class_style=grid_style,
 			formstyle=form_style,
 			details=False, editable = False, create = False, deletable = False)
@@ -899,10 +899,11 @@ select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 			orderby=db.Reservations.Created if request.query.get('waitlist') else db.Reservations.Lastname|db.Reservations.Firstname,
 			columns=[Column('member', lambda row: A(member_name(row.Reservations.Member)[0:20], _href=URL(f"reservation/N/{row.Reservations.Member}/{event_id}/select"))),
 	    				db.Members.Membership, db.Members.Paiddate, db.Reservations.Affiliation, db.Reservations.Notes,
-					    Column('cost', lambda row: res_totalcost(row.Reservations.Member, row.Reservations.Event) or ''),
-					    Column('tbc', lambda row: res_tbc(row.Reservations.Member, row.Reservations.Event, True) or ''),
+					    Column('cost', lambda row: event_cost(row.Reservations.Event, row.Reservations.Member) or ''),
+					    Column('tbc', lambda row: event_unpaid(row.Reservations.Event, row.Reservations.Member) or ''),
 					    Column('count', lambda row: (res_wait(row.Reservations.Member, row.Reservations.Event) if request.query.get('waitlist')\
-				      		else res_prov(row.Reservations.Member, row.Reservations.Event) if request.query.get('provisional') else res_conf(row.Reservations.Member, row.Reservations.Event)) or'')],
+				      		else res_prov(row.Reservations.Member, row.Reservations.Event) if request.query.get('provisional')\
+							else res_conf(row.Reservations.Member, row.Reservations.Event)) or'')],
 			headings=['Member', 'Type', 'Until', 'College', 'Notes', 'Cost', 'Tbc', '#'],
 			details=False, editable = False, create = False, deletable = False,
 			rows_per_page=200, grid_class_style=grid_style, formstyle=form_style)
@@ -1008,7 +1009,7 @@ def reservation(ismember, member_id, event_id, path=None):
 			elif event.Capacity and attend+adding==event.Capacity:
 				flash.set(f"Please note, this fills the event; if you add another guest all unconfirmed guests will be waitlisted.")
 			dues_tbc = f" (including {CURRENCY_SYMBOL}{session['dues']} membership dues)" if session.get('dues') else ''
-			payment = (int(session.get('dues') or 0)) + confirmed_ticket_cost - (host_reservation.Paid or 0) - (host_reservation.Charged or 0)
+			payment = (int(session.get('dues') or 0)) + confirmed_ticket_cost - event_revenue(event_id, member_id) - (host_reservation.Charged or 0)
 			if not waitlist:
 				payment += (provisional_ticket_cost or 0)
 			if not event.Guests or len(all_guests)<event.Guests:
@@ -1098,7 +1099,6 @@ Moving member on/off waitlist will also affect all guests."))
 			db.Reservations.Firstname.readable=db.Reservations.Lastname.readable=False
 			db.Reservations.Suffix.default = member.Suffix
 			if ismember!='Y':
-				db.Reservations.Paid.writable=db.Reservations.Paid.readable=True
 				db.Reservations.Charged.writable=db.Reservations.Charged.readable=True
 				db.Reservations.Checkout.writable=db.Reservations.Checkout.readable=True
 			elif tickets and not sponsor:
@@ -1181,7 +1181,7 @@ Moving member on/off waitlist will also affect all guests."))
 					subject = 'Registration Confirmation'
 					message = msg_header(member, subject)
 					message += '<b>Your registration is now confirmed:</b><br>'
-					message += event_confirm(event.id, member.id, 0)
+					message += event_confirm(event.id, member.id)
 					msg_send(member, subject, message)
 					flash.set('Thank you. Confirmation has been sent by email.')
 				redirect(back)
@@ -1819,12 +1819,9 @@ def transactions(path=None):
 			elif not form.vars.get('Event'):
 				form.errors['Event'] = "Please identify the event"
 			elif transaction.Account!=actkts and new_amount>0:	#e.g. recording check
-				tbc = res_tbc(form.vars.get('Member'), form.vars.get('Event'))
+				tbc = event_unpaid(form.vars.get('Event'), form.vars.get('Member'))
 				if not tbc or tbc < new_amount:
 					form.errors['Member'] = "Unexpected ticket payment"
-				else:
-					host_res = db((db.Reservations.Event==form.vars.get('Event'))&(db.Reservations.Member==form.vars.get('Member'))&(db.Reservations.Host==True)).select().first()
-					host_res.update_record(Paid=(host_res.Paid or 0)+new_amount)
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return

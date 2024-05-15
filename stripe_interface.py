@@ -9,7 +9,7 @@ interface
 """
 from py4web import action, redirect, Field, request, URL
 from .common import db, session, flash
-from .models import primary_email, member_name, res_tbc
+from .models import primary_email, member_name, event_unpaid
 from .controllers import checkaccess, form_style
 from .utilities import notify_support, newpaiddate, msg_header, msg_send, event_confirm
 from py4web.utils.form import Form
@@ -92,7 +92,7 @@ def stripe_process_charge(dict_csv, bank, reference, timestamp, amount, fee):
 			if resvtn:
 				db.AccTrans.insert(Bank = bank.id, Account = actkts.id, Member=member.id, Amount = amount, Fee = fee,
 					Timestamp = timestamp, Event = resvtn.Event, Reference = reference, Accrual = False, Notes = notes)
-				resvtn.update_record(Paid=(resvtn.Paid or 0) + amount, Charged = resvtn.Charged - amount, Checkout=None)
+				resvtn.update_record(Charged = resvtn.Charged - amount, Checkout=None)
 				amount = 0
 	return (amount, notes)	#if amount not zero will be stored as unallocated
 
@@ -229,7 +229,7 @@ def stripe_checkout():
 		
 	if session.get('event_id'):			#event registration
 		event = db.Events[session.get('event_id')]
-		tickets_tbc = res_tbc(member.id, event.id)
+		tickets_tbc = event_unpaid(event.id, member.id)
 		if tickets_tbc:
 			params['event_id'] = event.id
 			params['tickets_tbc'] = tickets_tbc

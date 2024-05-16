@@ -150,7 +150,7 @@ def members(path=None):
 			back = session['back'][-1] if len(session['back'])>0 else back
 		header = CAT(A('back', _href=back), H5('Member Record'))
 		if path.startswith('edit') or path.startswith('details'):
-			acdues = db(db.CoA.Name == "Membership Dues").select().first().id
+			acdues = db(db.CoA.Name.ilike("Membership Dues")).select().first().id
 			member_id = path[path.find('/')+1:]
 			member = db.Members[member_id]
 			header= CAT(header, 
@@ -312,7 +312,7 @@ def members_export():
 
 #used by member_analytics and financial_statement to analyze the stream of dues payments
 def scan_dues(function, cutoff=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)):
-	acdues = db(db.CoA.Name == "Membership Dues").select().first().id
+	acdues = db(db.CoA.Name.ilike("Membership Dues")).select().first().id
 
 	query = (db.Members.Paiddate >= datetime.date(2016,1,1))|((db.Members.Paiddate==None)&(db.Members.Membership!=None))
 	left = db.AccTrans.on((db.AccTrans.Member==db.Members.id)&(db.AccTrans.Account==acdues)&(db.AccTrans.Amount>0))
@@ -601,7 +601,7 @@ To change your mailing list subscritions, use the <b>Edit</b> button."))
 @checkaccess('read')
 def new_members(path=None):
 	access = session['access']	#for layout.html
-	acdues = db(db.CoA.Name == "Membership Dues").select().first().id
+	acdues = db(db.CoA.Name.ilike("Membership Dues")).select().first().id
 
 	rows = db((db.AccTrans.Account==acdues) & (db.AccTrans.Member!=None) & (db.AccTrans.Amount>0)).select(orderby=~db.AccTrans.Timestamp)
 
@@ -1331,7 +1331,7 @@ def financial_statement():
 	startdate = datetime.date.fromisoformat(start)
 	enddate = datetime.date.fromisoformat(end)
 	title = f"Financial Statement for period {start} to {end}"
-	acdues = db(db.CoA.Name == "Membership Dues").select().first().id
+	acdues = db(db.CoA.Name.ilike("Membership Dues")).select().first().id
 
 	if not start or not end:
 		redirect(URL('get_date_range', vars=dict(function='financial_statement',title='Financial Statement')))
@@ -1404,7 +1404,7 @@ def financial_statement():
 	rows.append(THEAD(TR(TH('Total'), tdnum(totals[0], th=True), tdnum(totals[1], th=True), tdnum(totals[1]-totals[0], th=True))))
 	header = CAT(header, H6('\nLiabilities'), TABLE(*rows))
 	
-	transfer = db(db.CoA.Name=='Transfer').select().first().id	#ignoretransfertransactions
+	transfer = db(db.CoA.Name.ilike('Transfer')).select().first().id	#ignoretransfertransactions
 	query = f"(((db.AccTrans.Event!=None)&(db.Events.DateTime>='{startdatetime}')&(db.Events.DateTime<'{enddatetime}'))|\
 ((db.AccTrans.Event==None)&(db.AccTrans.Account!={transfer})&\
 (db.AccTrans.Timestamp>='{startdatetime}')&(db.AccTrans.Timestamp<'{enddatetime}')))"
@@ -1456,9 +1456,9 @@ def tax_statement():
 
 	sumamt = db.AccTrans.Amount.sum()
 	sumfee = db.AccTrans.Fee.sum()
-	tktacct = db(db.CoA.Name=='Ticket sales').select().first().id
-	sponacct = db(db.CoA.Name=='Sponsorships').select().first().id
-	xferacct = db(db.CoA.Name=='Transfer').select().first().id	#ignore transfer transactions
+	tktacct = db(db.CoA.Name.ilike('Ticket sales')).select().first().id
+	sponacct = db(db.CoA.Name.ilike('Sponsorships')).select().first().id
+	xferacct = db(db.CoA.Name.ilike('Transfer')).select().first().id	#ignore transfer transactions
 
 	query = f"((db.AccTrans.Timestamp>='{startdatetime}')&(db.AccTrans.Timestamp < '{enddatetime}') & (db.AccTrans.Accrual!=True))"
 	left = 'db.Events.on(db.Events.id == db.AccTrans.Event)'
@@ -1610,7 +1610,7 @@ def bank_file(bank_id):
 	bank = db.Bank_Accounts[bank_id]
 	rules = db(db.bank_rules.bank==bank.id).select()
 	bkrecent = db((db.AccTrans.Bank==bank.id)&(db.AccTrans.Accrual!=True)).select(orderby=~db.AccTrans.Timestamp, limitby=(0,1)).first()
-	unalloc = db(db.CoA.Name == 'Unallocated').select().first()
+	unalloc = db(db.CoA.Name.ilike('Unallocated')).select().first()
 	origin = 'since account start'
 
 	header = CAT(A('back', _href=URL('accounting')),
@@ -1749,8 +1749,8 @@ def transactions(path=None):
 	db.AccTrans.Fee.writable = False
 	db.AccTrans.Paiddate.writable = False
 	db.AccTrans.Membership.writable = False
-	acdues = db(db.CoA.Name == "Membership Dues").select().first().id
-	actkts = db(db.CoA.Name == "Ticket sales").select().first().id
+	acdues = db(db.CoA.Name.ilike("Membership Dues")).select().first().id
+	actkts = db(db.CoA.Name.ilike("Ticket sales")).select().first().id
 
 	back = URL('transactions/select', scheme=True)
 	if not path:
@@ -1893,7 +1893,7 @@ def composemail():
 			comment='Include spaces between multiple recipients',
    			requires=[IS_NOT_EMPTY(), IS_LIST_OF_EMAILS()]))
 	if not query or query_count==1:
-		fields.append(Field('bcc', 'string', requires=IS_LIST_OF_EMAILS(), default=source[0]))
+		fields.append(Field('bcc', 'string', requires=IS_LIST_OF_EMAILS()))
 	fields.append(Field('subject', 'string', requires=IS_NOT_EMPTY(), default=proto.Subject if proto else ''))
 	fields.append(Field('body', 'text', requires=IS_NOT_EMPTY(), default=proto.Body if proto else "<letterhead>\n<greeting>\n\n" if query else "<letterhead>\n\n",
 				comment=CAT("You can use placeholders <letterhead>, <subject>, <greeting>, <member>, <reservation>, <email>, ",

@@ -61,8 +61,8 @@ def stripe_update_email(member):
 
 #process a Stripe transaction
 def stripe_process_charge(dict_csv, bank, reference, timestamp, amount, fee):
-	acdues = db(db.CoA.Name == "Membership Dues").select().first()
-	actkts = db(db.CoA.Name == "Ticket sales").select().first()
+	acdues = db(db.CoA.Name.ilike("Membership Dues")).select().first()
+	actkts = db(db.CoA.Name.ilike("Ticket sales")).select().first()
 	charge = stripe.Charge.retrieve(dict_csv['Source'])
 	member = db(db.Members.Pay_cust==charge.customer).select().first()
 	notes = f"{dict_csv['Source']}"

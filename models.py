@@ -118,7 +118,7 @@ db.define_table('Emails',
 	singular="Email", plural="Emails", format='%(Email)s')
 	
 def event_revenue(event_id, member_id=None):	#revenue from confirmed tickets
-	actkts = db(db.CoA.Name == "Ticket sales").select().first().id
+	actkts = db(db.CoA.Name.ilike("Ticket sales")).select().first().id
 
 	query = (db.Reservations.Event==event_id)
 	if member_id:

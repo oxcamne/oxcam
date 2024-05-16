@@ -239,7 +239,7 @@ def event_confirm(event_id, member_id, justpaid=0, event_only=False):
 	member = db.Members[member_id]
 	resvtns = db((db.Reservations.Event==event_id)&(db.Reservations.Member==member_id)).select(
 					orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname)
-	rows=[TR(TH('Event:', _style="text-align:left"), TD( f"{member.Lastname}, {member.Title or ''} {member.Firstname} {member.Suffix or ''}"))]
+	rows=[TR(TH('Event:', _style="text-align:left"), TD(event.Description or ''))]
 	rows.append(TR(TH('Venue:', _style="text-align:left"), TD(event.Venue or '')))
 	rows.append(TR(TH('Date:', _style="text-align:left"), TD(event.DateTime.strftime("%A %B %d, %Y"))))
 	rows.append(TR(TH('Time:', _style="text-align:left"), TD(event.DateTime.strftime("%I:%M%p"))))

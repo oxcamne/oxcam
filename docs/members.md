@@ -26,7 +26,7 @@ Each row of the grid shows a member record, with the membership status and curre
 
 ### Email
 
-If you have a Society email address (address includes SOCIETY_SHORT_NAME), the link above the grid allows you to compose and send email to any email address(es). And if a list of members has been selected using the filter, there will be an additional link to send a notice to that list.
+If you have a Society email address (address includes SOCIETY_SHORT_NAME), the link above the grid allows you to [compose and send email](send_email.md) to any email address(es). And if a list of members has been selected using the filter, there will be an additional link to [send a notice](send_email.md) to that list.
 
 ### Add Member
 

@@ -18,7 +18,7 @@ The message body can use various metadata elements, such as \<letterhead>,  \<gr
 
 [Markdown](https://www.markdownguide.org/basic-syntax/) can  be used to apply some formatting and to include links and graphics.
 
-You can also include snippets or even large chunks of html using braces: {{<html ...>}}.
+You can also include snippets or even large chunks of html using braces: `{{<html ...>}}`.
 
 See [below](send_email.md#embedding-images-in-email) for a discussion of embedding images.
 
@@ -40,8 +40,8 @@ Fortunately there is a [free web tool](https://www.labnol.org/embed/google/drive
 
 You can use the *image_url* directly in Markdown, or if you want more complex formatting you can use html. You can set the image size (width) and make it a centered block, for example, thus:
 
-{{\<img src="*image_url*" alt="*alt_text*" style="display: block; margin: auto; width:300px;"/>}}
+`{{\<img src="image_url" alt="alt_text" style="display: block; margin: auto; width:300px;"/>}}`
 
 Or you might wish to have the image on the left with the following text alongside, separated by a margin:
 
-{{\<img src="*image_url*" alt="*alt_text*" style="float: left; margin: 0 10px 10px 0; width: 300px;"/>}}
+`{{\<img src="image_url* alt="alt_text" style="float: left; margin: 0 10px 10px 0; width: 300px;"/>}}`

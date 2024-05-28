@@ -1091,6 +1091,8 @@ Moving member on/off waitlist will also affect all guests."))
 			db.Reservations.Host.default=False
 			db.Reservations.Firstname.writable=True
 			db.Reservations.Lastname.writable=True
+			db.Reservations.Provisional.default=host_reservation.Provisional
+			db.Reservations.Waitlist.default=host_reservation.Waitlist
 		else:
 			#creating or revising the host reservation
 			db.Reservations.Title.default = member.Title
@@ -1141,6 +1143,13 @@ Moving member on/off waitlist will also affect all guests."))
 					if row.id != host_reservation.id and (not row.Provisional or host_reservation.Provisional):
 						row.update_record(Waitlist = form.vars.get('Waitlist'), Provisional = form.vars.get('Provisional'))
 
+	if (path and (path.startswith('delete') or path.startswith('edit') and request.POST._delete)):
+		#deleting a reservation - if it's the host, also delete all guests
+		if host_reservation.id==int(path[path.find('/')+1:]):
+			for row in all_guests:
+				if row.id != host_reservation.id:
+					db(db.Reservations.id==row.id).delete()
+
 	grid = Grid(path, (db.Reservations.Member==member.id)&(db.Reservations.Event==event.id),
 			orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname,
 			columns=[db.Reservations.Lastname, db.Reservations.Firstname, db.Reservations.Notes,
@@ -1148,10 +1157,10 @@ Moving member on/off waitlist will also affect all guests."))
 					Column('Price', lambda row: res_unitcost(row.id)),
 					Column('Status', lambda row: res_status(row.id))],
 			headings=['Last', 'First', 'Notes', 'Selection', 'Price', 'Status'],
-			deletable=lambda row: write and (len(all_guests)==1 or row['id'] != host_reservation.id) \
-						and (ismember!='Y' or row.Provisional or row.Waitlist),
+			deletable=lambda row: write and event_revenue(event_id, member_id)==0 or (row['id'] != host_reservation.id\
+									and (ismember!='Y' or row.Provisional or row.Waitlist)),
 			details=not write, 
-			editable=lambda row: write and (ismember!='Y' or row['Provisional'] or row['Waitlist']), 
+			editable=lambda row: write and (event_revenue(event_id, member_id)==0 or ismember!='Y' or row['Provisional'] or row['Waitlist']), 
 			create=write and (ismember!='Y' or not event.Guests or (len(all_guests)<event.Guests)),
 			grid_class_style=grid_style, formstyle=form_style, validation=validate, show_id=ismember!='Y')
 	
@@ -1175,7 +1184,7 @@ Moving member on/off waitlist will also affect all guests."))
 				if event.Capacity and attend+adding>event.Capacity:
 					event.update_record(Waiting=True)
 		
-			if payment==0:	#free event, confirm booking
+			if payment<=0:	#free event or payment already covered, confirm booking
 				if not waitlist:
 					host_reservation.update_record(Checkout=None)
 					subject = 'Registration Confirmation'

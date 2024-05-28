@@ -264,14 +264,6 @@ db.define_table('Reservations',
 	Field('Ticket_', 'reference Event_Tickets'),
 	Field('Selection_', 'reference Event_Selections'),
 	Field('Survey_', 'reference Event_Survey', readable=False, writable=False),
-
-	#Following group of fields now obsolete
-	Field('Ticket', 'string', writable=False, readable=False),
-	Field('Selection', 'string', writable=False, readable=False), #field was previously Menuchoice
-	Field('Unitcost', 'decimal(5,2)', writable=False, readable=False),
-	Field('Survey', 'string', readable=False, writable=False),	#answer to multiple choice question
-	Field('Paid', 'decimal(8,2)', readable=False, writable=False),
-
 	Field('Notes', 'string'),	#host name specified, or justifying ticket selection
 	Field('Comment', 'string', readable=False, writable=False),	#answer to open ended question
 	Field('Provisional', 'boolean', default=False, readable=False, writable=False),

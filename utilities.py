@@ -282,7 +282,7 @@ def member_greeting(member):
 		title = member.Title[4:] if member.Title.startswith('The ') else member.Title
 		greeting = f"Dear {title} {member.Firstname if title.find('Sir')>=0 else member.Lastname},"
 	else:
-		greeting = f"Dear {member.Firstname.partition(' ')[0]},"
+		greeting = f"<p>Dear {member.Firstname.partition(' ')[0]},</p>"
 	return greeting
 
 import hashlib

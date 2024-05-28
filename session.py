@@ -33,8 +33,6 @@ def checkaccess(requiredaccess):
 			if not (session.get('logged_in') == True and (not member_id or db(db.Members.id==member_id).count()>0)):    #not logged in, or member deleted
 				if db(db.Colleges.id>0).count()==0:
 					session['url']=URL('db_restore')
-				elif db(db.Reservations.Ticket_!=None).count()==0:
-					session['url']=URL('db_convert')
 				redirect(URL('login'))
 
 			#check access

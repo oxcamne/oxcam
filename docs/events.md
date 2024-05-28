@@ -10,7 +10,7 @@ The **+New** button is used to create a new event. However, new events are usual
 
 The **Search** row allows search on (all or part of) an event name, venue, or speaker name.
 
-The grid contains one row for each event, showing summary data including guest and waitlist counts, total ticket revenue collected and any unpaid amounts (e.g. if a member checks out to confirm registration but does not complete the payment process).
+The grid contains one row for each event, showing summary data including guest and waitlist counts, total ticket revenue as recorded in accounts or charged but not yet recorded, and any unpaid amounts (e.g. if a member checks out to confirm registration but does not complete the payment process). The TBC amount may be negative if guests have cancelled but no refund has been recorded.
 
 The event name in a row is a link which opens up the [**reservation list**](reservation_list.md).
 The **Edit/Display** button on the row allows the [**event record**](event_record.md) to be viewed or edited.

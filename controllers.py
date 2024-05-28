@@ -1157,8 +1157,8 @@ Moving member on/off waitlist will also affect all guests."))
 					Column('Price', lambda row: res_unitcost(row.id)),
 					Column('Status', lambda row: res_status(row.id))],
 			headings=['Last', 'First', 'Notes', 'Selection', 'Price', 'Status'],
-			deletable=lambda row: write and event_revenue(event_id, member_id)==0 or (row['id'] != host_reservation.id\
-									and (ismember!='Y' or row.Provisional or row.Waitlist)),
+			deletable=lambda row: write and (event_revenue(event_id, member_id)==0 or (row['id'] != host_reservation.id\
+									and (ismember!='Y' or row.Provisional or row.Waitlist))),
 			details=not write, 
 			editable=lambda row: write and (event_revenue(event_id, member_id)==0 or ismember!='Y' or row['Provisional'] or row['Waitlist']), 
 			create=write and (ismember!='Y' or not event.Guests or (len(all_guests)<event.Guests)),

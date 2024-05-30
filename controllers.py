@@ -411,7 +411,7 @@ def member_reservations(member_id, path=None):
 			left=db.Events.on(db.Events.id == db.Reservations.Event),
 			orderby=~db.Events.DateTime,
 			columns=[db.Events.DateTime,
-	    			Column('event', lambda row: A(row.Reservations.Event.Description[0:23], _href=URL(f"reservation/N/{member_id}/{row.Reservations.Event}"))),
+	    			Column('event', lambda row: A(row.Reservations.Event.Description[0:23], _href=URL(f"reservation/N/{member_id}/{row.Reservations.Event}/select"))),
 				    Column('wait', lambda row: res_wait(row.Reservations.Member, row.Reservations.Event) or ''),
 				    Column('conf', lambda row: res_conf(row.Reservations.Member, row.Reservations.Event) or ''),
 				    Column('cost', lambda row: event_cost(row.Reservations.Event, row.Reservations.Member) or ''),
@@ -438,7 +438,7 @@ def add_member_reservation(member_id):
 		formstyle=FormStyleBulma)
 	
 	if form.accepted:
-		redirect(URL(f"reservation/N/{member_id}/{form.vars.get('event')}"))
+		redirect(URL(f"reservation/N/{member_id}/{form.vars.get('event')}/select"))
 	return locals()
 
 @action('affiliations/<ismember>/<member_id:int>', method=['POST', 'GET'])
@@ -931,6 +931,7 @@ def reservation(ismember, member_id, event_id, path=None):
 		write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 
 	event = db.Events[event_id]
+	clist = collegelist(sponsors = event.Sponsors or [])
 	member = db.Members[member_id]
 	is_good_standing = member_good_standing(member, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date())
 	if is_good_standing:
@@ -940,7 +941,8 @@ def reservation(ismember, member_id, event_id, path=None):
 		if membership:		#joining as part of event registration
 			is_good_standing = True
 
-	affinity = db(db.Affiliations.Member == member_id).select(orderby=db.Affiliations.Modified).first()
+	affinity = db((db.Affiliations.Member==member_id)&db.Affiliations.College.belongs([c[0] for c in clist])).select(
+						orderby=db.Affiliations.Modified).first()
 	sponsor = not affinity.College.Oxbridge if affinity else False
 	all_guests = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)).select(orderby=~db.Reservations.Host)
 	host_reservation = all_guests.first()
@@ -1053,7 +1055,6 @@ Moving member on/off waitlist will also affect all guests."))
 	#set up reservations form, we have both member and event id's
 	db.Reservations.Member.default = member.id
 	db.Reservations.Event.default=event.id
-	clist = collegelist(sponsors = event.Sponsors or [])
 	db.Reservations.Affiliation.requires=requires=IS_EMPTY_OR(IS_IN_SET(clist))
 
 	if host_reservation:
@@ -1072,7 +1073,7 @@ Moving member on/off waitlist will also affect all guests."))
 			db.Reservations.Ticket_.requires=IS_EMPTY_OR(IS_IN_SET(event_tickets, zero='please select the appropriate ticket'))
 		else:
 			db.Reservations.Ticket_.requires=IS_IN_SET(event_tickets, zero='please select the appropriate ticket')
-			db.Reservations.Ticket_.default = host_reservation.Ticket_ if host_reservation else event_tickets[0][0] if len(event_tickets)==1 else None
+			db.Reservations.Ticket_.default = host_reservation.Ticket_ if host_reservation else event_tickets[0][0] if len(event_tickets)==1 or sponsor else None
 	else:
 		db.Reservations.Ticket_.writable = db.Reservations.Ticket_.readable = False
 	
@@ -2107,7 +2108,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 						#still need dues, so signal
 						session['membership'] = checkout.get('membership')
 						session['dues'] = str(checkout.get('dues')) if checkout.get('dues') else None
-				redirect(URL(f'reservation/Y/{member_id}/{event_id}/'))	#go add guests and/or checkout
+				redirect(URL(f'reservation/Y/{member_id}/{event_id}/select'))	#go add guests and/or checkout
 			if member_good_standing(member, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()) or sponsor \
 					or ((affinity or member.Membership) and not event.Members_only and not event.Allow_join):
 				#members in good standing at time of event, or, members of sponsor organizations, or

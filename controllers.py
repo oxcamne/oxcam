@@ -31,7 +31,7 @@ grid_style = GridClassStyleBulma
 form_style = FormStyleBulma
 
 from py4web import action, request, response, redirect, URL, Field
-from yatl.helpers import H5, H6, XML, TABLE, TH, TD, THEAD, TR, HTML
+from yatl.helpers import H5, H6, XML, TABLE, TH, TD, THEAD, TR, HTML, P
 from .common import db, session, flash
 from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
 	SOCIETY_NAME, MEMBERSHIP, MEMBER_CATEGORIES, MAIL_LISTS, TIME_ZONE,\
@@ -668,7 +668,8 @@ def events(path=None):
 	     	orderby=~db.Events.DateTime,
 		    headings=['Datetime', 'Event', 'Venue', 'Paid', 'TBC', 'Conf', 'Wait'],
 			columns=[db.Events.DateTime,
-					Column('event', lambda row: A(row.Description[0:23], _href=URL(f"event_reservations/{row['id']}"))),
+					Column('event', lambda row: A(row.Description, _href=URL(f"event_reservations/{row['id']}"),
+								   _style="white-space: normal")),
 	   				db.Events.Venue,
 					Column('Paid', lambda row: event_revenue(row.id) or ''),
 					Column('TBC', lambda row: event_unpaid(row.id) or ''),
@@ -1437,7 +1438,8 @@ def financial_statement():
 			else:
 				exp += a[sumamt]
 			exp += a[sumfee] or 0
-		rows.append(TR(TD(A(name[0:25], _href=URL(f'financial_detail/{e.AccTrans.Event or 0}', vars=dict(title=title, query=query, left=left)))), 
+		rows.append(TR(TD(A(name, _href=URL(f'financial_detail/{e.AccTrans.Event or 0}', vars=dict(title=title, query=query, left=left)),
+					  _style='white-space: normal')), 
 		 				TD(date), tdnum(rev), tdnum(exp), tdnum(rev + exp)))
 		totrev += rev
 		totexp += exp

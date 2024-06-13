@@ -411,7 +411,8 @@ def member_reservations(member_id, path=None):
 			left=db.Events.on(db.Events.id == db.Reservations.Event),
 			orderby=~db.Events.DateTime,
 			columns=[db.Events.DateTime,
-	    			Column('event', lambda row: A(row.Reservations.Event.Description[0:23], _href=URL(f"reservation/N/{member_id}/{row.Reservations.Event}/select"))),
+	    			Column('event', lambda row: A(row.Reservations.Event.Description, _href=URL(f"reservation/N/{member_id}/{row.Reservations.Event}/select"),
+								   _style="white-space: normal")),
 				    Column('wait', lambda row: res_wait(row.Reservations.Member, row.Reservations.Event) or ''),
 				    Column('conf', lambda row: res_conf(row.Reservations.Member, row.Reservations.Event) or ''),
 				    Column('cost', lambda row: event_cost(row.Reservations.Event, row.Reservations.Member) or ''),
@@ -618,7 +619,8 @@ def new_members(path=None):
 	header =H5('Recent New/Reinstated Members')
 
 	grid = Grid(path, db.AccTrans.id.belongs(ids), orderby=~db.AccTrans.Timestamp,
-			columns=[Column("Name", lambda row: A(member_name(row['Member']), _href=URL(f"members/edit/{row['Member']}"))),
+			columns=[Column("Name", lambda row: A(member_name(row['Member']), _href=URL(f"members/edit/{row['Member']}"),
+								   _style="white-space: normal")),
 	    			Column("College", lambda row: primary_affiliation(row['Member'])),
 	    			Column("Matr", lambda row: primary_matriculation(row['Member'])),
 					Column("Status", lambda row: db.Members[row['Member']].Membership),
@@ -2022,7 +2024,8 @@ def directory(path=None):
 	      XML(f"You can search by last name, town, state, or college/university using the boxes below; click on a name to view contact information"))
 
 	grid = Grid(path, eval(query),
-		columns=(Column('Name', lambda r: A(f"{member_name(r['id'])}", _href=URL(f"contact_details/{r['id']}"))),
+		columns=(Column('Name', lambda r: A(f"{member_name(r['id'])}", _href=URL(f"contact_details/{r['id']}"),
+								   _style="white-space: normal")),
 	   			Column('Affiliations', lambda r: member_affiliations(r['id'])),
 				db.Members.City, db.Members.State),
 		orderby=db.Members.Lastname|db.Members.Firstname,

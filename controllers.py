@@ -109,7 +109,6 @@ def members(path=None):
 	qdesc = ""
 	errors = ''
 	header = H5('Member Records')
-	back = URL('members/select', scheme=True)
 
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
 	admin = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('admin')
@@ -117,37 +116,44 @@ def members(path=None):
 		db.Members.Access.writable = False
 
 	search_form=Form([
-		Field('mailing_list', 'reference Email_Lists', 
+		Field('mailing_list', 'reference Email_Lists', default = request.query.get('mailing_list'),
 				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Email_Lists', '%(Listname)s', zero="mailing?"))),
-		Field('event', 'reference Events', 
+		Field('event', 'reference Events',  default = request.query.get('event'),
 				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Events',
 				lambda r: f"{r.DateTime.strftime(DATE_FORMAT)} {r.Description[:25]}",
 				orderby = ~db.Events.DateTime, zero="event?")),
 				comment = "exclude/select confirmed event registrants (with/without mailing list selection) "),
-		Field('good_standing', 'boolean', comment='tick to limit to members in good standing'),
-		Field('field', 'string', requires=IS_EMPTY_OR(IS_IN_SET(['Affiliation', 'Email']+db.Members.fields,
-					zero='field?'))),
-		Field('value', 'string')],
+		Field('good_standing', 'boolean',  default = request.query.get('good_standing'),
+				comment='tick to limit to members in good standing'),
+		Field('field', 'string', default = request.query.get('field'),
+				requires=IS_EMPTY_OR(IS_IN_SET(['Affiliation', 'Email']+db.Members.fields,
+								   zero='field?'))),
+		Field('value', 'string', default = request.query.get('value'))],
 		keep_values=True, formstyle=FormStyleBulma)
 	
+	if search_form.accepted:	#Filter button clicked
+		select_vars = {}
+		if search_form.vars.get('mailing_list'):
+			select_vars['mailing_list'] = search_form.vars.get('mailing_list')
+		if search_form.vars.get('event'):
+			select_vars['event'] = search_form.vars.get('event')
+		if search_form.vars.get('good_standing'):
+			select_vars['good_standing'] = 'On'
+		if search_form.vars.get('field'):
+			select_vars['field'] = search_form.vars.get('field')
+		if search_form.vars.get('value'):
+			select_vars['value'] = search_form.vars.get('value')
+		redirect(URL('members/select', vars=select_vars))
+	
 	if path=='select':
-		if len(search_form.vars) == 0:
-			search_form.vars = session.get('filter') or {}
-		else:
-			filter=dict(mailing_list=search_form.vars.get('mailing_list'),
-						event=search_form.vars.get('event'),
-						field=search_form.vars.get('field'),
-						value=search_form.vars.get('value')) if len(search_form.vars)>0 else {}
-			if search_form.vars.get('good_standing'):
-				filter['good_standing'] = 'On'
-			session['filter'] = filter
 		header = CAT(header, A("Send Email to Specific Address(es)", _href=URL('composemail')), XML('<br>'))
+		session['back'] = [session['url']] #start fresh stack of back links
 	elif path:
 		caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev']).group(1)
-		if caller!='members' and caller not in ['composemail', 'affiliations', 'emails', 'transactions', 'member_reservations', 'cancel_subscription']:
+		if caller != 'members' and not request.query.get('link_back'):
 			session['back'].append(session['url_prev'])
-		if len(session['back'])>0 and re.match(f'.*/{request.app_name}/([a-z_]*).*', session['back'][-1]).group(1)!='members':
-			back = session['back'][-1] if len(session['back'])>0 else back
+			#side entry from another controller, push link_back
+		back = session['back'][-1]
 		header = CAT(A('back', _href=back), H5('Member Record'))
 		if path.startswith('edit') or path.startswith('details'):
 			acdues = db(db.CoA.Name.ilike("Membership Dues")).select().first().id
@@ -164,30 +170,26 @@ def members(path=None):
 			if member_good_standing(member, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()):
 				header = CAT(header, XML('<br>'),
 					A('Cancel Membership', _href=URL(f"cancel_subscription/{member_id}")))
-	else:
-		back = session.get('back')
-		if len(back)==2 and 'reservation' in back[1]:
-			redirect(back[1])	#return to reservation record
-		session['filter'] = None
-		session['back'] = []
+	else:	# edit etc. submitted after side entry from another controller
+		redirect(session.get('back')[-1])	#return to other controller
 
-	if search_form.vars.get('mailing_list'):
-		query.append(f"(db.Members.id==db.Emails.Member)&db.Emails.Mailings.contains({search_form.vars.get('mailing_list')})")
-		qdesc = f"{db.Email_Lists[search_form.vars.get('mailing_list')].Listname} mail list, "
-	if search_form.vars.get('event'):
-		if search_form.vars.get('mailing_list'):
-			left=f"db.Reservations.on((db.Reservations.Member == db.Members.id)&(db.Reservations.Event=={search_form.vars.get('event')})&(db.Reservations.Host==True)&(db.Reservations.Provisional!=True)&(db.Reservations.Waitlist!=True))"
+	if request.query.get('mailing_list'):
+		query.append(f"(db.Members.id==db.Emails.Member)&db.Emails.Mailings.contains({request.query.get('mailing_list')})")
+		qdesc = f"{db.Email_Lists[request.query.get('mailing_list')].Listname} mail list, "
+	if request.query.get('event'):
+		if request.query.get('mailing_list'):
+			left=f"db.Reservations.on((db.Reservations.Member == db.Members.id)&(db.Reservations.Event=={request.query.get('event')})&(db.Reservations.Host==True)&(db.Reservations.Provisional!=True)&(db.Reservations.Waitlist!=True))"
 			query.append("(db.Reservations.id==None)")
 		else:
-			query.append(f"(db.Members.id==db.Reservations.Member)&(db.Reservations.Event=={search_form.vars.get('event')})&(db.Reservations.Host==True)&(db.Reservations.Provisional!=True)&(db.Reservations.Waitlist!=True)")
-		qdesc += f"{'excluding ' if search_form.vars.get('mailing_list') else ''}{db.Events[search_form.vars.get('event')].Description[0:25]} attendees, "
-	if search_form.vars.get('good_standing'):
+			query.append(f"(db.Members.id==db.Reservations.Member)&(db.Reservations.Event=={request.query.get('event')})&(db.Reservations.Host==True)&(db.Reservations.Provisional!=True)&(db.Reservations.Waitlist!=True)")
+		qdesc += f"{'excluding ' if request.query.get('mailing_list') else ''}{db.Events[request.query.get('event')].Description[0:25]} attendees, "
+	if request.query.get('good_standing'):
 		query.append("((db.Members.Membership!=None)&(((db.Members.Paiddate==None)|(db.Members.Paiddate>=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()))|(db.Members.Charged!=None)|((db.Members.Pay_subs!=None)&(db.Members.Pay_subs!=('Cancelled')))))")
 		qdesc += ' in good standing, '
-	if search_form.vars.get('value'):
-		field = search_form.vars.get('field')
-		value = search_form.vars.get('value')
-		if not search_form.vars.get('field'):
+	if request.query.get('value'):
+		field = request.query.get('field')
+		value = request.query.get('value')
+		if not request.query.get('field'):
 			errors = 'Please specify which field to search'
 		elif field == 'Affiliation':
 			query.append(f'(db.Colleges.Name.ilike("%{value}%")&(db.Affiliations.College==db.Colleges.id)&(db.Members.id==db.Affiliations.Member))')
@@ -402,10 +404,12 @@ def member_analytics(path=None):
 def member_reservations(member_id, path=None):
 # .../member_reservations/member_id/...
 	access = session['access']	#for layout.html
-	header = CAT(A('back', _href=URL(f"members/{'details' if access=='read' else 'edit'}/{member_id}", scheme=True)),
+	session['url']=session['url_prev']	#preserve back link
+	header = CAT(A('back', _href=session['url_prev']),
 				H5('Member Reservations'),
 	      		H6(member_name(member_id)),
-				A('Add New Reservation', _href=URL(f'add_member_reservation/{member_id}', scheme=True)))
+				A('Add New Reservation', _href=URL(f'add_member_reservation/{member_id}',
+					vars=dict(back=session['url']), scheme=True)))
 
 	grid = Grid(path, (db.Reservations.Member==member_id)&(db.Reservations.Host==True),
 			left=db.Events.on(db.Events.id == db.Reservations.Event),
@@ -427,7 +431,7 @@ def member_reservations(member_id, path=None):
 @checkaccess('write')
 def add_member_reservation(member_id):
 	access = session['access']	#for layout.html
-	header = CAT(A('back', _href=URL(f'members/edit/{member_id}', scheme=True)),
+	header = CAT(A('back', _href=request.query.get('back')),
 	      		H5('Add New Reservation'),
 	      		H6(member_name(member_id)),
 				)
@@ -619,7 +623,7 @@ def new_members(path=None):
 	header =H5('Recent New/Reinstated Members')
 
 	grid = Grid(path, db.AccTrans.id.belongs(ids), orderby=~db.AccTrans.Timestamp,
-			columns=[Column("Name", lambda row: A(member_name(row['Member']), _href=URL(f"members/edit/{row['Member']}"),
+			columns=[Column("Name", lambda row: A(member_name(row['Member']), _href=URL(f"members/{'details' if access=='read' else 'edit'}/{row['Member']}"),
 								   _style="white-space: normal")),
 	    			Column("College", lambda row: primary_affiliation(row['Member'])),
 	    			Column("Matr", lambda row: primary_matriculation(row['Member'])),
@@ -640,21 +644,19 @@ def new_members(path=None):
 def events(path=None):
 	access = session['access']	#for layout.html
 	write = ACCESS_LEVELS.index(session['access']) >= ACCESS_LEVELS.index('write')
-	back = URL('events/select', scheme=True)
 
 	header = H5('Events')
 
-	if not path:
-		session['back'] = []
-	elif path=='select':
+	if path=='select':
 		footer = CAT(A("Export all Events as CSV file", _href=URL('events_export')), XML('<br>'),
 			A("Export event analytics as CSV file", _href=URL('event_analytics')))
+		session['back'] = [session['url']] #start fresh stack of back links
 	elif path=='new':
-		header = CAT(A('back', _href=back), H5('New Event'))
-	else:
+		header = CAT(A('back', _href=session['back'][-1]), H5('New Event'))
+	elif path:
 		url = URL('registration', path[path.find('/')+1:], scheme=True)
 		event_id = path[path.find('/')+1:]
-		header = CAT(A('back', _href=back), H5('Event Record'),
+		header = CAT(A('back', _href=session['back'][-1]), H5('Event Record'),
 	       			"Booking link is ", A(url, _href=url), XML('<br>'),
 			   		A('Ticket Types', _href=URL(f'tickets/{event_id}')), XML('<br>'),
 			   		A('Selections', _href=URL(f'selections/{event_id}')), XML('<br>'),
@@ -865,10 +867,9 @@ def event_reservations(event_id, path=None):
 # request.query: waitlist=True, provisional=True
 	access = session['access']	#for layout.html
 	db.Reservations.id.readable=db.Reservations.Event.readable=False
-	back=URL(f'event_reservations/{event_id}/select', vars=request.query, scheme=True)
 
 	event = db.Events[event_id]
-	header = CAT(A('back', _href=URL('events/select')),
+	header = CAT(A('back', _href=session['back'][-1]),
 	      		H5('Provisional Reservations' if request.query.get('provisional') else 'Waitlist' if request.query.get('waitlist') else 'Reservations'),
 				H6(f"{event.DateTime}, {event.Description}"),
 				XML("Click on the member name to drill down on a reservation and view/edit the details."), XML('<br>'))
@@ -989,19 +990,29 @@ def reservation(ismember, member_id, event_id, path=None):
 				confirmed += 1
 				confirmed_ticket_cost += ticket.Price
 	
-	back = URL(f'reservation/{ismember}/{member_id}/{event_id}/select')
-	caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev'] or '').group(1)
-	if caller not in ['reservation', 'composemail', 'members', '']:
-		session['back'].append(session['url_prev'])
-	if path=='select' and len(session['back'])>0:
-			back = session['back'][-1] if len(session['back'])>0 else back
-
 	header = CAT(H5('Event Registration'), H6(member_name(member_id)),
 			XML(event_confirm(event.id, member.id, event_only=True)))
-	if ismember!='Y':
-		header = CAT(A('back', _href=back), header)
 
-	if ismember=='Y':
+	caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev']).group(1)
+	if caller != 'reservation' and not request.query.get('link_back'):
+		if ismember=='Y':
+			session['back'] = [session['url_prev']]
+		else:
+			session['back'].append(session['url_prev'])
+
+	if ismember!='Y':
+		header = CAT(A('back', _href=session['back'][-1]), header)
+		if path=='select':
+			header = CAT(header, A('send email', _href=(URL('composemail', vars=dict(
+				query=f"(db.Members.id=={member_id})&(db.Members.id==db.Reservations.Member)&(db.Reservations.Event=={event_id})&(db.Reservations.Host==True)",
+				qdesc=member_name(member_id))))),
+				XML(" (use "), "<reservation>", XML(" to include confirmation and payment link)<br>"),
+				A('view member record', _href=URL(f"members/{'details' if access=='read' else 'edit'}/{member_id}")),
+				XML("<br>Top row is the member's own reservation, additional rows are guests.<br>\
+Use Add Record to add the member, initially, then to add additional guests.<br>\
+Edit rows to move on/off waitlist or first row to record a check payment.<br>\
+Moving member on/off waitlist will also affect all guests."))
+	else:
 		if path=='select':
 			if not host_reservation:	#allow changes, e.g. join Society
 				redirect(URL(f'registration/{event_id}'))
@@ -1045,16 +1056,6 @@ def reservation(ismember, member_id, event_id, path=None):
 			header = CAT(header,
 				f"Please enter your own details{' (you will be able to enter guests on next screen)' if (event.Guests or 2)>1 else ''}:"\
 					if not host_reservation else "Please enter your guest's details:")
-	elif path=='select':
-		header = CAT(header, A('send email', _href=(URL('composemail', vars=dict(
-			query=f"(db.Members.id=={member_id})&(db.Members.id==db.Reservations.Member)&(db.Reservations.Event=={event_id})&(db.Reservations.Host==True)",
-			qdesc=member_name(member_id))))),
-			XML(" (use "), "<reservation>", XML(" to include confirmation and payment link)<br>"),
-			A('view member record', _href=URL(f'members/edit/{member_id}')),
-			XML("<br>Top row is the member's own reservation, additional rows are guests.<br>\
-Use Add Record to add the member, initially, then to add additional guests.<br>\
-Edit rows to move on/off waitlist or first row to record a check payment.<br>\
-Moving member on/off waitlist will also affect all guests."))
 	
 	#set up reservations form, we have both member and event id's
 	db.Reservations.Member.default = member.id
@@ -1198,7 +1199,7 @@ Moving member on/off waitlist will also affect all guests."))
 					message += event_confirm(event.id, member.id)
 					msg_send(member, subject, message)
 					flash.set('Thank you. Confirmation has been sent by email.')
-				redirect(back)
+				redirect(session['back'][-1])
 			redirect(URL(f'{member.Pay_source or PAYMENT_PROCESSOR}_checkout'))
 	return locals()
 
@@ -1324,8 +1325,7 @@ def financial_detail(event, title=''):
 	access = session['access']	#for layout.html
 	title = request.query.get('title')
 	
-	caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev']).group(1)
-	if caller!='transactions':
+	if not request.query.get('link_back'):
 		session['back'].append(session['url_prev'])
 	session['url_prev'] = None #no longer needed, save cookie space
 
@@ -1767,16 +1767,15 @@ def transactions(path=None):
 	acdues = db(db.CoA.Name.ilike("Membership Dues")).select().first().id
 	actkts = db(db.CoA.Name.ilike("Ticket sales")).select().first().id
 
-	back = URL('transactions/select', scheme=True)
 	if not path:
 		session['back'].append(session['url_prev'])
-		session['url_prev'] = None	#no longer needed, save cookie space
-		session['query'] = request.query.get('query')
-		session['left'] = request.query.get('left')
 	elif path=='select':
-		back = session['back'][-1] if len(session['back'])>0 else back
-	elif path.startswith('edit') or path.startswith('details'):	#editing AccTrans record
-		session['url'] = URL(f"transactions/{path}")	#strip off _referrer parameter to save cookie space
+		bank_id_match=re.match('db.AccTrans.Bank==([0-9]+)$', request.query.get('query'))
+		session['bank_id'] = int(bank_id_match.group(1)) if bank_id_match else None
+	elif path.startswith('edit') or path.startswith('details'):	#editing/viewing AccTrans record
+		caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev']).group(1)
+		if request.method=='GET':
+			session['back'].append(session['url_prev'])
 		db.AccTrans.Amount.comment = 'to split transaction, enter amount of a split piece'
 		db.AccTrans.CheckNumber.writable = False
 		db.AccTrans.CheckNumber.requires = None
@@ -1789,21 +1788,18 @@ def transactions(path=None):
 		else:
 			db.AccTrans.Amount.requires=IS_DECIMAL_IN_RANGE(transaction.Amount, 0)
 	elif path=='new':	#adding AccTrans accrual
+		if request.method=='GET':
+			session['back'].append(session['url_prev'])
 		db.AccTrans.Amount.comment='enter full amount of check as a negative number; split using Edit if multiple accounts',
 		db.AccTrans.Timestamp.writable=True
 		db.AccTrans.Amount.requires=IS_DECIMAL_IN_RANGE(-100000, 0)
 		db.AccTrans.CheckNumber.requires=IS_NOT_EMPTY()
-	session['url_prev'] = None	#no longer needed, save cookie space
-	query = session['query']
-	left = session['left']
-	if not query:
-		redirect(URL('accounting'))
+		db.AccTrans.Bank.default = session['bank_id']
 
-	bank_id_match=re.match('db.AccTrans.Bank==([0-9]+)$', query)
-	bank_id = int(bank_id_match.group(1)) if bank_id_match else None
-	db.AccTrans.Bank.default = bank_id
+	session['url_prev'] = None	#no longer needed, save cookie space
 	
-	header = CAT(A('back', _href=back), H5('Accounting Transactions'))
+	if path:
+		header = CAT(A('back', _href=session['back'][-1]), H5('Accounting Transactions'))
 
 	def validate(form):
 		if not form.vars.get('id'): #must be creating an accrual
@@ -1858,13 +1854,15 @@ def transactions(path=None):
 		["Notes", lambda value: db.AccTrans.Notes.ilike(f'%{value}%')],
 	]
 	
-	grid = Grid(path, eval(query), left=eval(left) if left else None,
+	grid = Grid(path, eval(request.query.get('query') or 'db.AccTrans.id>0'), left=eval(request.query.get('left')) if request.query.get('left') else None,
 			orderby=~db.AccTrans.Timestamp,
-			columns=[db.AccTrans.Timestamp, db.AccTrans.Account, db.AccTrans.Event, db.AccTrans.Member,
+			columns=[db.AccTrans.Timestamp, db.AccTrans.Account, db.AccTrans.Event,
+					Column('member', lambda row: A(member_name(row.Member), _href=URL(f"members/edit/{row.Member}"),
+										   _style='white-space: normal') if row.Member else ''),
 	 				db.AccTrans.Amount, db.AccTrans.Fee, db.AccTrans.CheckNumber, db.AccTrans.Accrual],
 			headings=['Timestamp', 'Account','Event','Member','Amt', 'Fee', 'Chk#', 'Acc'],
 			validation=validate, search_queries=search_queries, show_id=True,
-			deletable=lambda r: r.Accrual, details=False, editable=True, create=bank_id!=None,
+			deletable=lambda r: r.Accrual, details=False, editable=True, create=session.get('bank_id'),
 			field_id=db.AccTrans.id, grid_class_style=grid_style, formstyle=form_style)
 	return locals()
 
@@ -2335,6 +2333,7 @@ reached by using the join/renew link on our home page).<br>\
 @checkaccess(None)
 def cancel_subscription(member_id=None):
 	access = session['access']	#for layout.html
+	session['url']=session['url_prev']	#preserve back link
 	
 	if not session.get('member_id'):
 		redirect(URL('index'))

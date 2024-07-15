@@ -29,6 +29,7 @@ def checkaccess(requiredaccess):
 			session['url']=request.url
 			if session.get('back') and len(session['back'])>0 and request.url==session['back'][-1]:
 				session['back'].pop()
+				request.query['link_back']='On'
 			member_id = session.get('member_id')
 			if not (session.get('logged_in') == True and (not member_id or db(db.Members.id==member_id).count()>0)):    #not logged in, or member deleted
 				if db(db.Colleges.id>0).count()==0:
@@ -124,7 +125,6 @@ def validate(id, token):
 	
 	session['logged_in'] = True
 	session['email'] = user.email
-	session['filter'] = None
 	session['access'] = None
 	session['member_id'] = None
 	session['back'] = []

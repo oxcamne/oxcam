@@ -1011,7 +1011,7 @@ def reservation(ismember, member_id, event_id, path=None):
 				XML("<br>Top row is the member's own reservation, additional rows are guests.<br>\
 Use Add Record to add the member, initially, then to add additional guests.<br>\
 Edit rows to move on/off waitlist or first row to record a check payment.<br>\
-Moving member on/off waitlist will also affect all guests."))
+Deleting or moving member on/off waitlist will also affect all guests."))
 	else:
 		if path=='select':
 			if not host_reservation:	#allow changes, e.g. join Society
@@ -1039,18 +1039,19 @@ Moving member on/off waitlist will also affect all guests."))
 			if payment>0 and payment>int(session.get('dues') or 0):
 				header = CAT(header, XML(f"Your registration will be confirmed when your payment of {CURRENCY_SYMBOL}{payment}{dues_tbc} is received at Checkout.<br>"))
 
-			fields = []
-			if len(survey)>0:
-				fields.append(Field('survey', requires=IS_IN_SET(event_survey, zero=survey[0].Item,
-									error_message='Please make a selection'),
-									default = host_reservation.Survey_))
-			if event.Comment:
-				fields.append(Field('comment', 'string', comment=event.Comment,
-									default = host_reservation.Comment))
 			if host_reservation:
 				host_reservation.update_record(Checkout=str(dict(membership=session.get('membership'),
 						     dues=session.get('dues'))).replace('Decimal','decimal.Decimal'),
 							 Modified=host_reservation.Modified)
+				fields = []
+				if host_reservation.Provisional:
+					if len(survey)>0:
+						fields.append(Field('survey', requires=IS_IN_SET(event_survey, zero=survey[0].Item,
+											error_message='Please make a selection'),
+											default = host_reservation.Survey_))
+					if event.Comment:
+						fields.append(Field('comment', 'string', comment=event.Comment,
+											default = host_reservation.Comment))
 				form2 = Form(fields, formstyle=FormStyleBulma, keep_values=True, submit_value='Checkout')
 		elif path=='new':
 			header = CAT(header,
@@ -1097,7 +1098,7 @@ Moving member on/off waitlist will also affect all guests."))
 			db.Reservations.Host.default=False
 			db.Reservations.Firstname.writable=True
 			db.Reservations.Lastname.writable=True
-			db.Reservations.Provisional.default=host_reservation.Provisional
+			db.Reservations.Provisional.default=not host_reservation.Waitlist
 			db.Reservations.Waitlist.default=host_reservation.Waitlist
 		else:
 			#creating or revising the host reservation
@@ -1163,10 +1164,9 @@ Moving member on/off waitlist will also affect all guests."))
 					Column('Price', lambda row: res_unitcost(row.id)),
 					Column('Status', lambda row: res_status(row.id))],
 			headings=['Last', 'First', 'Notes', 'Selection', 'Price', 'Status'],
-			deletable=lambda row: write and (event_revenue(event_id, member_id)==0 or (row['id'] != host_reservation.id\
-									and (ismember!='Y' or row.Provisional or row.Waitlist))),
+			deletable=lambda row: write and (ismember!='Y' or row.Provisional or row.Waitlist),
 			details=not write, 
-			editable=lambda row: write and (event_revenue(event_id, member_id)==0 or ismember!='Y' or row['Provisional'] or row['Waitlist']), 
+			editable=lambda row: write and (ismember!='Y' or row['Provisional'] or row['Waitlist']), 
 			create=write and (ismember!='Y' or not event.Guests or (len(all_guests)<event.Guests)),
 			grid_class_style=grid_style, formstyle=form_style, validation=validate, show_id=ismember!='Y')
 	

@@ -51,7 +51,7 @@ from .session import checkaccess
 from .stripe_interface import stripe_update_email, stripe_update_card, stripe_switched_card,\
 	stripe_get_dues, stripe_process_charge, stripe_cancel_subscription
 from py4web.utils.factories import Inject
-import datetime, re, csv, decimal, io, pickle, markdown
+import datetime, re, csv, decimal, pickle, markdown
 from io import StringIO
 
 preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
@@ -820,7 +820,7 @@ def survey(event_id, path=None):
 @action.uses("download.html", db, session, flash, Inject(response=response))
 @checkaccess('write')
 def event_analytics():
-	stream=io.StringIO()
+	stream=StringIO()
 	content_type = "text/csv"
 	filename = 'event_analytics.csv'
 
@@ -1676,8 +1676,7 @@ def bank_file(bank_id):
 	file_transactions = []
 	
 	try:
-		f = io.TextIOWrapper(form.vars.get('downloaded_file').file, encoding='utf-8')
-		
+		f = StringIO(form.vars.get('downloaded_file').file.read().decode(encoding='utf-8'))
 		reader = csv.DictReader(f)
 		headers = bank.Csvheaders.split(',')
 		if headers != reader.fieldnames:

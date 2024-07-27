@@ -2021,10 +2021,10 @@ def directory(path=None):
 	      XML(f"You can search by last name, town, state, or college/university using the boxes below; click on a name to view contact information"))
 
 	grid = Grid(path, eval(query),
-		columns=(Column('Name', lambda r: A(f"{member_name(r['id'])}", _href=URL(f"contact_details/{r['id']}"),
+		columns=[Column('Name', lambda r: A(f"{member_name(r['id'])}", _href=URL(f"contact_details/{r['id']}"),
 								   _style="white-space: normal")),
 	   			Column('Affiliations', lambda r: member_affiliations(r['id'])),
-				db.Members.City, db.Members.State),
+				db.Members.City, db.Members.State],
 		orderby=db.Members.Lastname|db.Members.Firstname,
 		search_queries=[["Last Name", lambda value: db.Members.Lastname.ilike(f'%{value}%')],
 						["Town", lambda value: db.Members.City.ilike(f'%{value}%')],

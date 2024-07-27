@@ -149,7 +149,7 @@ def members(path=None):
 		header = CAT(header, A("Send Email to Specific Address(es)", _href=URL('composemail')), XML('<br>'))
 		session['back'] = [session['url']] #start fresh stack of back links
 	elif path:
-		caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev']).group(1)
+		caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev'] or '').group(1)
 		if caller != 'members' and not request.query.get('link_back'):
 			session['back'].append(session['url_prev'])
 			#side entry from another controller, push link_back
@@ -993,7 +993,7 @@ def reservation(ismember, member_id, event_id, path=None):
 	header = CAT(H5('Event Registration'), H6(member_name(member_id)),
 			XML(event_confirm(event.id, member.id, event_only=True)))
 
-	caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev']).group(1)
+	caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev'] or '').group(1)
 	if caller != 'reservation' and not request.query.get('link_back'):
 		if ismember=='Y':
 			session['back'] = [session['url_prev']]
@@ -1772,7 +1772,7 @@ def transactions(path=None):
 		bank_id_match=re.match('db.AccTrans.Bank==([0-9]+)$', request.query.get('query'))
 		session['bank_id'] = int(bank_id_match.group(1)) if bank_id_match else None
 	elif path.startswith('edit') or path.startswith('details'):	#editing/viewing AccTrans record
-		caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev']).group(1)
+		caller = re.match(f'.*/{request.app_name}/([a-z_]*).*', session['url_prev'] or '').group(1)
 		if request.method=='GET':
 			session['back'].append(session['url_prev'])
 		db.AccTrans.Amount.comment = 'to split transaction, enter amount of a split piece'

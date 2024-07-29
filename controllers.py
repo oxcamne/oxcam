@@ -44,7 +44,7 @@ from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name
 	res_unitcost, res_selection
 from pydal.validators import IS_LIST_OF_EMAILS, IS_EMPTY_OR, IS_IN_DB, IS_IN_SET,\
 	IS_NOT_EMPTY, IS_DATE, IS_DECIMAL_IN_RANGE, IS_INT_IN_RANGE, IS_MATCH
-from .utilities import email_sender, member_good_standing, ageband, newpaiddate,\
+from .utilities import email_sender, member_good_standing, ageband, newpaiddate, get_list,\
 	collegelist, tdnum, get_banks, financial_content, event_confirm, msg_header, msg_send,\
 	society_emails, emailparse, notification, notify_support, member_profile, generate_hash
 from .session import checkaccess
@@ -153,7 +153,7 @@ def members(path=None):
 		if caller != 'members' and not request.query.get('link_back'):
 			session['back'].append(session['url_prev'])
 			#side entry from another controller, push link_back
-		back = session['back'][-1]
+		back = get_list(session['back'], -1)
 		header = CAT(A('back', _href=back), H5('Member Record'))
 		if path.startswith('edit') or path.startswith('details'):
 			acdues = db(db.CoA.Name.ilike("Membership Dues")).select().first().id
@@ -171,7 +171,7 @@ def members(path=None):
 				header = CAT(header, XML('<br>'),
 					A('Cancel Membership', _href=URL(f"cancel_subscription/{member_id}")))
 	else:	# edit etc. submitted after side entry from another controller
-		redirect(session.get('back')[-1])	#return to other controller
+		redirect(get_list(session['back'], -1) or URL('index'))	#return to other controller
 
 	if request.query.get('mailing_list'):
 		query.append(f"(db.Members.id==db.Emails.Member)&db.Emails.Mailings.contains({request.query.get('mailing_list')})")
@@ -652,11 +652,11 @@ def events(path=None):
 			A("Export event analytics as CSV file", _href=URL('event_analytics')))
 		session['back'] = [session['url']] #start fresh stack of back links
 	elif path=='new':
-		header = CAT(A('back', _href=session['back'][-1]), H5('New Event'))
+		header = CAT(A('back', _href=get_list(session['back'], -1)), H5('New Event'))
 	elif path:
 		url = URL('registration', path[path.find('/')+1:], scheme=True)
 		event_id = path[path.find('/')+1:]
-		header = CAT(A('back', _href=session['back'][-1]), H5('Event Record'),
+		header = CAT(A('back', _href=get_list(session['back'], -1)), H5('Event Record'),
 	       			"Booking link is ", A(url, _href=url), XML('<br>'),
 			   		A('Ticket Types', _href=URL(f'tickets/{event_id}')), XML('<br>'),
 			   		A('Selections', _href=URL(f'selections/{event_id}')), XML('<br>'),
@@ -869,7 +869,7 @@ def event_reservations(event_id, path=None):
 	db.Reservations.id.readable=db.Reservations.Event.readable=False
 
 	event = db.Events[event_id]
-	header = CAT(A('back', _href=session['back'][-1]),
+	header = CAT(A('back', _href=get_list(session['back'], -1)),
 	      		H5('Provisional Reservations' if request.query.get('provisional') else 'Waitlist' if request.query.get('waitlist') else 'Reservations'),
 				H6(f"{event.DateTime}, {event.Description}"),
 				XML("Click on the member name to drill down on a reservation and view/edit the details."), XML('<br>'))
@@ -1001,7 +1001,7 @@ def reservation(ismember, member_id, event_id, path=None):
 			session['back'].append(session['url_prev'])
 
 	if ismember!='Y':
-		header = CAT(A('back', _href=session['back'][-1]), header)
+		header = CAT(A('back', _href=get_list(session['back'], -1)), header)
 		if path=='select':
 			header = CAT(header, A('send email', _href=(URL('composemail', vars=dict(
 				query=f"(db.Members.id=={member_id})&(db.Members.id==db.Reservations.Member)&(db.Reservations.Event=={event_id})&(db.Reservations.Host==True)",
@@ -1199,7 +1199,7 @@ Deleting or moving member on/off waitlist will also affect all guests."))
 					message += event_confirm(event.id, member.id)
 					msg_send(member, subject, message)
 					flash.set('Thank you. Confirmation has been sent by email.')
-				redirect(session['back'][-1])
+				redirect(get_list(session['back'], -1) or URL('index'))
 			redirect(URL(f'{member.Pay_source or PAYMENT_PROCESSOR}_checkout'))
 	return locals()
 
@@ -1329,7 +1329,7 @@ def financial_detail(event, title=''):
 		session['back'].append(session['url_prev'])
 	session['url_prev'] = None #no longer needed, save cookie space
 
-	header = CAT(A('back', _href=session['back'][-1]), H5(f'{title}'),
+	header = CAT(A('back', _href=get_list(session['back'], -1)), H5(f'{title}'),
 			financial_content(event if event!=0 else None, request.query.get('query'), request.query.get('left')))
 	return locals()
 	
@@ -1798,7 +1798,7 @@ def transactions(path=None):
 	session['url_prev'] = None	#no longer needed, save cookie space
 	
 	if path:
-		header = CAT(A('back', _href=session['back'][-1]), H5('Accounting Transactions'))
+		header = CAT(A('back', _href=get_list(session['back'], -1)), H5('Accounting Transactions'))
 
 	def validate(form):
 		if not form.vars.get('id'): #must be creating an accrual

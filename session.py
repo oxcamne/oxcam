@@ -5,7 +5,7 @@ from py4web import URL, request, redirect, action, Field
 from .common import db, session, flash, logger
 from .settings import SUPPORT_EMAIL, TIME_ZONE, LETTERHEAD, SOCIETY_SHORT_NAME, PAGE_BANNER, HOME_URL, HELP_URL, DATE_FORMAT
 from .models import ACCESS_LEVELS, member_name
-from .utilities import email_sender
+from .utilities import email_sender, get_list
 from yatl.helpers import A, H6, XML, P, DIV
 from py4web.utils.form import Form, FormStyleBulma
 from pydal.validators import IS_IN_SET, IS_EMAIL
@@ -27,7 +27,7 @@ def checkaccess(requiredaccess):
 		def wrapped_f(*args, **kwds):
 			session['url_prev'] = session.get('url')
 			session['url']=request.url
-			if session.get('back') and len(session['back'])>0 and request.url==session['back'][-1]:
+			if session.get('back') and len(session['back'])>0 and request.url==get_list(session['back'], -1):
 				session['back'].pop()
 				request.query['link_back']='On'
 			member_id = session.get('member_id')

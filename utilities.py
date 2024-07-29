@@ -261,7 +261,7 @@ def event_confirm(event_id, member_id, justpaid=0, event_only=False):
 		rows.append(TR(TH('Membership Dues', _style="text-align:left"), TD(''), TD(''), TH(f'{CURRENCY_SYMBOL}{dues:6.2f}', _style="text-align:left")))
 	rows.append(TR(TH('Total Cost', _style="text-align:left"), TD(''), TD(''), TH(f'{CURRENCY_SYMBOL}{cost + dues:6.2f}', _style="text-align:left")))
 	rows.append(TR(TH('Paid', _style="text-align:left"), TD(''), TD(''),
-				TH(f'{CURRENCY_SYMBOL}{event_revenue(event_id, member_id)+(resvtns.first().Charged or 0)+justpaid:6.2f}', _style="text-align:left")))
+				TH(f'{CURRENCY_SYMBOL}{event_revenue(event_id, member_id)+justpaid:6.2f}', _style="text-align:left")))
 	if tbc + dues>justpaid:
 		rows.append(TR(TH('Net amount due', _style="text-align:left"), TD(''), TD(''), TH(f'{CURRENCY_SYMBOL}{tbc+dues-justpaid:6.2f}', _style="text-align:left")))
 	body += TABLE(*rows).__str__()
@@ -288,3 +288,9 @@ def member_greeting(member):
 import hashlib
 def generate_hash(email):
     return hashlib.sha1((email + STRIPE_SKEY).encode()).hexdigest()
+
+def get_list(list, index):
+	try:
+		return list[index]
+	except IndexError:
+		return None

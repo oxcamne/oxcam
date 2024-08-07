@@ -16,7 +16,7 @@ from py4web.utils.grid import Grid, GridClassStyle
 from yatl.helpers import XML, H5
 from .settings import SOCIETY_SHORT_NAME, PAGE_BANNER, HOME_URL, HELP_URL, GRACE_PERIOD
 from py4web.utils.factories import Inject
-from io import StringIO
+from io import StringIO, TextIOWrapper
 
 preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
 
@@ -92,7 +92,7 @@ def db_restore():
 	
 	if form.accepted:
 		try:
-			with StringIO(form.vars.get('backup_file').file.read().decode(encoding='utf-8')) as backup_file:
+			with TextIOWrapper(form.vars.get('backup_file').file, encoding='utf-8') as backup_file:
 				if form.vars.get('overwrite_existing_database'):
 					for tablename in db.tables:	#clear out existing database
 						db(db[tablename]).delete()

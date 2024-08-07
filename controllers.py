@@ -1026,7 +1026,7 @@ Deleting or moving member on/off waitlist will also affect all guests."))
 			elif event.Capacity and attend+adding==event.Capacity:
 				flash.set(f"Please note, this fills the event; if you add another guest all unconfirmed guests will be waitlisted.")
 			dues_tbc = f" (including {CURRENCY_SYMBOL}{session['dues']} membership dues)" if session.get('dues') else ''
-			payment = (int(session.get('dues') or 0)) + confirmed_ticket_cost - event_revenue(event_id, member_id) - (host_reservation.Charged or 0)
+			payment = (int(session.get('dues') or 0)) + confirmed_ticket_cost - event_revenue(event_id, member_id)
 			if not waitlist:
 				payment += (provisional_ticket_cost or 0)
 			if not event.Guests or len(all_guests)<event.Guests:
@@ -1160,7 +1160,8 @@ Deleting or moving member on/off waitlist will also affect all guests."))
 	grid = Grid(path, (db.Reservations.Member==member.id)&(db.Reservations.Event==event.id),
 			orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname,
 			columns=[db.Reservations.Lastname, db.Reservations.Firstname, db.Reservations.Notes,
-					Column('Selection', lambda row: res_selection(row.id)),
+					Column('Selection', lambda row: res_selection(row.id),
+						required_fields=[db.Reservations.Provisional, db.Reservations.Waitlist]),
 					Column('Price', lambda row: res_unitcost(row.id)),
 					Column('Status', lambda row: res_status(row.id))],
 			headings=['Last', 'First', 'Notes', 'Selection', 'Price', 'Status'],

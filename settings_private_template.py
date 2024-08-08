@@ -98,6 +98,13 @@ SMTP_TRANS = ('smtp.somewhere.com', 'port', 'username', 'password')
 #SMTP host connection for bulk messages
 SMTP_BULK = SMTP_TRANS
 
+# logger settings
+LOGGERS = [
+    "warning:stdout",
+    "info:oxcam.log"
+]  # syntax "severity:filename" filename can be stderr or stdout
+ALLOWED_ACTIONS = []    #disable Py4web's auth
+
 # payment processor (currently only stripe implemented):
 PAYMENT_PROCESSOR='stripe'  
 #Stripe settings development keys and id's

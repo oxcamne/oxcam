@@ -48,7 +48,7 @@ LOGIN_AFTER_REGISTRATION = False
 #  "change_password", "change_email", "profile", "config", "register",
 #  "verify_email", "unsubscribe"]
 # Note: if you add "login", add also "logout"
-ALLOWED_ACTIONS = []
+ALLOWED_ACTIONS = ["all"]
 
 # email settings
 SMTP_SSL = False
@@ -66,7 +66,6 @@ REDIS_SERVER = "localhost:6379"
 # logger settings
 LOGGERS = [
     "warning:stdout",
-    "info:oxcam.log"
 ]  # syntax "severity:filename" filename can be stderr or stdout
 
 # Disable default login when using OAuth

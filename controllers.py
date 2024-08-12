@@ -1908,11 +1908,16 @@ def composemail():
 	if not query or query_count==1:
 		fields.append(Field('bcc', 'string', requires=IS_LIST_OF_EMAILS()))
 	fields.append(Field('subject', 'string', requires=IS_NOT_EMPTY(), default=proto.Subject if proto else ''))
-	fields.append(Field('body', 'text', requires=IS_NOT_EMPTY(), default=proto.Body if proto else "<letterhead>\n<greeting>\n\n" if query else "<letterhead>\n\n",
-				comment=CAT("You can use placeholders <letterhead>, <subject>, <greeting>, <member>, <reservation>, <email>, ",
-				"<support_email>, <society_short_name>, <society_name>, or <public_url>, depending on the context. ",
-				"You can also include html content thus: {{content}}. Text may be formatted, and images and links included, using ",
-				A('Markdown', _href='https://www.markdownguide.org/basic-syntax/', _target='Markdown'), '.')))
+	fields.append(Field('body', 'text', requires=IS_NOT_EMPTY(),
+					 default=proto.Body if proto else "<letterhead>\n<greeting>\n\n" if query else "<letterhead>\n\n",
+				comment=CAT("You can use ",
+				A('Markdown', _href='https://www.markdownguide.org/basic-syntax/', _target='Markdown'),
+				" formatting, and you can also include HTML.", XML('<br>'),
+				"There are custom tags <letterhead>, <subject>, <greeting>, <member>, <reservation>, and <email> ",
+				"available, depending on the context.", XML('<br>'),
+				"Convert shareable image links from Google Drive using ",
+				A('this tool', _href="https://www.labnol.org/embed/google/drive/", _target="LinkTool"),
+				", they won't work directly!")))
 	fields.append(Field('save', 'boolean', default=proto!=None, comment='store/update template'))
 	fields.append(Field('attachment', 'upload', uploadfield=False))
 	if proto:

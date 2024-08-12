@@ -164,17 +164,9 @@ def emailparse(body, subject, query=None):
 #parse email body from composemail form into a list of tuples:
 #	(text, function)
 #	where function will build html format from the results of the query,
-#	text (or {{html_content}}) will be inserted directly into the output
-	m = re.match(r"^(.*)\{\{(.*)\}\}(.*)$", body, flags=re.DOTALL)
-	if m:			#{{html content}} is simply stored. it will be sanitized later with XML()
-		bodyparts = [(m.group(2), None)]
-		if m.group(1)!='':
-			bodyparts = emailparse(m.group(1), subject, query)+bodyparts
-		if m.group(3)!='':
-			bodyparts = bodyparts+emailparse(m.group(3), subject, query)
-		return bodyparts
-
-	m = re.match(r"^(.*)<(.*)>(.*)$", body, flags=re.DOTALL)
+#	markdown and HTML will be passed directly into the output
+#	The special tags such as <reservation> etc are parsed out separatly.
+	m = re.match(r"^(.*)<(letterhead|subject|greeting|reservation|member|email)>(.*)$", body, flags=re.DOTALL)
 	if m:			#found something to expand
 		text = func = None
 		if m.group(2)=='subject':
@@ -184,10 +176,9 @@ def emailparse(body, subject, query=None):
 				raise Exception(f"<{m.group(2)}> can't be used in this context")
 			func=m.group(2) #will be generated individually for each target later
 		#should be <name> where name is defined in settings_private, for example <letterhead>
-		elif m.group(2)=='letterhead':	#use template and insert subject
+		else:	#letterhead
 			text = eval(m.group(2).upper()).replace('&lt;subject&gt;', subject)
-		else: #assume it an UPPER_CASE defined value from settings_private.py
-			text = eval(m.group(2).upper())
+
 		bodyparts = [(text, func)]
 		if m.group(1)!='':
 			bodyparts = emailparse(m.group(1), subject, query)+bodyparts

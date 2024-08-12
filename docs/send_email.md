@@ -14,11 +14,11 @@ If the message is explicitly addressed, or targetted to a single member, a 'Bcc:
 
 The Sender field allows you select which address to use if you have multiple roles. Replies will be sent to this address.
 
-The message body can use various metadata elements, such as \<letterhead>,  \<greeting> which include the Society letterhead and a personalized greeting (more or less formal depending on whether the member included a title when joining).  The metadata \<member> is replaced by the member's directory information, and in context \<reservation> will show details of a reservation.
+The message body can use various custom tags, such as \<letterhead>,  \<greeting> which include the Society letterhead and a personalized greeting (more or less formal depending on whether the member included a title when joining).  The tag \<member> is replaced by the member's directory information or \<email> by just their email address, and in context \<reservation> will show details of a reservation.
 
-[Markdown](https://www.markdownguide.org/basic-syntax/) can  be used to apply some formatting and to include links and graphics.
+[Markdown](https://www.markdownguide.org/basic-syntax/) can  be used to apply some formatting and to include links and graphics. The Send Email page has a link to Markdown documentation.
 
-You can also include snippets or even large chunks of html using braces: \{\{<html ...>}}.
+You can also include snippets or even large chunks of html.
 
 See [below](send_email.md#embedding-images-in-email) for a discussion of embedding images.
 
@@ -28,20 +28,18 @@ Ticking the 'save/update template' box allows the content to be saved for later 
 
 ### Embedding Images in Email
 
-The Markdown syntax \!\[alt_text](image_url) is a simple way to include images. They are displayed as a block, i.e. text does not wrap alongside them, and at full size or, depending on the email client, scaled to occupy the available display width.
-
-Images can be stored in a static subfolder of your web server. For example <https://oxcamne.pythonanywhere.com/oxcam/static/images/middlesex_canal.jpg> is an OxCamNE example of an *image_url*. However it may well be preferable to store images somewhere such as on Google Drive.
+The Markdown syntax \!\[alt_text](image_url) is a simple way to include images. They are displayed as a block, i.e. text does not wrap alongside them, and at full size or, depending on the email client, scaled to occupy the available display width. Either make sure the image is not too large, or specify the display width using HTML as discussed below!
 
 Although Google Drive was not designed to be an image server, this can be done. You first make the image publicly available by right clicking, selecting share and then share again in the resulting menu, which produces a pop up box. If necessary, change General Access from 'Restricted' to 'Anyone with the link'. Then click Copy link followed by done. The saved link will be something like: <https://drive.google.com/file/d/1bPvuOwCA8BEwP1-s53Yc2zM1tru8rkaR/view?usp=sharing>. This includes an *image_id* `1bPvuOwCA8BEwP1-s53Yc2zM1tru8rkaR`.
 
 You cannot use this Google Drive link directly, as it opens the image in google drive. Theoretically one should be able to construct an *image_url* as <https://drive.google.com/uc?export=view&id=image_id> but unfortunately at the time of writing many email clients will not display the image obtained this way (it is in SVG format).
 
-Fortunately there is a [free web tool](https://www.labnol.org/embed/google/drive/) to convert the Google Drive link to one that does work. Open the tool and paste the google drive link into the top box (make sure to clear the box first). Then click Generate Embed Code, after dealing with the captcha. Click the button to copy the Direct Image Link, which is your *image_url* something like: <https://lh3.googleusercontent.com/drive-viewer/AKGpihZVuyjwH9QtlTk95UwU3Jzb_TSuM7FLrAYZqV3TIerHLWR57RkwnHrDOdteUiokJu6AJXSQ_Uo2luNK8nQ8vNsYWZAKO0Om5EA=s1600-rw-v1>.
+Fortunately there is a [free web tool](https://www.labnol.org/embed/google/drive/) to convert the Google Drive link to one that does work. Open the tool and paste the google drive link into the top box (make sure to clear the box first). Then click Generate Embed Code, after dealing with the captcha. Click the button to copy the Direct Image Link, which is your *image_url* something like: <https://drive.google.com/drive-viewer/AKGpihYTP_pp-bWTHyWYIYpor9HDsVe2gDPKdYWVShRSrZyWtDINGfbEcUDtJIcZVpRlKSr0mtMJ6HF92ezmLQOrX-5choJQoTogyrw=s2560>. The link to the conversion tool is included on the Send Email page.
 
 You can use the *image_url* directly in Markdown, or if you want more complex formatting you can use html. You can set the image size (width) and make it a centered block, for example, thus:
 
-\{\{\<img src="*image_url*" alt="*alt_text*" style="display:block; margin:auto; width:300px;"/>}}
+\<p>img src="*image_url*" alt="*alt_text*" style="display:block; margin:auto; width:300px;">\</p>
 
 Or you might wish to have the image on the left with the following text alongside, separated by a margin:
 
-\{\{\<img src="*image_url*" alt="*alt_text*" style="float:left; margin: 0 10px 10px 0; width:300px;"/>}}
+\<p>\<img src="*image_url*" alt="*alt_text*" style="float:left; margin: 0px 15px 0px 0px; width:300px">\</p>

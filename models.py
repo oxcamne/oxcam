@@ -190,21 +190,22 @@ db.define_table('Event_Tickets',
 	   comment="use if qualification required in notes"),
 	Field('Allow_as_guest', 'boolean', default=True,
 	   comment="clear if ticket can't apply to a guest"),
-	format='%(Ticket)s'
+	format='%(Short_name)s'
 )
 
 db.define_table('Event_Selections',
 	Field('Event', 'reference Events', writable=False),
 	Field('Selection', requires=IS_NOT_EMPTY(), comment="for form dropdown"),
 	Field('Short_name', requires=IS_NOT_EMPTY(), comment="for doorlist"),
-	format='%(Selection)s'
+	format='%(Short_name)s'
 )
 
 db.define_table('Event_Survey',
 	Field('Event', 'reference Events', writable=False),
 	Field('Item', requires=IS_NOT_EMPTY(),
 	   comment="first is question, remainder answer choices"),
-	format='%(Item)s'
+	Field('Short_name', requires=IS_NOT_EMPTY(), comment="for doorlist"),
+	format='%(Short_name)s'
 )
 
 db.define_table('Affiliations',

@@ -130,6 +130,9 @@ def validate(id, token):
 	if member_id:
 		session.member_id = int(member_id)
 		session.access = db.Members[member_id].Access
+	else:
+		support = f'<a href="mailto:{SUPPORT_EMAIL}">{SUPPORT_EMAIL}</a>'
+		flash.set(f"If you already have a member record, please {A('relogin', _href=URL('login', vars=dict(url=request.query.url)))} with the email you used before or contact {support}.", sanitize=False)
 	log =f"verified {request.remote_addr} {user.email}"
 	logger.info(log)
 	redirect(request.query.url)

@@ -888,6 +888,32 @@ def event_reservations(event_id, path=None):
 	db.Reservations.id.readable=db.Reservations.Event.readable=False
 
 	event = db.Events[event_id]
+
+	search_fields = []
+	if db(db.Event_Tickets.Event==event_id).count()>1:
+		search_fields.append(
+			Field('ticket', 'reference Event_Tickets', default = request.query.get('ticket'),
+					requires=IS_EMPTY_OR(IS_IN_DB(db(db.Event_Tickets.Event==event_id), db.Event_Tickets.id,
+								'%(Short_name)s', zero="ticket?"))))
+	if db(db.Event_Selections.Event==event_id).count()>0:
+		search_fields.append(
+			Field('selection', 'reference Event_Selections', default = request.query.get('selection'),
+					requires=IS_EMPTY_OR(IS_IN_DB(db(db.Event_Selections.Event==event_id), db.Event_Selections.id,
+								'%(Short_name)s', zero="selection?"))))
+	if db(db.Event_Survey.Event==event_id).count()>0:
+		search_fields.append(
+			Field('survey', 'reference Event_Survey', default = request.query.get('survey'),
+					requires=IS_EMPTY_OR(IS_IN_DB(db((db.Event_Survey.Event==event_id)&~db.Event_Survey.Item.startswith('Please select')), db.Event_Survey.id,
+								'%(Short_name)s', zero="survey?"))))
+	search_form=Form(search_fields, keep_values=True, formstyle=FormStyleBulma)
+
+	if search_form.accepted:
+		vars=dict(request.query)
+		vars['ticket'] = search_form.vars.get('ticket') or ''
+		vars['selection'] = search_form.vars.get('selection') or ''
+		vars['survey'] = search_form.vars.get('survey') or ''
+		redirect(URL(f"event_reservations/{event_id}/select", vars=vars))
+	
 	header = CAT(A('back', _href=request.query.back),
 	      		H5('Provisional Reservations' if request.query.get('provisional') else 'Waitlist' if request.query.get('waitlist') else 'Reservations'),
 				H6(f"{event.DateTime}, {event.Description}"),
@@ -895,14 +921,25 @@ def event_reservations(event_id, path=None):
 
 	query = f'(db.Reservations.Event=={event_id})'
 	#for waitlist or provisional, have to include hosts with waitlisted or provisional guests
-	if request.query.get('waitlist') or request.query.get('provisional'):
-		query += f"&db.Reservations.Member.belongs([r.Member for r in \
-db((db.Reservations.Event=={event_id})&{'(db.Reservations.Waitlist==True)' if request.query.get('waitlist') else '(db.Reservations.Provisional==True)'}).\
-select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
+	if request.query.get('waitlist'):
+		query += f"&db.Reservations.Member.belongs([r.Member for r in db((db.Reservations.Event=={event_id})&\
+(db.Reservations.Waitlist==True)).select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
+	elif request.query.get('provisional'):
+		query += f"&db.Reservations.Member.belongs([r.Member for r in db((db.Reservations.Event=={event_id})&\
+(db.Reservations.Provisional==True)).select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 	else:
 		query += '&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)'
 		header = CAT(header, A('Export Doorlist as CSV file',
-			 _href=(URL(f'doorlist_export/{event_id}', scheme=True))), XML('<br>'))
+			 _href=(URL(f'doorlist_export/{event_id}', scheme=True))), " (ignores filters)", XML('<br>'))
+	if request.query.ticket:
+		query += f"&db.Reservations.Member.belongs([r.Member for r in db((db.Reservations.Event=={event_id})&\
+(db.Reservations.Ticket_=={request.query.ticket})).select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
+	if request.query.selection:
+		query += f"&db.Reservations.Member.belongs([r.Member for r in db((db.Reservations.Event=={event_id})&\
+(db.Reservations.Selection_=={request.query.selection})).select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
+	if request.query.survey:
+		query += f"&db.Reservations.Member.belongs([r.Member for r in db((db.Reservations.Event=={event_id})&\
+(db.Reservations.Survey_=={request.query.survey})).select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 	query += '&(db.Reservations.Host==True)'
 
 	header = CAT(header, A('Send Email Notice', _href=URL('composemail', vars=dict(query=query,
@@ -912,11 +949,13 @@ select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 		))), XML('<br>'))
 	header = CAT(header, XML('Display: '))
 	if request.query.get('waitlist') or request.query.get('provisional'):
-		header = CAT(header, A('reservations', _href=URL(f'event_reservations/{event_id}', vars=dict(back=request.query.back))), ' or ')
+		header = CAT(header, A('reservations', _href=URL(f'event_reservations/{event_id}/select', vars=dict(back=request.query.back))), ' or ')
 	if not request.query.get('waitlist'):
 		header = CAT(header, A('waitlist', _href=URL(f'event_reservations/{event_id}/select', vars=dict(waitlist=True, back=request.query.back))), ' or ')		
 	if not request.query.get('provisional'):
 		header = CAT(header, A('provisional', _href=URL(f'event_reservations/{event_id}/select', vars=dict(provisional=True, back=request.query.back))), XML(' (not checked out)'))
+	if len(search_fields)>0:
+		header = CAT(header, XML('<br>'), "Use dropdowns to filter (includes if member or any guest fits filter):")
 
 	grid = Grid(path, eval(query),
 			left=db.Members.on(db.Members.id == db.Reservations.Member),
@@ -932,6 +971,7 @@ select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 				      		else res_prov(row.Reservations.Member, event_id) if request.query.get('provisional')\
 							else res_conf(row.Reservations.Member, event_id)) or'')],
 			headings=['Member', 'Type', 'Until', 'College', 'Notes', 'Cost', 'Tbc', '#'],
+			search_form=search_form if len(search_fields)>0 else None,
 			details=False, editable = False, create = False, deletable = False,
 			rows_per_page=200, grid_class_style=grid_style, formstyle=form_style)
 	return locals()
@@ -1244,14 +1284,15 @@ def doorlist_export(event_id):
 			ticket_name = ticket.Short_name or ticket.Ticket if ticket else ''
 			selection = db.Event_Selections[guest.Selection_] if guest.Selection_ else None
 			selection_name = selection.Short_name or selection.Selection if selection else ''
-			survey = db.Event_Survey[guest.Survey_].Item if guest.Survey_ else ''
+			survey = db.Event_Survey[guest.Survey_] if guest.Survey_ else ''
+			survey_name = survey.Short_name or survey.item if survey else ''
 			writer.writerow([host.Reservations.Lastname, host.Reservations.Firstname, guest.Notes or '',
 								guest.Lastname, guest.Firstname, guest.Affiliation.Name if guest.Affiliation else '',
 								primary_matriculation(guest.Member) or '' if host.Reservations.id==guest.id else '',
 								selection_name, '', ticket_name,
 								primary_email(guest.Member) if host.Reservations.id==guest.id else '',
 								host.Members.Cellphone if host.Reservations.id==guest.id else '',
-								survey, guest.Comment or ''])
+								survey_name, guest.Comment or ''])
 	return locals()
 	
 @action('event_copy/<event_id:int>', method=['GET'])
@@ -2111,8 +2152,6 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 				member.update_record(Pay_subs = None, Pay_next = None)
 	else:
 		member = None
-		support = f'<a href="mailto:{SUPPORT_EMAIL}">{SUPPORT_EMAIL}</a>'
-		flash.set(f"If you already have a member record, please {A('relogin', _href=URL('login', vars=dict(url=request.url)))} with the email you used before or contact {support}.", sanitize=False)
 		
 	header = H5('Event Registration: Your Information' if event 
 				else 'Mailing List Registration' if request.query.get('mail_lists')

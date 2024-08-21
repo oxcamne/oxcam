@@ -4,8 +4,8 @@ This file contains controllers used to manage the user's session
 from py4web import URL, request, redirect, action, Field
 from .common import db, session, flash, logger
 from .settings import SUPPORT_EMAIL, TIME_ZONE, LETTERHEAD, SOCIETY_SHORT_NAME, PAGE_BANNER, HOME_URL, HELP_URL, DATE_FORMAT
-from .models import ACCESS_LEVELS, member_name
-from .utilities import email_sender, get_list
+from .models import ACCESS_LEVELS, member_name, CAT
+from .utilities import email_sender
 from yatl.helpers import A, H6, XML, P, DIV
 from py4web.utils.form import Form, FormStyleBulma
 from pydal.validators import IS_IN_SET, IS_EMAIL
@@ -25,25 +25,25 @@ for an explanation see the blog article from which I cribbed
 def checkaccess(requiredaccess):
 	def wrap(f):
 		def wrapped_f(*args, **kwds):
-			session['url_prev'] = session.get('url')
-			session['url']=request.url
-			if session.get('back') and len(session['back'])>0 and request.url==get_list(session['back'], -1):
-				session['back'].pop()
-				request.query['link_back']='On'
-			member_id = session.get('member_id')
-			if not (session.get('logged_in') == True and (not member_id or db(db.Members.id==member_id).count()>0)):    #not logged in, or member deleted
-				if db(db.Colleges.id>0).count()==0:
-					session['url']=URL('db_restore')
-				redirect(URL('login'))
+			if db(db.Colleges.id>0).count()==0 and not session.logged_in:
+				redirect(URL('login', vars=dict(url=URL('db_restore'))))
+			member_id = session.member_id
+			if member_id:
+				member = db(db.Members.id == member_id).select(db.Members.Access).first()
+				if member:
+					session.access = member.Access
+				else:
+					redirect(URL('login', vars=dict(url=request.url)))
+			if not(session.logged_in and (not member_id or member)):    #not logged in, or member deleted
+				redirect(URL('login', vars=dict(url=request.url)))
 
 			#check access
 			if requiredaccess != None:
 				require = ACCESS_LEVELS.index(requiredaccess)
-				if not session.get('member_id') or not session.get('access'):
-					if db(db.Members.id>0).count()==0:
-						return f(*args, **kwds)
-				have = ACCESS_LEVELS.index(session['access']) if session.get('access') != None else -1
-				if have < require:
+				have = -1
+				if member_id and member.Access:
+					have = ACCESS_LEVELS.index(member.Access)
+				if have < require and db(db.Members.id>0).count()>0:
 					redirect(URL('accessdenied'))
 			return f(*args, **kwds)
 		return wrapped_f
@@ -57,16 +57,16 @@ def login():
 			#most recent email used at this ip, precedence to email associated with a record
 	form = Form([Field('email', 'string',
 				requires=IS_EMAIL(),
-				default = user.users.email if user else session.get('email'))],
+				default = user.users.email if user else None)],
 				formstyle=FormStyleBulma)
 	header = P(XML(f"Please specify your email to login.<br />If you have signed in previously, please use the \
 same email as this identifies your record.<br />You can change your email after logging in via 'My account'.<br />If \
 you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}."))
  
 	if form.accepted:
-		log =f"login {request.remote_addr} {form.vars['email']} {session.get('url') or ''} {request.environ['HTTP_USER_AGENT']}"
+		log =f"login {request.remote_addr} {form.vars['email']} {request.query.url or ''} {request.environ['HTTP_USER_AGENT']}"
 		logger.info(log)
-		redirect(URL('send_email_confirmation', vars=dict(email=form.vars['email'],
+		redirect(URL('send_email_confirmation', vars=dict(email=form.vars['email'], url=request.query.url,
 						timestamp=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))))
 	return locals()
 
@@ -89,9 +89,9 @@ def send_email_confirmation():
 		else:
 			user = db.users[db.users.insert(email=email, remote_addr = request.remote_addr)]
 		token = str(random.randint(10000,999999))
-		user.update_record(tokens= [token]+(user.tokens or []), url=session.get('url') or URL('index'),
-							email = email, when_issued = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))
-		link = URL('validate', user.id, token, scheme=True)
+		user.update_record(tokens= [token]+(user.tokens or []),
+				email = email, when_issued = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))
+		link = URL('validate', user.id, token, scheme=True, vars=dict(url=request.query.url))
 		message = f"{LETTERHEAD.replace('&lt;subject&gt;', ' ')}<br><br>\
 Please click {A(link, _href=link)} to continue to {SOCIETY_SHORT_NAME}.<br><br>\
 If the link doesn't work, please try copy & pasting it to your browser's address bar.<br><br>\
@@ -116,7 +116,7 @@ def validate(id, token):
 	members = [(row.id, member_name(row.id)+(' '+row.Membership+' member until '+(row.Paiddate.strftime(DATE_FORMAT) if row.Paiddate else '')  if row.Membership else '')) for row in rows]
 	form = Form([Field('member', 'integer', requires=IS_IN_SET(members))],
 	     formstyle=FormStyleBulma, csrf_protection=False)
-	if len(rows)<=1 or 'switch_email' in user.url:
+	if len(rows)<=1 or 'switch_email' in request.query.url:
 		member_id = rows.first().id if len(rows)==1 else None
 	elif form.accepted:
 		member_id = form.vars.get('member')
@@ -124,22 +124,33 @@ def validate(id, token):
 		return locals()	#display form
 	
 	session['logged_in'] = True
-	session['email'] = user.email
-	session['access'] = None
-	session['member_id'] = None
-	session['back'] = []
+	session.email = user.email
+	session.access = None
+	session.member_id = None
 	if member_id:
-		session['member_id'] = int(member_id)
-		session['access'] = db.Members[member_id].Access
+		session.member_id = int(member_id)
+		session.access = db.Members[member_id].Access
 	log =f"verified {request.remote_addr} {user.email}"
 	logger.info(log)
-	redirect(user.url)
+	redirect(request.query.url)
 
 @action('accessdenied')
-@action.uses(session, flash)
+@preferred
 def accessdenied():
-	flash.set(f"You do not have permission for that, please contact {SUPPORT_EMAIL} if you think this is wrong")
-	redirect(session['url_prev'])
+	access = session.access	#for layout.html
+	header = CAT(
+			"You do not have permission for that, please contact ",
+			A(SUPPORT_EMAIL, _href=f'mailto:{SUPPORT_EMAIL}'),
+			" if you think this is wrong."
+			)
+	form = Form([], submit_value='OK')
+	if form.accepted:
+		redirect(URL('browser_back'))
+	return locals()
+
+@action('browser_back')
+@action.uses("back.html", Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
+def browser_back():
 	return locals()
 
 @action('logout')

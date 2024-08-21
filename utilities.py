@@ -1,14 +1,14 @@
 """
 This file contains functions shared by multiple controllers
 """
-from py4web import URL
+from py4web import URL, request
 from .common import db
 from .settings import TIME_ZONE, SUPPORT_EMAIL, LETTERHEAD, GRACE_PERIOD, CURRENCY_SYMBOL,\
 	DB_URL, SOCIETY_SHORT_NAME, MEMBER_CATEGORIES, DATE_FORMAT, SMTP_TRANS, STRIPE_SKEY, SOCIETY_NAME
 from .models import primary_email, event_cost, res_status, member_name, res_selection,\
 	res_unitcost, event_revenue, event_unpaid, res_dues
 from yatl.helpers import A, TABLE, TH, THEAD, H6, TR, TD, CAT, HTML, XML
-import datetime, re, smtplib, markdown
+import datetime, re, smtplib, markdown, base64
 from email.message import EmailMessage
 
 #check if member is in good standing at a particular date
@@ -112,7 +112,7 @@ def get_banks(startdatetime, enddatetime):
 def tdnum(value, query=None, left=None, th=False):
 	#return number as TD or TH
 	nums = f'{CURRENCY_SYMBOL}{value:,.2f}' if value >= 0 else f'({CURRENCY_SYMBOL}{-value:,.2f})'
-	numsq = A(nums, _href=URL('transactions', vars=dict(query=query,left=left))) if query else nums
+	numsq = A(nums, _href=URL('transactions/select', vars=dict(query=query, left=left, back=request.url))) if query else nums
 	return TH(numsq, _style=f'text-align:right{"; color:Red" if value <0 else ""}') if th==True else TD(numsq, _style=f'text-align:right{"; color:Red" if value <0 else ""}')
 
 def financial_content(event, query, left):
@@ -133,8 +133,8 @@ def financial_content(event, query, left):
 	rows = [THEAD(TR(TH('Account'), TH('Amount')))]
 	for acct in accts:
 		if acct[sumamt] >= 0:
-			rows.append(TR(TD(A(acct.CoA.Name[0:25], _href=URL('transactions',
-							vars=dict(query=f"{query}&(db.AccTrans.Account=={acct.CoA.id})&(db.Events.id=={event})", left=left)))),
+			rows.append(TR(TD(A(acct.CoA.Name[0:25], _href=URL('transactions/select',
+							vars=dict(query=f"{query}&(db.AccTrans.Account=={acct.CoA.id})&(db.Events.id=={event})", left=left, back=request.url)))),
 						tdnum(acct[sumamt])))
 			totrev += acct[sumamt]
 			cardfees -= acct[sumfee] or 0
@@ -144,8 +144,8 @@ def financial_content(event, query, left):
 	rows = [THEAD(TR(TH('Account'), TH('Amount')))]
 	for acct in accts:
 		if acct[sumamt] < 0:
-			rows.append(TR(TD(A(acct.CoA.Name[0:25], _href=URL('transactions',
-							vars=dict(query=f"{query}&(db.AccTrans.Account=={acct.CoA.id})&(db.Events.id=={event})", left=left)))),
+			rows.append(TR(TD(A(acct.CoA.Name[0:25], _href=URL('transactions/select',
+							vars=dict(query=f"{query}&(db.AccTrans.Account=={acct.CoA.id})&(db.Events.id=={event})", left=left, back=request.url)))),
 						tdnum(-acct[sumamt])))
 			totexp -= acct[sumamt]
 			cardfees -= acct[sumfee] or 0
@@ -285,3 +285,11 @@ def get_list(list, index):
 		return list[index]
 	except IndexError:
 		return None
+	
+#encode something, usually a URL, for use in another URL, e.g. as _referrer
+def encode_url(url):
+	return base64.b16encode(url.encode("utf8")).decode("utf8")
+
+#decode encoded something, usually URL, from a URL parameter
+def decode_url(code):
+	return base64.b16decode(code.encode("utf8")).decode("utf8")

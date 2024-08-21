@@ -25,7 +25,7 @@ preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=
 @preferred
 @checkaccess('admin')
 def db_tool(path=None):
-	access = session['access']	#for layout.html
+	access = session.access	#for layout.html
 	form = Form([Field('query'),
 			  	Field('orderby'),
 				Field('left'),
@@ -82,7 +82,7 @@ See the Py4web documentation (DAL) for to learn more.")
 @preferred
 @checkaccess('admin')
 def db_restore():
-	access = session['access']	#for layout.html
+	access = session.access	#for layout.html
 	header = f"Restore {SOCIETY_SHORT_NAME} database from backup file"
 	
 	form = Form([Field('overwrite_existing_database', 'boolean',
@@ -109,7 +109,7 @@ def db_restore():
 @action.uses("download.html", db, session, Inject(response=response))
 @checkaccess('admin')
 def db_backup():
-	access = session['access']	#for layout.html
+	access = session.access	#for layout.html
 	stream = StringIO()
 	content_type = "text/csv"
 	filename = f'{SOCIETY_SHORT_NAME}_db_backup.csv'

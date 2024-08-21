@@ -22,8 +22,7 @@ db.define_table('users',
 	Field('email', 'string'),
 	Field('tokens', 'list:integer'),
 	Field('remote_addr', 'string'),
-	Field('when_issued', 'datetime'),
-	Field('url', 'string'))
+	Field('when_issued', 'datetime'))
 db.users.email.requires = IS_NOT_IN_DB(db, db.users.email)
 
 def collegelist(sponsors=[]):

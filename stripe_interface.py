@@ -29,7 +29,7 @@ preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=
 @preferred
 @checkaccess('accounting')
 def stripe_tool():
-	access = session['access']	#for layout.html
+	access = session.access	#for layout.html
 	form = Form([Field('object_type', comment="e.g. 'Customer', 'Subscription'"),
 	      		Field('object_id')],
 				keep_values=True, formstyle=form_style)
@@ -101,7 +101,7 @@ def stripe_process_charge(dict_csv, bank, reference, timestamp, amount, fee):
 @action.uses("stripe_checkout.html", session)
 @checkaccess(None)
 def stripe_update_card():
-	access = session['access']	#for layout.html
+	access = session.access	#for layout.html
 	stripe_session_id = request.query.get('stripe_session_id')
 	stripe_pkey = STRIPE_PKEY
 	return locals()
@@ -111,10 +111,10 @@ def stripe_update_card():
 @action.uses("stripe_checkout.html", session, db, flash)
 @checkaccess(None)
 def stripe_switched_card():
-	access = session['access']	#for layout.html
-	if not session.get('member_id'):
+	access = session.access	#for layout.html
+	if not session.member_id:
 		redirect(URL('index'))
-	member = db.Members[session['member_id']]
+	member = db.Members[session.member_id]
 
 	stripe_session = stripe.checkout.Session.retrieve(session['stripe_session_id'], expand=['setup_intent'])
 	stripe.Customer.modify(member.Pay_cust,
@@ -129,11 +129,11 @@ def stripe_switched_card():
 @preferred
 @checkaccess(None)
 def stripe_view_card():
-	access = session['access']	#for layout.html
+	access = session.access	#for layout.html
 
-	if not session.get('member_id'):
+	if not session.member_id:
 		redirect(URL('index'))
-	member = db.Members[session['member_id']]
+	member = db.Members[session.member_id]
 	
 	if member.Pay_subs and member.Pay_subs!='Cancelled':
 		try:	#check subscription still exists on Stripe
@@ -195,11 +195,11 @@ def stripe_subscription_cancelled(member):	#return True if subscription no longe
 @action.uses("stripe_checkout.html", db, session, flash)
 @checkaccess(None)
 def stripe_checkout():
-	access = session['access']	#for layout.html
-	if (not session.get('membership') and not session.get('event_id')) or not session.get('member_id'):
+	access = session.access	#for layout.html
+	if (not session.get('membership') and not session.get('event_id')) or not session.member_id:
 		redirect(URL('index'))	#protect against regurgitated old requests
 
-	member = db.Members[session.get('member_id')]
+	member = db.Members[session.member_id]
 	if member.Pay_cust:	#check customer still exists on Stripe
 		try:
 			customer = stripe.Customer.retrieve(member.Pay_cust)
@@ -249,7 +249,7 @@ def stripe_checkout():
 	  customer=member.Pay_cust,
 	  payment_method_types=['card'], line_items=items, mode=mode,
 	  success_url=URL('stripe_checkout_success', vars=params, scheme=True),
-	  cancel_url=session.get('url_prev')
+	  cancel_url=request.query.back
 	)
 	stripe_session_id = stripe_session.stripe_id		#for use in template
 	session['stripe_session_id'] = stripe_session.stripe_id
@@ -260,7 +260,7 @@ def stripe_checkout():
 @preferred
 @checkaccess(None)
 def stripe_checkout_success():
-	member = db.Members[session.get('member_id')]
+	member = db.Members[session.member_id]
 	dues = decimal.Decimal(request.query.get('dues') or 0)
 	tickets_tbc = decimal.Decimal(request.query.get('tickets_tbc') or 0)
 	stripe_session = stripe.checkout.Session.retrieve(session.get('stripe_session_id'))
@@ -297,8 +297,7 @@ def stripe_checkout_success():
 	session['stripe_session_id'] = None
 	if dues:
 		flash.set('Confirmation has been sent by email. Please review your mailing list subscriptions.')
-		session['url'] = URL('index')
-		redirect(URL(f"emails/Y/{member.id}/select"))
+		redirect(URL(f"emails/Y/{member.id}/select", vars=dict(back=URL('index'))))
 		#it would be nice to go right to edit the subscription of the primary email,
 		#but a side effect of Stripe Checkout seems to be that the first 'submit' doesn't work
 		#I think this is CSRF protection at work.

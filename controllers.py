@@ -1947,7 +1947,7 @@ def composemail():
 		fields.append(Field('delete', 'boolean', comment='tick to delete template; sends no message'))
 
 	def validate(form2):
-		if form2.vars['delete']:
+		if form2.vars.get('delete'):
 			db(db.EMProtos.id == proto.id).delete()
 			flash.set("Template deleted: "+ proto.Subject)
 			redirect(request.query.back)

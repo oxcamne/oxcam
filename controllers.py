@@ -44,7 +44,7 @@ from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name
 	res_conf, event_cost, res_wait, res_prov, bank_accrual, tickets_sold,\
 	res_unitcost, res_selection
 from pydal.validators import IS_LIST_OF_EMAILS, IS_EMPTY_OR, IS_IN_DB, IS_IN_SET,\
-	IS_NOT_EMPTY, IS_DATE, IS_DECIMAL_IN_RANGE, IS_INT_IN_RANGE, IS_MATCH
+	IS_NOT_EMPTY, IS_DATE, IS_DECIMAL_IN_RANGE, IS_INT_IN_RANGE, IS_MATCH, CLEANUP
 from .utilities import email_sender, member_good_standing, ageband, newpaiddate,\
 	collegelist, tdnum, get_banks, financial_content, event_confirm, msg_header, msg_send,\
 	society_emails, emailparse, notification, notify_support, member_profile, generate_hash,\
@@ -1768,7 +1768,8 @@ def bank_file(bank_id):
 					amount, details = eval(f"{bank.Name.lower()}_process_charge(row, bank, reference, timestamp, amount, fee)")
 					if amount==0:
 						continue
-					notes = f"{details} {notes}"
+					if notes != details:
+						notes = f"{details} {notes}"
 				except Exception as e:
 					pass	#if fails, leave unallocated
 				
@@ -2166,9 +2167,9 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 		
 	#gather the person's information as necessary (may have only email)
 	fields=[]
-	fields.append(Field('firstname', 'string', requires = IS_NOT_EMPTY(),
+	fields.append(Field('firstname', 'string', requires = [IS_NOT_EMPTY(), CLEANUP()],
 					default=member.Firstname if member else ''))
-	fields.append(Field('lastname', 'string', requires = IS_NOT_EMPTY(),
+	fields.append(Field('lastname', 'string', requires = [IS_NOT_EMPTY(), CLEANUP()],
 					default=member.Lastname if member else ''))
 	fields.append(Field('affiliation', 'reference Colleges',
 			default=affinity.College if affinity else None, 
@@ -2220,7 +2221,20 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
-	
+		if not member and form.vars.get('affiliation'):
+			r= db(db.Members.Firstname.ilike(form.vars['firstname'].split(' ')[0]+'%')&\
+					db.Members.Lastname.ilike(form.vars['lastname'].split(' ')[0]+'%')&\
+					(db.Affiliations.College==int(form.vars['affiliation']))).select(
+				db.Members.Firstname, db.Members.Lastname, db.Members.id, orderby=db.Affiliations.Modified,
+				left=db.Affiliations.on(db.Affiliations.Member==db.Members.id)).first()
+			if r and r.Firstname.lower().split(' ')[0]==form.vars['firstname'].lower().split(' ')[0] and \
+				r.Lastname.lower().split(' ')[0]==form.vars['lastname'].lower().split(' ')[0] and \
+				form.vars['matr'] == primary_matriculation(r.id):
+				support = f'<a href="mailto:{SUPPORT_EMAIL}">{SUPPORT_EMAIL}</a>'
+				flash.set(f"It looks as if you have an existing member record under another email, \
+please login with the email you used before or contact {support}.", sanitize=False)
+				redirect(URL('login', vars=dict(url=request.url)))
+
 	form = Form(fields, validation=validate, formstyle=FormStyleBulma, keep_values=True)
 		
 	if form.accepted:
@@ -2234,8 +2248,8 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 							Lastname = form.vars['lastname'])
 		else:
 			set_access = 'admin' if db(db.Members.id>0).count() == 0 else None
-			member_id = db.Members.insert(Firstname = form.vars['firstname'], 
-							Lastname = form.vars['lastname'], Notes=notes, Access = set_access,
+			member_id = db.Members.insert(Firstname = form.vars['firstname'].strip(), 
+							Lastname = form.vars['lastname'].strip(), Notes=notes, Access = set_access,
 							Source = form.vars.get('please_indicate_how_you_heard_of_us'))
 			member = db.Members[member_id]
 			session.member_id = member_id

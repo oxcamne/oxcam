@@ -72,7 +72,7 @@ See the Py4web documentation (DAL) for to learn more.")
 			   		orderby=eval(form.vars.get('orderby')) if form.vars.get('orderby') else None,
 			   		left=eval(form.vars.get('left')) if form.vars.get('left') else None,
 					details=False, editable=True, create=True, deletable=True,
-					grid_class_style=GridClassStyle, formstyle=form_style, show_id=True,
+					show_id=True,
 					)
 	except Exception as e:
 		flash.set(e)

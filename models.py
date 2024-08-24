@@ -4,7 +4,7 @@ This file defines the database models
 
 from .common import db, Field
 from .settings import MEMBER_CATEGORIES, ACCESS_LEVELS, TIME_ZONE, DATE_FORMAT
-from pydal.validators import IS_IN_DB, IS_EMPTY_OR, IS_IN_SET, IS_NOT_EMPTY, IS_DATE,\
+from pydal.validators import IS_IN_DB, IS_EMPTY_OR, IS_IN_SET, IS_NOT_EMPTY, IS_DATE,CLEANUP,\
 	IS_NOT_IN_DB, IS_MATCH, IS_EMAIL, IS_DECIMAL_IN_RANGE, IS_DATETIME, IS_INT_IN_RANGE
 from yatl.helpers import CAT, A
 import datetime, decimal
@@ -77,8 +77,8 @@ def member_name(id):
 	
 db.define_table('Members',
 	Field('Title', 'string'),
-	Field('Firstname', 'string', requires = IS_NOT_EMPTY(),comment='*'),
-	Field('Lastname', 'string', requires = IS_NOT_EMPTY(),comment='*'),
+	Field('Firstname', 'string', requires = [IS_NOT_EMPTY(), CLEANUP()], comment='*'),
+	Field('Lastname', 'string', requires = [IS_NOT_EMPTY(), CLEANUP()], comment='*'),
 	Field('Suffix', 'string'),
 	Field('Membership', 'string', requires=IS_EMPTY_OR(IS_IN_SET(MEMBER_CATEGORIES))),
 	Field('Paiddate', 'date', requires = IS_EMPTY_OR(IS_DATE())),

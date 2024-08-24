@@ -8,7 +8,7 @@ from .models import ACCESS_LEVELS, member_name, CAT
 from .utilities import email_sender
 from yatl.helpers import A, H6, XML, P, DIV
 from py4web.utils.form import Form, FormStyleBulma
-from pydal.validators import IS_IN_SET, IS_EMAIL
+from pydal.validators import IS_IN_SET, IS_EMAIL, ANY_OF
 from py4web.utils.factories import Inject
 import datetime, random
 
@@ -53,12 +53,12 @@ def checkaccess(requiredaccess):
 @preferred
 def login():
 	session['logged_in'] = False
-	user = db(db.users.remote_addr==request.remote_addr).select(orderby=~db.Emails.id|~db.users.when_issued,
-			left=db.Emails.on(db.Emails.Email==db.users.email)).first()
-			#most recent email used at this ip, precedence to email associated with a record
+	possible_emails = [r.users.email for r in db(db.users.remote_addr==request.remote_addr).select(orderby=~db.Emails.id|~db.users.when_issued,
+			left=db.Emails.on(db.Emails.Email==db.users.email))]
+			#not currently used
 	form = Form([Field('email', 'string',
-				requires=IS_EMAIL(),
-				default = user.users.email if user else None)],
+					requires=IS_EMAIL())
+				],
 				formstyle=FormStyleBulma)
 	header = P(XML(f"Please specify your email to login.<br />If you have signed in previously, please use the \
 same email as this identifies your record.<br />You can change your email after logging in via 'My account'.<br />If \

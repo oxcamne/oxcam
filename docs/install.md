@@ -123,7 +123,7 @@ SMTP_BULK = SMTP_TRANS
 # logger settings
 LOGGERS = [
     "warning:stdout",
-    "info:oxcam.log"
+     "info:oxcam.log:%(asctime)s - %(levelname)s - %(message)s"
 ]  # syntax "severity:filename" filename can be stderr or stdout
 ALLOWED_ACTIONS = []    #disable Py4web's auth
 

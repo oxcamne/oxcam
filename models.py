@@ -115,31 +115,37 @@ db.define_table('Emails',
 	Field('Modified', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None),
        			update=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),
 	singular="Email", plural="Emails", format='%(Email)s')
+
+#returns a dictionary to look up host member_id and get confirmed ticket cost for an event
+def event_ticket_dict(event_id):
+	price = db.Event_Tickets.Price.sum()
+	return {r.Reservations.Member: r[price] for r in db((db.Reservations.Event==event_id)&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)).select(
+			db.Reservations.Member, price, left = db.Event_Tickets.on(db.Event_Tickets.id==db.Reservations.Ticket_),
+			orderby = db.Reservations.Member, groupby = db.Reservations.Member)}
+
+#returns a dictionary to look up host member_id and get amount paid for an event including pending charges
+#includes all reservations for an event regardless of status
+def event_paid_dict(event_id):
+	actkts = db(db.CoA.Name.ilike("Ticket sales")).select().first().id
+	amount = db.AccTrans.Amount.sum()
+	paid = {r.AccTrans.Member: r[amount] for r in db((db.AccTrans.Event==event_id)&(db.AccTrans.Account==actkts)).select(
+		db.AccTrans.Member, amount, orderby = db.AccTrans.Member, groupby = db.AccTrans.Member)}
+	return {r.Member: (r.Charged or 0) + (paid.get(r.Member) or 0) for r in 
+		 	db(db.Reservations.Event==event_id).select(db.Reservations.Member, db.Reservations.Charged)}
 	
 def event_revenue(event_id, member_id=None):	#revenue from confirmed tickets
-	actkts = db(db.CoA.Name.ilike("Ticket sales")).select().first().id
-
-	query = (db.Reservations.Event==event_id)
+	paid = event_paid_dict(event_id)
 	if member_id:
-		query = (db.Reservations.Member==member_id)&query
-	reservations = db(query).select(db.Reservations.Charged)
-	charged = sum([res.Charged or 0 for res in reservations]) if reservations else 0
-
-	query = (db.AccTrans.Event==event_id)&(db.AccTrans.Account==actkts)
-	if member_id:
-		query = (db.AccTrans.Member==member_id)&query
-	payments = db(query).select(db.AccTrans.Amount)
-	paid = sum([pay.Amount or 0 for pay in payments]) if payments else 0
-
-	return charged + paid
+		return paid.get(member_id)
+	return sum(paid.values())
 
 def event_cost(event_id, member_id=None):
-	query = (db.Reservations.Event==event_id)&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)
+	tickets = event_ticket_dict(event_id)
 	if member_id:
-		query = (db.Reservations.Member==member_id)&query
-	reservations = db(query).select(db.Event_Tickets.Price,
-		  		left=db.Event_Tickets.on(db.Event_Tickets.id==db.Reservations.Ticket_))
-	cost = sum([res.Price or 0 for res in reservations]) if reservations else 0
+		return tickets.get(member_id) or 0
+	cost = 0	#can't use sum() as there may be None values.
+	for member, price in tickets.items():
+		cost += price or 0
 	return cost
 
 def event_unpaid(event_id, member_id=None):	#unpaid from confirmed reservations

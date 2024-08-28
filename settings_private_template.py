@@ -100,9 +100,8 @@ SMTP_BULK = SMTP_TRANS
 
 # logger settings
 LOGGERS = [
-    "warning:stdout",
-    "info:oxcam.log"
-]  # syntax "severity:filename" filename can be stderr or stdout
+     "info:oxcam.log:%(asctime)s - %(levelname)s - %(message)s"
+]  # syntax "severity:filename:format" filename can be stderr or stdout
 ALLOWED_ACTIONS = []    #disable Py4web's auth
 
 # payment processor (currently only stripe implemented):

@@ -42,7 +42,7 @@ from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
 	primary_matriculation, event_revenue, event_unpaid, res_status,\
 	res_conf, event_cost, res_wait, res_prov, bank_accrual, tickets_sold,\
-	res_unitcost, res_selection
+	res_unitcost, res_selection, event_paid_dict, event_ticket_dict
 from pydal.validators import IS_LIST_OF_EMAILS, IS_EMPTY_OR, IS_IN_DB, IS_IN_SET,\
 	IS_NOT_EMPTY, IS_DATE, IS_DECIMAL_IN_RANGE, IS_INT_IN_RANGE, IS_MATCH, CLEANUP
 from .utilities import email_sender, member_good_standing, ageband, newpaiddate,\
@@ -260,7 +260,7 @@ def members(path=None):
 using an optional operator (=, <, >, <=, >=) together with a value."))
 		footer = CAT(A("View Recent New Members", _href=URL('new_members/select')), XML('<br>'),
 			A("Export Membership Analytics", _href=URL('member_analytics')), XML('<br>'),
-			A("Export Displayed Records", _href=URL('members_export',
+			A("Export Selected Records", _href=URL('members_export',
 						vars=dict(query=query, left=left or '', qdesc=qdesc))))
 
 	def member_deletable(id): #deletable if not member, never paid dues or attended recorded event, or on mailing list
@@ -707,6 +707,7 @@ def events(path=None):
 			grid_class_style=grid_style,
 			formstyle=form_style,
 			)
+	grid.render()
 	return locals()
 	
 @action('tickets/<event_id:int>/<path:path>', method=['POST', 'GET'])
@@ -885,9 +886,15 @@ def event_reservations(event_id, path=None):
 # ...event_reservatins/event_id/...
 # request.query: waitlist=True, provisional=True
 	access = session.access	#for layout.html
+	actkts = db(db.CoA.Name.ilike("Ticket sales")).select().first().id
+
 	db.Reservations.id.readable=db.Reservations.Event.readable=False
 
 	event = db.Events[event_id]
+
+	paid = event_paid_dict(event_id)
+	cost = event_ticket_dict(event_id)
+	tbc = str([member for member in paid.keys() if paid[member] != (cost.get(member) or 0)])
 
 	search_fields = []
 	if db(db.Event_Tickets.Event==event_id).count()>1:
@@ -905,6 +912,10 @@ def event_reservations(event_id, path=None):
 			Field('survey', 'reference Event_Survey', default = request.query.get('survey'),
 					requires=IS_EMPTY_OR(IS_IN_DB(db((db.Event_Survey.Event==event_id)&~db.Event_Survey.Item.startswith('Please select')), db.Event_Survey.id,
 								'%(Short_name)s', zero="survey?"))))
+	if tbc!='[]':
+		search_fields.append(
+			Field('tbc', 'boolean', default = request.query.get('tbc')))
+
 	search_form=Form(search_fields, keep_values=True, formstyle=FormStyleBulma)
 
 	if search_form.accepted:
@@ -912,6 +923,10 @@ def event_reservations(event_id, path=None):
 		vars['ticket'] = search_form.vars.get('ticket') or ''
 		vars['selection'] = search_form.vars.get('selection') or ''
 		vars['survey'] = search_form.vars.get('survey') or ''
+		if search_form.vars.get('tbc'):
+			vars['tbc'] = 'On' 
+		else:
+			del vars['tbc']
 		redirect(URL(f"event_reservations/{event_id}/select", vars=vars))
 	
 	header = CAT(A('back', _href=request.query.back),
@@ -941,6 +956,8 @@ def event_reservations(event_id, path=None):
 		query += f"&db.Reservations.Member.belongs([r.Member for r in db((db.Reservations.Event=={event_id})&\
 (db.Reservations.Survey_=={request.query.survey})).select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 	query += '&(db.Reservations.Host==True)'
+	if request.query.tbc:
+		query += f"&db.Reservations.Member.belongs({tbc})"
 
 	header = CAT(header, A('Send Email Notice', _href=URL('composemail', vars=dict(query=query,
 		left  = "[db.Emails.on(db.Emails.Member==db.Reservations.Member),db.Members.on(db.Members.id==db.Reservations.Member)]",	
@@ -965,8 +982,8 @@ def event_reservations(event_id, path=None):
 											vars=dict(back=request.url)),
 										   _style='white-space: normal'), required_fields=[db.Reservations.Member]),
 	    				db.Members.Membership, db.Members.Paiddate, db.Reservations.Affiliation, db.Reservations.Notes,
-					    Column('cost', lambda row: event_cost(event_id, row.Reservations.Member) or ''),
-					    Column('tbc', lambda row: event_unpaid(event_id, row.Reservations.Member) or ''),
+					    Column('cost', lambda row: cost.get(row.Reservations.Member) or ''),
+					    Column('tbc', lambda row: (cost.get(row.Reservations.Member) or 0)-paid.get(row.Reservations.Member) or ''),
 					    Column('count', lambda row: (res_wait(row.Reservations.Member, event_id) if request.query.get('waitlist')\
 				      		else res_prov(row.Reservations.Member, event_id) if request.query.get('provisional')\
 							else res_conf(row.Reservations.Member, event_id)) or'')],
@@ -2221,18 +2238,19 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
-		if not member and form.vars.get('affiliation'):
-			r= db(db.Members.Firstname.ilike(form.vars['firstname'].split(' ')[0]+'%')&\
-					db.Members.Lastname.ilike(form.vars['lastname'].split(' ')[0]+'%')&\
-					(db.Affiliations.College==int(form.vars['affiliation']))).select(
-				db.Members.Firstname, db.Members.Lastname, db.Members.id, orderby=db.Affiliations.Modified,
-				left=db.Affiliations.on(db.Affiliations.Member==db.Members.id)).first()
-			if r and r.Firstname.lower().split(' ')[0]==form.vars['firstname'].lower().split(' ')[0] and \
-				r.Lastname.lower().split(' ')[0]==form.vars['lastname'].lower().split(' ')[0] and \
-				form.vars['matr'] == primary_matriculation(r.id):
+		if not member:
+			rows= db(db.Members.Firstname.ilike(form.vars['firstname'].split(' ')[0]+'%')&\
+					db.Members.Lastname.ilike(form.vars['lastname'].split(' ')[0]+'%')).select(
+				db.Members.Firstname, db.Members.Lastname, db.Members.id, db.Emails.Email, db.users.remote_addr,
+				left=(db.Emails.on(db.Emails.Member==db.Members.id),
+					db.users.on(db.users.email==db.Emails.Email)
+					),
+				)
+			if len(rows)>0:
+				suggest = " or ".join([r.Emails.Email for r in rows.find(lambda r: r.users.remote_addr==request.remote_addr)])
 				support = f'<a href="mailto:{SUPPORT_EMAIL}">{SUPPORT_EMAIL}</a>'
-				flash.set(f"It looks as if you have an existing member record under another email, \
-please login with the email you used before or contact {support}.", sanitize=False)
+				flash.set(f"It looks as if you may have an existing record under another email. \
+Please login with the email you used before{f'<em>, possibly {suggest}, </em>' if len({suggest})>0 else ''} or contact {support}.", sanitize=False)
 				redirect(URL('login', vars=dict(url=request.url)))
 
 	form = Form(fields, validation=validate, formstyle=FormStyleBulma, keep_values=True)

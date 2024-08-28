@@ -925,7 +925,7 @@ def event_reservations(event_id, path=None):
 		vars['survey'] = search_form.vars.get('survey') or ''
 		if search_form.vars.get('tbc'):
 			vars['tbc'] = 'On' 
-		else:
+		elif vars.get('tbc'):
 			del vars['tbc']
 		redirect(URL(f"event_reservations/{event_id}/select", vars=vars))
 	

@@ -65,8 +65,6 @@ same email as this identifies your record.<br />You can change your email after 
 you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}."))
  
 	if form.accepted:
-		log =f"login {request.remote_addr} {form.vars['email']} {request.query.url or ''} {request.environ['HTTP_USER_AGENT']}"
-		logger.info(log)
 		redirect(URL('send_email_confirmation', vars=dict(email=form.vars['email'], url=request.query.url,
 						timestamp=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))))
 	return locals()
@@ -131,7 +129,7 @@ def validate(id, token):
 	if member_id:
 		session.member_id = int(member_id)
 		session.access = db.Members[member_id].Access
-	log =f"verified {request.remote_addr} {user.email}"
+	log =f"login verified {request.remote_addr} {user.email} {request.query.url or ''} {request.environ['HTTP_USER_AGENT']}"
 	logger.info(log)
 	redirect(request.query.url)
 

@@ -1892,6 +1892,7 @@ def transactions(path=None):
 		["Member", lambda value: db.AccTrans.Member.belongs([r.id for r in db(db.Members.Lastname.ilike(f'%{value}%')|db.Members.Firstname.ilike(f'%{value}%')).select(db.Members.id)])],
 		["Event", lambda value: db.AccTrans.Event.belongs([r.id for r in db(db.Events.Description.ilike(f'%{value}%')).select(db.Events.id)])],
 		["Notes", lambda value: db.AccTrans.Notes.ilike(f'%{value}%')],
+		["Reference", lambda value: db.AccTrans.Reference.ilike(f'%{value}%')],
 	]
 	
 	grid = Grid(path, eval(request.query.get('query') or 'db.AccTrans.id>0'), left=eval(request.query.get('left')) if request.query.get('left') else None,

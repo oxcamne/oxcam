@@ -119,7 +119,8 @@ db.define_table('Emails',
 #returns a dictionary to look up host member_id and get confirmed ticket cost for an event
 def event_ticket_dict(event_id):
 	price = db.Event_Tickets.Price.sum()
-	return {r.Reservations.Member: r[price] for r in db((db.Reservations.Event==event_id)&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)).select(
+	return {r.Reservations.Member: r[price] for r in db((db.Reservations.Event==event_id)&(db.Reservations.Waitlist==False)\
+							&(db.Reservations.Provisional==False)&(db.Event_Tickets.Price!=None)).select(
 			db.Reservations.Member, price, left = db.Event_Tickets.on(db.Event_Tickets.id==db.Reservations.Ticket_),
 			orderby = db.Reservations.Member, groupby = db.Reservations.Member)}
 
@@ -143,10 +144,7 @@ def event_cost(event_id, member_id=None):
 	tickets = event_ticket_dict(event_id)
 	if member_id:
 		return tickets.get(member_id) or 0
-	cost = 0	#can't use sum() as there may be None values.
-	for member, price in tickets.items():
-		cost += price or 0
-	return cost
+	return sum(tickets.values())
 
 def event_unpaid(event_id, member_id=None):	#unpaid from confirmed reservations
 	return event_cost(event_id, member_id) - event_revenue(event_id, member_id)

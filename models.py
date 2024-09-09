@@ -132,7 +132,7 @@ def event_paid_dict(event_id):
 	paid = {r.AccTrans.Member: r[amount] for r in db((db.AccTrans.Event==event_id)&(db.AccTrans.Account==actkts)).select(
 		db.AccTrans.Member, amount, orderby = db.AccTrans.Member, groupby = db.AccTrans.Member)}
 	return {r.Member: (r.Charged or 0) + (paid.get(r.Member) or 0) for r in 
-		 	db(db.Reservations.Event==event_id).select(db.Reservations.Member, db.Reservations.Charged)}
+		 	db((db.Reservations.Event==event_id)&(db.Reservations.Host==True)).select(db.Reservations.Member, db.Reservations.Charged)}
 	
 def event_revenue(event_id, member_id=None):	#revenue from confirmed tickets
 	paid = event_paid_dict(event_id)

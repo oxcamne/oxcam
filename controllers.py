@@ -850,7 +850,8 @@ def event_analytics():
 
 	rows = db((db.Reservations.Host==True) & (db.Reservations.Waitlist==False) & (db.Reservations.Provisional==False)& \
 					(db.Reservations.Event == db.Events.id)).select(db.Reservations.Member, db.Reservations.Lastname,
-				db.Reservations.Firstname, db.Reservations.Affiliation, db.Events.Description, db.Events.DateTime, db.Events.id,
+					db.Reservations.Firstname, db.Reservations.Affiliation, db.Events.Description, db.Events.DateTime,
+					db.Events.id, 
 					orderby = db.Reservations.Lastname|db.Reservations.Firstname|db.Events.DateTime)
 
 	membid = 0
@@ -2118,9 +2119,13 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 	access = session.access	#for layout.html
 	db.Members.Created.default = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
 	db.Reservations.Created.default = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
+	member_id = session.member_id
 	if event_id:
 		event = db(db.Events.id==event_id).select().first()
-		if not event or datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.DateTime or (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.Booking_Closed and not event_attend(event_id)):
+		if not event or \
+				(datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.DateTime and \
+	 				not (member_id and event_unpaid(event_id, member_id) > 0)) or \
+				(datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.Booking_Closed and not event_attend(event_id)):
 			flash.set('Event is not open for booking.')
 			redirect(URL('index'))
 		if datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.Booking_Closed:
@@ -2135,7 +2140,6 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 			
 	affinity = None
 	clist = collegelist(event.Sponsors if event_id and event.Sponsors else [])
-	member_id = session.member_id
 	
 	if member_id:
 		member = db.Members[member_id]

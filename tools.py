@@ -76,6 +76,11 @@ See the Py4web documentation (DAL) for to learn more.")
 					)
 	except Exception as e:
 		flash.set(e)
+	"""
+	rows = db(eval(form.vars.get('query'))).select(
+				orderby=eval(form.vars.get('orderby')) if form.vars.get('orderby') else None,
+				left=eval(form.vars.get('left')) if form.vars.get('left') else None)
+	"""
 	return locals()
 
 @action("db_restore", method=['POST', 'GET'])

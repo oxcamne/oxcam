@@ -137,7 +137,7 @@ def event_paid_dict(event_id):
 def event_revenue(event_id, member_id=None):	#revenue from confirmed tickets
 	paid = event_paid_dict(event_id)
 	if member_id:
-		return paid.get(member_id)
+		return paid.get(member_id) or 0
 	return sum(paid.values())
 
 def event_cost(event_id, member_id=None):

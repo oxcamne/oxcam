@@ -94,10 +94,6 @@ def newpaiddate(paiddate, timestamp=datetime.datetime.now(TIME_ZONE).replace(tzi
 	basedate = timestamp.date() if not paiddate or paiddate<datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()-datetime.timedelta(days=graceperiod) else paiddate
 	if basedate.month==2 and basedate.day==29: basedate -= datetime.timedelta(days=1)
 	return datetime.date(basedate.year+years, basedate.month, basedate.day)
-
-def collegelist(sponsors=[]):
-	colleges = db().select(db.Colleges.ALL, orderby=db.Colleges.Oxbridge|db.Colleges.Name).find(lambda c: c.Oxbridge==True or c.id in sponsors)
-	return [(c.id, c.Name) for c in colleges if c.Name != 'Cambridge University' and c.Name != 'Oxford University']
 			
 def get_banks(startdatetime, enddatetime):
 	assets = {}
@@ -227,7 +223,6 @@ def msg_send(member,subject, message):
 #create confirmation of event
 def event_confirm(event_id, member_id, justpaid=0, event_only=False):
 	event = db.Events[event_id]
-	member = db.Members[member_id]
 	resvtns = db((db.Reservations.Event==event_id)&(db.Reservations.Member==member_id)).select(
 					orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname)
 	rows=[TR(TH('Event:', _style="text-align:left"), TD(event.Description or ''))]
@@ -256,6 +251,9 @@ def event_confirm(event_id, member_id, justpaid=0, event_only=False):
 	if tbc + dues>justpaid:
 		rows.append(TR(TH('Net amount due', _style="text-align:left"), TD(''), TD(''), TH(f'{CURRENCY_SYMBOL}{tbc+dues-justpaid:6.2f}', _style="text-align:left")))
 	body += TABLE(*rows).__str__()
+	host_reservation = resvtns[0]
+	if host_reservation.Notes:
+		body += f"<b>Notes:</b> {host_reservation.Notes}<br>"
 	if tbc + dues>justpaid:
 		body += f"To pay online please visit {DB_URL}/registration/{event_id}<br>"
 						#scheme=True doesn't pick up the domain in the email_daemon!

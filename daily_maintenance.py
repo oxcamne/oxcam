@@ -57,8 +57,7 @@ or cancel membership to receive no futher reminders.</p><p>\
 We are very grateful for your membership support and hope that you will renew!</p>\
 If you have any questions, please contact {SUPPORT_EMAIL}"
 			if IS_PRODUCTION:
-				email_sender(to=primary_email(m.id), sender=SUPPORT_EMAIL,
-					 bcc=SUPPORT_EMAIL, subject='Renewal Reminder', body=text)
+				email_sender(to=primary_email(m.id), sender=SUPPORT_EMAIL, subject='Renewal Reminder', body=text)
 			logger.info(f"Renewal Reminder sent to {primary_email(m.id)}")
 
 	subs = db((db.Members.Pay_subs!=None)&(db.Members.Pay_subs!='Cancelled')).select()

@@ -6,7 +6,7 @@ Colleges.id,Colleges.Name,Colleges.Oxbridge
 4,"St Edmund Hall, Oxford",True
 5,"St Peter's, Oxford",True
 6,"Gonville & Caius, Cambridge",True
-7,Cambridge University,True
+7,Cambridge University,False
 8,"Selwyn, Cambridge",True
 9,"Wolfson, Cambridge",True
 11,"Corpus Christi, Oxford",True
@@ -40,7 +40,7 @@ Colleges.id,Colleges.Name,Colleges.Oxbridge
 41,"All Souls, Oxford",True
 42,"Campion Hall, Oxford",True
 43,"Jesus, Oxford",True
-44,Oxford University,True
+44,Oxford University,False
 45,"Regent's Park, Oxford",True
 46,"St Hilda's, Oxford",True
 47,"St Stephen's House, Oxford",True

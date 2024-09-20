@@ -25,12 +25,10 @@ db.define_table('users',
 	Field('when_issued', 'datetime'))
 db.users.email.requires = IS_NOT_IN_DB(db, db.users.email)
 
+#include OxBridge colleges, explicit sponsors; excludes Cambridge/Oxford University
 def collegelist(sponsors=[]):
-	colleges = db().select(db.Colleges.ALL, orderby=db.Colleges.Oxbridge|db.Colleges.Name).find(lambda c: c.Oxbridge==True or c.id in sponsors)
-	clist = []
-	for c in colleges:
-		if c.Name != 'Cambridge University' and c.Name != 'Oxford University': clist.append((c.id, c.Name))
-	return clist
+	return [(c.id, c.Name) for c in db((db.Colleges.Oxbridge==True)|(db.Colleges.id.belongs(sponsors))).select(
+		orderby=db.Colleges.Oxbridge|db.Colleges.Name)]
 	
 db.define_table('Colleges',	#contains the individual colleges and other Oxbridge institutions, plus
 	Field('Name', 'string'),	#organizations with whom we co-sponsor events.
@@ -257,26 +255,26 @@ def res_selection(reservation_id):
 #Primary reservation record has Host==True
 db.define_table('Reservations',
 	Field('Member', 'reference Members', writable=False),
-	Field('Event', 'reference Events', readable=False, writable=False),
-	Field('Host', 'boolean', default=True, writable=False, readable=False), #indicates primary (member's) reservation
-	Field('Title', 'string', default='', writable=False, readable=False),
+	Field('Event', 'reference Events', writable=False),
+	Field('Host', 'boolean', default=True, writable=False), #indicates primary (member's) reservation
+	Field('Title', 'string', default='', readable=False, writable=False),
 	Field('Firstname', 'string', default='', requires = IS_NOT_EMPTY(), writable=False),
 	Field('Lastname', 'string', default='', requires = IS_NOT_EMPTY(), writable=False),
-	Field('Suffix', 'string', default='', writable=False, readable=False),
+	Field('Suffix', 'string', default='', readable=False, writable=False),
 	Field('Affiliation', 'reference Colleges', writable=True, default=None,	#primary affiliation
 			requires=IS_EMPTY_OR(IS_IN_DB(db, db.Colleges.id, '%(Name)s', orderby=db.Colleges.Name))),
 	Field('Ticket_', 'reference Event_Tickets'),
 	Field('Selection_', 'reference Event_Selections'),
-	Field('Survey_', 'reference Event_Survey', readable=False, writable=False),
+	Field('Survey_', 'reference Event_Survey', writable=False),
 	Field('Notes', 'string'),	#host name specified, or justifying ticket selection
-	Field('Comment', 'string', readable=False, writable=False),	#answer to open ended question
-	Field('Provisional', 'boolean', default=False, readable=False, writable=False),
+	Field('Comment', 'string', writable=False),	#answer to open ended question
+	Field('Provisional', 'boolean', default=False, writable=False),
 													#incomplete reservation: checkout not started, places not allocated
-	Field('Waitlist', 'boolean', default=False),	#now meaningfull in each individual reservation
+	Field('Waitlist', 'boolean', default=False, writable=False),	#now meaningfull in each individual reservation
 	
 	#following fields meaningfull only on the member's own reservation (Host==True)
-	Field('Charged', 'decimal(6,2)', readable=False, writable=False),	#payment made, not yet downloaded from Stripe
-	Field('Checkout', 'string', readable=False, writable=False),	#session.vars of incomplete checkout
+	Field('Charged', 'decimal(6,2)', writable=False),	#payment made, not yet downloaded from Stripe
+	Field('Checkout', 'string', writable=False),	#session.vars of incomplete checkout
 
 	Field('Created', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),
 	Field('Modified', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None),
@@ -360,7 +358,7 @@ db.define_table('AccTrans',
 				requires=IS_DECIMAL_IN_RANGE(-100000, 100000)),	# >=0 for asset/revenue, <0 for liability/expense
 	Field('Fee', 'decimal(6,2)', requires=IS_EMPTY_OR(IS_DECIMAL_IN_RANGE(-1000,1000))),	# e.g. PayPal transaction fee, <0 (unless refunded)
 	Field('CheckNumber', 'integer'),
-	Field('Accrual', 'boolean', default=True, readable=True, writable=False),
+	Field('Accrual', 'boolean', default=True, writable=False),
 	Field('Reference', 'string', writable=False),
 	Field('Notes', 'text'),
 	singular='Transaction', plural='Transaction_List')

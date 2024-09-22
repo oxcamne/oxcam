@@ -129,19 +129,19 @@ def event_paid_dict(event_id):
 	amount = db.AccTrans.Amount.sum()
 	paid = {r.AccTrans.Member: r[amount] for r in db((db.AccTrans.Event==event_id)&(db.AccTrans.Account==actkts)).select(
 		db.AccTrans.Member, amount, orderby = db.AccTrans.Member, groupby = db.AccTrans.Member)}
-	return {r.Member: (r.Charged or 0) + (paid.get(r.Member) or 0) for r in 
+	return {r.Member: (r.Charged or 0) + paid.get(r.Member, 0) for r in 
 		 	db((db.Reservations.Event==event_id)&(db.Reservations.Host==True)).select(db.Reservations.Member, db.Reservations.Charged)}
 	
 def event_revenue(event_id, member_id=None):	#revenue from confirmed tickets
 	paid = event_paid_dict(event_id)
 	if member_id:
-		return paid.get(member_id) or 0
+		return paid.get(member_id, 0)
 	return sum(paid.values())
 
 def event_cost(event_id, member_id=None):
 	tickets = event_ticket_dict(event_id)
 	if member_id:
-		return tickets.get(member_id) or 0
+		return tickets.get(member_id, 0)
 	return sum(tickets.values())
 
 def event_unpaid(event_id, member_id=None):	#unpaid from confirmed reservations
@@ -220,11 +220,6 @@ db.define_table('Affiliations',
        			update=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),
 	singular="Affiliation", plural="Affiliations")
 
-def res_dues(member_id, event_id, dues=False):	#dues payment associated with reservation
-	host_reservation = db((db.Reservations.Event==event_id)&(db.Reservations.Member==member_id)).select(
-							orderby=~db.Reservations.Host).first()
-	return decimal.Decimal(eval(host_reservation.Checkout).get('dues') or 0) if host_reservation and host_reservation.Checkout else 0
-
 def res_wait(member_id, event_id):
 	wait = db((db.Reservations.Member==member_id)&(db.Reservations.Event==event_id)&(db.Reservations.Waitlist==True)).count()
 	return wait
@@ -237,10 +232,6 @@ def res_conf(member_id, event_id):
 	conf = db((db.Reservations.Member==member_id)& (db.Reservations.Waitlist==False) &\
 			(db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)).count()
 	return conf
-
-def res_status(reservation_id):
-	r= db.Reservations[reservation_id]
-	return 'waitlisted' if r.Waitlist else 'unconfirmed' if r.Provisional else ''
 
 def res_unitcost(reservation_id):
 	r= db.Reservations[reservation_id]

@@ -261,8 +261,8 @@ def stripe_checkout():
 @checkaccess(None)
 def stripe_checkout_success():
 	member = db.Members[session.member_id]
-	dues = decimal.Decimal(request.query.get('dues') or 0)
-	tickets_tbc = decimal.Decimal(request.query.get('tickets_tbc') or 0)
+	dues = decimal.Decimal(request.query.get('dues', 0))
+	tickets_tbc = decimal.Decimal(request.query.get('tickets_tbc', 0))
 	stripe_session = stripe.checkout.Session.retrieve(session.get('stripe_session_id'))
 
 	if not stripe_session or decimal.Decimal(stripe_session.amount_total)/100 != tickets_tbc + dues:
@@ -285,8 +285,8 @@ def stripe_checkout_success():
 		host_reservation = db((db.Reservations.Event==request.query.get('event_id'))&(db.Reservations.Member == member.id)\
 					&(db.Reservations.Host == True)).select().first()
 		message += '<br><b>Your registration is now confirmed:</b><br>'
-		message +=event_confirm(request.query.get('event_id'), member.id, dues+tickets_tbc)
 		host_reservation.update_record(Charged = (host_reservation.Charged or 0) + tickets_tbc, Checkout = None)
+		message +=event_confirm(request.query.get('event_id'), member.id, dues)
 
 	msg_send(member,subject, message)
 	

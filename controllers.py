@@ -35,7 +35,7 @@ from py4web import action, request, response, redirect, URL, Field
 from yatl.helpers import H5, H6, XML, TABLE, TH, TD, THEAD, TR, HTML, P, BUTTON
 from .common import db, session, flash
 from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
-	MEMBERSHIP, MEMBER_CATEGORIES, MAIL_LISTS, TIME_ZONE,\
+	MEMBERSHIP, MEMBER_CATEGORIES, TIME_ZONE,\
 	PAYMENT_PROCESSOR, PAGE_BANNER, HOME_URL, HELP_URL, IS_PRODUCTION,\
 	ALLOWED_EMAILS, DATE_FORMAT, CURRENCY_SYMBOL
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
@@ -571,7 +571,11 @@ To change your mailing list subscritions, use the <b>Edit</b> button."))
 	if path=="new":
 		footer = "You will be able to adjust mailing list prefences after verifying your new email."
 	else:
-		footer = XML(MAIL_LISTS)
+		table_rows=[]
+		for l in db(db.Email_Lists.id>0).select():
+			table_rows.append(TR(TH(l.Listname, _style="text-align:left"), TD(XML(l.Description), _style="white-space: normal")))
+		footer = CAT("The mailing lists are used as follows:",
+				XML(TABLE(*table_rows).__str__()))
 
 	def validate(form):
 		if len(form.errors)>0:

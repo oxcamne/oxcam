@@ -87,8 +87,8 @@ Colleges.id,Colleges.Name,Colleges.Oxbridge
 
 
 TABLE Email_Lists
-Email_Lists.id,Email_Lists.Listname,Email_Lists.Member
-1,Group Mailings,True
+Email_Lists.id,Email_Lists.Listname,Email_Lists.Member,Email_Lists.Description
+1,Group Mailings,True,"All notices."
 
 
 TABLE CoA

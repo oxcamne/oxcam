@@ -79,3 +79,6 @@ If you have any questions, please contact {SUPPORT_EMAIL}"
 	db.export_to_csv_file(file)
 				
 	db.commit()
+
+	for handler in logger.handlers:
+		handler.flush()

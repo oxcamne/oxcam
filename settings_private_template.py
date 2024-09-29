@@ -65,10 +65,6 @@ THREAD_SUPPORT = False
 # access levels for group administrators do not change
 ACCESS_LEVELS = ['read', 'write', 'accounting', 'admin']
 
-# html description for mailing list selection
-# must correspond to mail lists defined in database Email_Lists table.
-MAIL_LISTS = f"The <b>Group Mailings</b> list is used for all {SOCIETY_SHORT_NAME} notices."
-
 # Paid membership categories, else empty list:
 MEMBER_CATEGORIES = ['Full', 'Student']
 # set to '[]' if your organization doesn't have paid memberships

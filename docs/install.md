@@ -87,10 +87,6 @@ THREAD_SUPPORT = False
 # access levels for group administrators do not change
 ACCESS_LEVELS = ['read', 'write', 'accounting', 'admin']
 
-# html description for mailing list selection
-# must correspond to mail lists defined in database Email_Lists table.
-MAIL_LISTS = f"The <b>Group Mailings</b> list is used for all {SOCIETY_SHORT_NAME} notices."
-
 # Paid membership categories, else empty list:
 MEMBER_CATEGORIES = ['Full', 'Student']
 # set to '[]' if your organization doesn't have paid memberships
@@ -156,8 +152,7 @@ possible also this [support guide](https://oxcamne.github.io/oxcam/support) as
 well as including organization specific information.
 
 1. A single mailing list is assumed. An organization can operate multiple
-mailing lists. MAIL_LISTS is simply an html description, the mailing lists
-themselves are set up in the database Email_Lists table. A mailing list should be defined and present in the database even it is not going to be used.
+mailing lists. The mailing lists are set up in the database Email_Lists table. A mailing list should be defined and present in the database even it is not going to be used.
 
 1. In the prototype membership categories are included for full and student
 members. If you do not have paid memberships MEMBER_CATEGORIES should be an empty list, '[]'.

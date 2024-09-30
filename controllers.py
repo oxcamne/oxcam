@@ -570,7 +570,7 @@ are sent as specified in the Mailings Column.<br>To switch to a new email addres
 To change your mailing list subscritions, use the <b>Edit</b> button."))
 	if path=="new":
 		footer = "You will be able to adjust mailing list prefences after verifying your new email."
-	else:
+	elif path=='select' or ismember!='Y':
 		table_rows=[]
 		for l in db(db.Email_Lists.id>0).select():
 			table_rows.append(TR(TH(l.Listname, _style="text-align:left"), TD(XML(l.Description), _style="white-space: normal")))
@@ -603,7 +603,8 @@ To change your mailing list subscritions, use the <b>Edit</b> button."))
 		header = CAT(header, email.Email)
 		fields = []
 		for list in db(db.Email_Lists.id>0).select():
-			fields.append(Field(list.Listname.replace(' ', '_'), 'boolean', default=list.id in (email.Mailings or [])))
+			fields.append(Field(list.Listname.replace(' ', '_'), 'boolean', default=list.id in (email.Mailings or []),
+					   comment=XML(list.Description)))
 		form = Form(fields)
 		if form.accepted:
 			mailings = []

@@ -255,7 +255,8 @@ def members(path=None):
 					vars=dict(query=query, left=left or None, qdesc=qdesc,
 					back=back))), XML('<br>'))
 		header = CAT(header,
-	       XML("Use filter to select a mailing list or apply other filters.<br>Selecting an event selects \
+	       XML(f"Use filter to select a <a href={URL('email_lists/select')}>\
+mailing list</a> or apply other filters.<br>Selecting an event selects \
 (or excludes from a mailing list) attendees.<br>You can filter on a member record field \
 using an optional operator (=, <, >, <=, >=) together with a value."))
 		footer = CAT(A("View Recent New Members", _href=URL('new_members/select')), XML('<br>'),
@@ -654,6 +655,62 @@ def new_members(path=None):
 			formstyle=form_style,
 			)
 	return locals()
+	
+@action('email_lists/<path:path>', method=['POST', 'GET'])
+@preferred
+@checkaccess('read')
+def email_lists(path=None):
+	access = session.access	#for layout.html
+	write = ACCESS_LEVELS.index(session.access) >= ACCESS_LEVELS.index('write')
+
+	header = H5('Email Lists')
+
+	if path=='select':
+		back = request.url
+	else:
+		back = decode_url(request.query._referrer)
+		if path=='new':
+			header = CAT(A('back', _href=back), H5('New Email List'))
+		elif path:
+			url = URL('registration', path[path.find('/')+1:], scheme=True)
+			list_id = path[path.find('/')+1:]
+			header = CAT(A('back', _href=back), H5('Email List Record'),
+						A('Make a Copy of This Email List', _href=URL(f'email_list_copy/{list_id}',
+								vars=dict(_referrer=request.query._referrer))))
+			if (path.startswith('delete') or path.startswith('edit') and request.POST._delete):
+				#deleting list, delete all references
+				for e in db(db.Emails.Mailings.contains(list_id)).select():
+					e.Mailings.remove(int(list_id))
+					e.update_record()
+
+	def validation(form):
+		if len(form.errors)>0:
+			flash.set("Error(s) in form, please check")
+			return
+
+	grid = Grid(path, db.Email_Lists.id>0,
+			details=not write, editable=write, create=write, deletable=write,
+			validation=validation,
+			grid_class_style=grid_style,
+			formstyle=form_style,
+			)
+	grid.render()
+	return locals()
+	
+@action('email_list_copy/<list_id:int>', method=['GET'])
+@preferred
+@checkaccess('write')
+def email_list_copy(list_id):
+	email_list = db.Email_Lists[list_id]
+	new_list_id = db.Email_Lists.insert(Listname='Copy of '+email_list.Listname, Member=email_list.Member,
+								Daemon=email_list.Daemon, Description=email_list.Description)
+
+	for e in db(db.Emails.Mailings.contains(list_id)).select():
+		e.Mailings.append(new_list_id)
+		e.update_record()
+
+	flash.set("Please customize the new email list.")
+	redirect(URL(f'email_lists/edit/{new_list_id}', vars=dict(_referrer=request.query._referrer)))
 	
 @action('events/<path:path>', method=['POST', 'GET'])
 @preferred

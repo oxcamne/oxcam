@@ -27,7 +27,7 @@ NOTE PythonAnywhere doesn't support threading so this runs instead
 """
 import time, os, random, pickle, datetime, re, smtplib
 from pathlib import Path
-from .common import db,logger
+from .common import db
 from .settings import VISIT_WEBSITE_INSTRUCTIONS, TIME_ZONE, THREAD_SUPPORT, IS_PRODUCTION,\
 	ALLOWED_EMAILS, SUPPORT_EMAIL, SMTP_BULK, DATE_FORMAT
 from .utilities import member_profile, event_confirm, member_greeting, emailparse, generate_hash, email_sender
@@ -113,7 +113,7 @@ def email_daemon():
 	db.commit()
 	print(f"{str(path)} email_daemon {start_time.strftime(DATE_FORMAT+' %H:%M')} running")
 
-	while True:	#until reload
+	while True:
 		email_list = db(db.Email_Lists.id>0).select().first()
 		if email_list and email_list.Daemon > start_time:
 			break	#exit this thread if reloaded

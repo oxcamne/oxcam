@@ -151,9 +151,6 @@ The help site might embed the [User Guide](https://oxcamne.github.io/oxcam) and
 possible also this [support guide](https://oxcamne.github.io/oxcam/support) as
 well as including organization specific information.
 
-1. A single mailing list is assumed. An organization can operate multiple
-mailing lists. The mailing lists are set up in the database Email_Lists table. A mailing list should be defined and present in the database even it is not going to be used.
-
 1. In the prototype membership categories are included for full and student
 members. If you do not have paid memberships MEMBER_CATEGORIES should be an empty list, '[]'.
 

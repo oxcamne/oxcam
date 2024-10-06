@@ -21,7 +21,7 @@ It can also be run in development using a launch.json configuration:
 import datetime
 import os
 from pathlib import Path
-from .common import db, logger
+from .common import db
 from .settings import SOCIETY_SHORT_NAME, STRIPE_SKEY, IS_PRODUCTION, ALLOWED_EMAILS, \
 	SUPPORT_EMAIL, LETTERHEAD, SOCIETY_NAME, DB_URL, DATE_FORMAT
 from .utilities import member_greeting, email_sender
@@ -58,7 +58,7 @@ We are very grateful for your membership support and hope that you will renew!</
 If you have any questions, please contact {SUPPORT_EMAIL}"
 			if IS_PRODUCTION:
 				email_sender(to=primary_email(m.id), sender=SUPPORT_EMAIL, subject='Renewal Reminder', body=text)
-			logger.info(f"Renewal Reminder sent to {primary_email(m.id)}")
+			print(f"Renewal Reminder sent to {primary_email(m.id)}")
 
 	subs = db((db.Members.Pay_subs!=None)&(db.Members.Pay_subs!='Cancelled')).select()
 	for m in subs:
@@ -71,7 +71,7 @@ but in any case we are grateful for your past support!</p>\
 If you have any questions, please contact {SUPPORT_EMAIL}"
 				email_sender(to=primary_email(m.id), sender=SUPPORT_EMAIL,
 					 bcc=SUPPORT_EMAIL, subject='Membership Renewal Failure', body=text)
-			logger.info(f"Membership Subscription Cancelled {primary_email(m.id)}")
+			print(f"Membership Subscription Cancelled {primary_email(m.id)}")
 			m.update_record(Pay_subs = 'Cancelled', Pay_next=None, Modified=datetime.datetime.now())
 
 	file=open(f'{SOCIETY_SHORT_NAME}_backup_{datetime.date.today().strftime("%Y%m%d")}.csv',
@@ -79,6 +79,3 @@ If you have any questions, please contact {SUPPORT_EMAIL}"
 	db.export_to_csv_file(file)
 				
 	db.commit()
-
-	for handler in logger.handlers:
-		handler.flush()

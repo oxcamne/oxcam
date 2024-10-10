@@ -3,7 +3,7 @@ This file defines the database models
 """
 
 from .common import db, Field
-from .settings import MEMBER_CATEGORIES, ACCESS_LEVELS, TIME_ZONE, DATE_FORMAT
+from .settings import MEMBERSHIPS, ACCESS_LEVELS, TIME_ZONE, DATE_FORMAT
 from pydal.validators import IS_IN_DB, IS_EMPTY_OR, IS_IN_SET, IS_NOT_EMPTY, IS_DATE,CLEANUP,\
 	IS_NOT_IN_DB, IS_MATCH, IS_EMAIL, IS_DECIMAL_IN_RANGE, IS_DATETIME, IS_INT_IN_RANGE
 from yatl.helpers import CAT, A
@@ -79,7 +79,7 @@ db.define_table('Members',
 	Field('Firstname', 'string', requires = [IS_NOT_EMPTY(), CLEANUP()], comment='*'),
 	Field('Lastname', 'string', requires = [IS_NOT_EMPTY(), CLEANUP()], comment='*'),
 	Field('Suffix', 'string'),
-	Field('Membership', 'string', requires=IS_EMPTY_OR(IS_IN_SET(MEMBER_CATEGORIES))),
+	Field('Membership', 'string', requires=IS_EMPTY_OR(IS_IN_SET([m.category for m in MEMBERSHIPS]))),
 	Field('Paiddate', 'date', requires = IS_EMPTY_OR(IS_DATE())),
 	Field('Pay_source'),	#payments source, e.g. 'stripe'
 	Field('Pay_cust'),	#Customer id on payment system
@@ -162,6 +162,7 @@ db.define_table('Events',
 	Field('DateTime', 'datetime', requires=[IS_NOT_EMPTY(), IS_DATETIME()], comment=" Event Date and Time, use 24-hour clock"),
 	Field('Booking_Closed', 'datetime'),
 	Field('Members_only', 'boolean', default=True, comment=" members and their guests only"),
+	Field('AdCom_only', 'boolean', default=False, comment=" advisory committee and guests only"),
 	Field('Allow_join', 'boolean', default=True, comment=" offer join option in registration"),
 	Field('Guests', 'integer', comment=" limit total guests (including member) allowed"),
 	Field('Sponsors', 'list:reference Colleges',

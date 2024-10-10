@@ -24,7 +24,6 @@ The path follows the bottlepy syntax.
 session, db, T, auth, and tempates are examples of Fixtures.
 Warning: Fixtures MUST be declared with @action.uses({fixtures}) else your app will result in undefined behavior
 """
-import dateutil.relativedelta
 from py4web.utils.grid import Grid, GridClassStyleBulma, Column
 from py4web.utils.form import Form, FormStyleBulma
 
@@ -35,7 +34,7 @@ from py4web import action, request, response, redirect, URL, Field
 from yatl.helpers import H5, H6, XML, TABLE, TH, TD, THEAD, TR, HTML, P, BUTTON
 from .common import db, session, flash
 from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
-	MEMBERSHIP, MEMBER_CATEGORIES, TIME_ZONE,\
+	MEMBERSHIPS, TIME_ZONE,\
 	PAYMENT_PROCESSOR, PAGE_BANNER, HOME_URL, HELP_URL, IS_PRODUCTION,\
 	ALLOWED_EMAILS, DATE_FORMAT, CURRENCY_SYMBOL
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
@@ -67,7 +66,7 @@ def index():
 	member = db.Members[session.member_id] if session.member_id else None
 	access = session.access	#for layout.html
 
-	if len(MEMBER_CATEGORIES)>0 and (not member or not member_good_standing(member, (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)+datetime.timedelta(days=GRACE_PERIOD)).date())):
+	if len(MEMBERSHIPS)>0 and (not member or not member_good_standing(member, (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)+datetime.timedelta(days=GRACE_PERIOD)).date())):
 		header = CAT(header, A("Join or Renew your Membership", _href=URL('registration')), XML('<br>'))
 		# allow renewal once within GRACE_PERIOD of expiration.
 	else:
@@ -93,6 +92,8 @@ def index():
 	events = db(db.Events.DateTime>=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)).select(orderby = db.Events.DateTime)
 	events = events.find(lambda e: e.Booking_Closed>=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) or event_attend(e.id))
 	for event in events:
+		if event.AdCom_only and not (member and member.Access):
+			continue
 		waitlist = ' '
 		if event.Booking_Closed < datetime.datetime.now(TIME_ZONE).replace(tzinfo=None):
 			waitlist = ' *Booking Closed, waitlisting* '
@@ -318,62 +319,6 @@ def members_export():
 		flash.set(e)
 	return locals()	
 
-#used by member_analytics and financial_statement to analyze the stream of dues payments
-def scan_dues(function, cutoff=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)):
-	acdues = db(db.CoA.Name.ilike("Membership Dues")).select().first().id
-
-	query = (db.Members.Paiddate >= datetime.date(2016,1,1))|((db.Members.Paiddate==None)&(db.Members.Membership!=None))
-	left = db.AccTrans.on((db.AccTrans.Member==db.Members.id)&(db.AccTrans.Account==acdues)&(db.AccTrans.Amount>0))
-
-	rows = db(query).select(db.Members.id, db.Members.Firstname, db.Members.Lastname, db.Members.Membership,
-			 		db.Members.Paiddate, db.Members.Created, db.Members.Pay_next, db.AccTrans.Timestamp, 
-					db.AccTrans.Amount, db.AccTrans.Paiddate, db.AccTrans.Membership,
-					orderby=db.Members.Lastname|db.Members.Firstname|~db.AccTrans.Timestamp,
-					left = left)
-	
-	l = None
-	
-	for r in rows:
-		if not l or r.Members.id != l.Members.id:
-			if l:
-				function(l, l.AccTrans.Timestamp, endpaid, l.AccTrans.Membership)
-				l = None
-
-			if not r.AccTrans.Timestamp:
-				if not r.Members.Paiddate:	#comp/life members
-					function(r, r.Members.Created, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)+datetime.timedelta(days=365), 'Full')
-				else:
-					function(r, r.Members.Paiddate-datetime.timedelta(days=365), r.Members.Paiddate, r.Members.Membership or 'Full')
-				continue	#early checks were aggregated, not individually recorded
-
-			endpaid = r.Members.Pay_next or r.Members.Paiddate
-			if r.Members.Pay_next and r.Members.Pay_next.year==datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).year:
-				endpaid = datetime.date(r.Members.Pay_next.year+1, 1, 1) #assume autosubscription good through year end
-			if r.AccTrans.Timestamp and r.AccTrans.Timestamp>cutoff:
-				endpaid = r.AccTrans.Paiddate
-				r.AccTrans.Amount = 0
-			elif (not r.AccTrans.Paiddate or r.AccTrans.Timestamp.date()>r.AccTrans.Paiddate + datetime.timedelta(days=GRACE_PERIOD)):
-				function(r, r.AccTrans.Timestamp, endpaid, r.AccTrans.Membership)
-				endpaid = r.AccTrans.Paiddate
-			l = r	#this was a renewal, check next record
-			continue
-
-		r.AccTrans.Amount += l.AccTrans.Amount
-		if r.AccTrans.Timestamp and r.AccTrans.Timestamp>cutoff:
-			endpaid = r.AccTrans.Paiddate
-			r.AccTrans.Amount = 0
-		elif (l.AccTrans.Paiddate and l.AccTrans.Timestamp.date()<=l.AccTrans.Paiddate + datetime.timedelta(days=GRACE_PERIOD)\
-			and l.AccTrans.Membership != r.AccTrans.Membership):
-			function(l, l.AccTrans.Timestamp, endpaid, l.AccTrans.Membership)
-			endpaid = l.AccTrans.Timestamp.date()
-		elif (not r.AccTrans.Paiddate or r.AccTrans.Timestamp.date()>r.AccTrans.Paiddate + datetime.timedelta(days=GRACE_PERIOD)):
-			function(r, r.AccTrans.Timestamp, endpaid, r.AccTrans.Membership)
-			endpaid = r.AccTrans.Paiddate
-		l = r
-
-	if l:
-		function(l, l.AccTrans.Timestamp, endpaid, l.AccTrans.Membership)
-
 @action('member_analytics', method=['GET'])
 @action('member_analytics/<path:path>', method=['GET'])
 @action.uses("download.html", db, session, flash, Inject(response=response))
@@ -385,6 +330,7 @@ def member_analytics(path=None):
 	writer=csv.writer(stream)
 	writer.writerow(['Name', 'Matr', 'AgeBand', 'Year', 'Category'])
 
+	acdues = db(db.CoA.Name.ilike("Membership Dues")).select().first().id
 	matr = db.Affiliations.Matr.min()
 	matrrows = db(db.Affiliations.Matr!=None).select(db.Affiliations.Member, matr, groupby = db.Affiliations.Member)
 	
@@ -392,15 +338,36 @@ def member_analytics(path=None):
 		if not endpaid:
 			return
 		name = r.Members.Lastname + ', ' + r.Members.Firstname
-		m = matrrows.find(lambda m: m.Affiliations.Member == r.Members.id).first()
+		m = matrrows.find(lambda m: m.Affiliations.Member == r.AccTrans.Member).first()
 		matric = m[matr] if m else None
 		year = endpaid.year-1
 		while year >= max(startpaid.year, 2016):
 			writer.writerow([name, str(matric) if matric else '', ageband(year, matric),
 						str(year), status])
 			year -= 1
-	
-	scan_dues(output)
+
+	rows = db((db.AccTrans.Account==acdues)&(db.AccTrans.Amount>0)&(db.AccTrans.Member!=None)).select(
+		db.AccTrans.ALL, db.Members.Lastname, db.Members.Firstname, db.Members.Paiddate, db.Members.Pay_next,
+		left = db.Members.on(db.AccTrans.Member==db.Members.id),
+		orderby = db.Members.Lastname|db.Members.Firstname|~db.AccTrans.Timestamp
+	)
+
+	l = None
+	end = 0
+	for r in rows:
+		if not l or l.AccTrans.Member != r.AccTrans.Member:
+			if r.Members.Pay_next: #assume next autopayment will be made
+				end = datetime.date(datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).year+1, 1, 1)
+			else:
+				end = r.Members.Paiddate
+
+		if not end:		#some historical records missing Paiddate, assume 1yr membership
+			end = r.AccTrans.Timestamp.date() + datetime.timedelta(365)
+		output(r, r.AccTrans.Timestamp.date(), end, r.AccTrans.Membership)
+		end = r.AccTrans.Paiddate
+
+		l = r
+
 	return locals()
 
 @action('member_reservations/<member_id:int>/<path:path>', method=['POST', 'GET'])
@@ -1465,9 +1432,9 @@ def event_copy(event_id):
 	selections = db(db.Event_Selections.Event==event_id).select()
 	survey = db(db.Event_Survey.Event==event_id).select()
 	new_event_id = db.Events.insert(Page=event.Page, Description='Copy of '+event.Description, DateTime=event.DateTime,
-				Booking_Closed=event.Booking_Closed, Members_only=event.Members_only, Allow_join=event.Allow_join,
-				Guest=event.Guests, Sponsors=event.Sponsors, Venue=event.Venue, Capacity=event.Capacity,
-				Speaker=event.Speaker, Notes=event.Notes, Comment=event.Comment)
+				Booking_Closed=event.Booking_Closed, Members_only=event.Members_only, AdCom_only=event.AdCom_only,
+				Allow_join=event.Allow_join, Guest=event.Guests, Sponsors=event.Sponsors, Venue=event.Venue,
+				Capacity=event.Capacity, Speaker=event.Speaker, Notes=event.Notes, Comment=event.Comment)
 	for t in tickets:
 		db.Event_Tickets.insert(Event=new_event_id, Ticket=t.Ticket, Price=t.Price, Count=t.Count,
 					Qualify=t.Qualify, Allow_as_guest=t.Allow_as_guest, Short_name=t.Short_name)
@@ -1569,16 +1536,31 @@ def financial_statement(start, end):
 		return (-(r[sumamt] or 0), query, left)
 		
 	def prepaiddues(date_time):
-		end = (date_time + datetime.timedelta(days=365)).date()
+		prepaidafter = (date_time + datetime.timedelta(days=365)).date()
 		prepaid = 0
-	
-		def dues_payment(r, startpaid, endpaid, status):
-			nonlocal prepaid
-			if r.AccTrans.Timestamp and endpaid and r.AccTrans.Timestamp<date_time and endpaid>end:
-				prepaid -= r.AccTrans.Amount*(endpaid-end).days/(endpaid-startpaid.date()).days
+		refs = []
 
-		scan_dues(dues_payment, cutoff=date_time)
-		return (prepaid, None, None)
+		rows = db((db.AccTrans.Account==acdues)&(db.AccTrans.Amount>0)&(db.AccTrans.Member!=None)).select(
+			db.AccTrans.ALL, db.Members.Paiddate, db.Members.Pay_next, db.Members.Lastname, db.Members.Firstname,
+			left = db.Members.on(db.AccTrans.Member==db.Members.id),
+			orderby = db.AccTrans.Member|~db.AccTrans.Timestamp
+		)
+
+		l = None
+		end = 0
+		for r in rows:
+			if not l or l.AccTrans.Member != r.AccTrans.Member:
+				end = r.Members.Paiddate
+
+			if not end:		#some historical records missing Paiddate, assume 1yr membership
+				end = r.AccTrans.Timestamp.date() + datetime.timedelta(365)
+			if end > prepaidafter and r.AccTrans.Timestamp < date_time:
+				prepaid += r.AccTrans.Amount*(end - prepaidafter).days/(end - r.AccTrans.Timestamp.date()).days
+				refs.append(r.AccTrans.id)
+			end = r.AccTrans.Paiddate
+
+			l = r
+		return (prepaid, f"db.AccTrans.id.belongs({str(refs)})", None)
 	
 	assets = get_banks(startdatetime, enddatetime)
 	
@@ -1998,14 +1980,16 @@ def transactions(path=None):
 			elif transaction.Account!=acdues and new_amount>0:	#e.g. recording check
 				member = db.Members[form.vars.get('Member')]
 				valid_dues = False
-				for membership in MEMBER_CATEGORIES:
-					dues = eval(f"{member.Pay_source or PAYMENT_PROCESSOR}_get_dues(membership)")
-					if new_amount == dues*int(new_amount/dues):
-						transaction.update_record(Paiddate = member.Paiddate, Membership=membership)
-						member.update_record(Membership=membership,
-							Paiddate=newpaiddate(member.Paiddate, transaction.Timestamp, years=int(new_amount/dues)))
-						valid_dues = True
-						break
+				for membership in MEMBERSHIPS:
+					transaction.update_record(Paiddate = member.Paiddate, Membership=membership.category)
+					if new_amount == membership.annual_dues*int(new_amount/membership.annual_dues): #this membership category
+						if not member.Paiddate or member.Paiddate < datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()+datetime.timedelta(days=GRACE_PERIOD):
+							#compute new paiddate & record it and membership category (in case changing Student to Full)
+							member.update_record(Paiddate=newpaiddate(member.Paiddate, transaction.Timestamp, years=int(new_amount/membership.annual_dues)),
+								Membership=membership.category)
+						#else assume member record updated manually when check received
+					valid_dues = True
+					break
 				if not valid_dues:
 					form.errors['Amount'] = "not a valid dues payment"
 		if form.vars.get('Account')==actkts:
@@ -2302,7 +2286,8 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 						session['membership'] = checkout.get('membership')
 						session['dues'] = str(checkout.get('dues')) if checkout.get('dues') else None
 				redirect(URL('reservation/select'))	#go add guests and/or checkout
-			if member_good_standing(member, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()) or sponsor \
+			if member.Access if event.AdCom_only else \
+			   member_good_standing(member, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()) or sponsor \
 					or ((affinity or member.Membership) and not event.Members_only and not event.Allow_join):
 				#members in good standing, or members of sponsor organizations, or
 				#membership-eligible and event open to all alums then no need to gather member information
@@ -2323,12 +2308,15 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 				else 'Mailing List Registration' if request.query.get('mail_lists')
 				else 'Membership Application/Renewal: Your Information')
 	if event:
-		header = CAT(header, XML(f"Event: {event.Description}<br>When: {event.DateTime.strftime('%A %B %d, %Y %I:%M%p')}<br>Where: {event.Venue}<br><br>\
-	This event is open to {'all alumni of Oxford & Cambridge' if not event.Members_only else 'members of '+SOCIETY_SHORT_NAME}\
-	{' and members of sponsoring organizations (list at the top of the Affiliations dropdown)' if event.Sponsors else ''}\
-	{' and their guests.' if not event.Guests or event.Guests>1 else ''}.<br>"))
+		if event.AdCom_only and not (member and member.Access):
+			redirect(URL('index'))
+		header = CAT(header, XML(f"Event: {event.Description}<br>When: {event.DateTime.strftime('%A %B %d, %Y %I:%M%p')}<br>Where: {event.Venue}<br><br>"),
+XML(f"This event is open to \
+{'all alumni of Oxford & Cambridge' if not event.Members_only else f'members of {SOCIETY_SHORT_NAME}'}\
+{' and members of sponsoring organizations (list at the top of the Affiliations dropdown)' if event.Sponsors else ''}\
+{' and their guests' if not event.Guests or event.Guests>1 else ''}.<br>"))
 	elif not request.query.get('mail_lists'):
-		header = CAT(header, XML(MEMBERSHIP))
+		header = CAT(header, XML('<br>'.join([f"<b>{m.category} Membership</b> is open to {m.description}" for m in MEMBERSHIPS])))
 		
 	#gather the person's information as necessary (may have only email)
 	fields=[]
@@ -2348,14 +2336,15 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 
 	if event:
 		mustjoin = event.Members_only and not event.Sponsors
-		if len(MEMBER_CATEGORIES)>0 and (event.Members_only or event.Allow_join):
+		if len(MEMBERSHIPS)>0 and (event.Members_only or event.Allow_join):
 			fields.append(Field('join_or_renew', 'boolean', default=mustjoin,
 				comment=' this event is restricted to OxCamNE members' if mustjoin else \
 					' tick if you are an Oxbridge alum and also wish to join OxCamNE or renew your membership'))
-	elif not request.query.get('mail_lists') and len(MEMBER_CATEGORIES)>0:
+	elif not request.query.get('mail_lists') and len(MEMBERSHIPS)>0:
 		fields.append(Field('membership', 'string',
 						default=member.Membership if member and member.Membership else '',
-						requires=IS_IN_SET(MEMBER_CATEGORIES, zero='please select your membership category')))
+						requires=IS_IN_SET([m.category for m in MEMBERSHIPS]),
+						zero='please select your membership category'))
 		fields.append(Field('notes', 'string'))
 
 	if not member:
@@ -2380,9 +2369,9 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 			form.errors['matr'] = 'please enter your matriculation year'
 		if event and event.Members_only and not form.vars.get('join_or_renew'):
 			form.errors['join_or_renew'] = 'This event is for members only, please join/renew to attend'
-		if not event and not request.query.get('mail_lists') and len(MEMBER_CATEGORIES)>0 and form.vars.get('membership')!=MEMBER_CATEGORIES[0]:
-			if not form.vars.get('notes') or form.vars.get('notes').strip()=='':
-				form.errors['notes'] = 'Please note how you qualify for '+form.vars.get('membership')+' status'
+		membership = next((m for m in MEMBERSHIPS if m.category==form.vars.get('membership')))
+		if membership and not event and (not form.vars.get('notes') or form.vars.get('notes').strip()==''):
+			form.errors['notes'] = membership.qualification
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return

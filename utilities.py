@@ -4,7 +4,7 @@ This file contains functions shared by multiple controllers
 from py4web import URL, request
 from .common import db
 from .settings import TIME_ZONE, SUPPORT_EMAIL, LETTERHEAD, GRACE_PERIOD, CURRENCY_SYMBOL,\
-	DB_URL, SOCIETY_SHORT_NAME, MEMBER_CATEGORIES, DATE_FORMAT, SMTP_TRANS, STRIPE_SKEY, SOCIETY_NAME
+	DB_URL, SOCIETY_SHORT_NAME, MEMBERSHIPS, DATE_FORMAT, SMTP_TRANS, STRIPE_SKEY, SOCIETY_NAME
 from .models import primary_email, event_cost, member_name, res_selection,\
 	res_unitcost, event_revenue
 from yatl.helpers import A, TABLE, TH, THEAD, H6, TR, TD, CAT, HTML, XML
@@ -12,9 +12,9 @@ import datetime, re, smtplib, markdown, base64, decimal
 from email.message import EmailMessage
 
 #check if member is in good standing at a particular date
-#if no MEMBER_CATEGORIES always return True
+#if no paid membership categories always return True
 def member_good_standing(member, date):
-	return member and (len(MEMBER_CATEGORIES)==0 or (member.Membership and ((not member.Paiddate or member.Paiddate>=date)\
+	return member and (len(MEMBERSHIPS)==0 or (member.Membership and ((not member.Paiddate or member.Paiddate>=date)\
 			or member.Charged or (member.Pay_subs and member.Pay_subs != 'Cancelled'))))
 
 def ageband(year, matr):

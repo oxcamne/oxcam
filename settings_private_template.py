@@ -65,17 +65,26 @@ THREAD_SUPPORT = False
 # access levels for group administrators do not change
 ACCESS_LEVELS = ['read', 'write', 'accounting', 'admin']
 
-# Paid membership categories, else empty list:
-MEMBER_CATEGORIES = ['Full', 'Student']
-# set to '[]' if your organization doesn't have paid memberships
+from dataclasses import dataclass
+import decimal
 
-# html description of paid membership criteria:
-MEMBERSHIP = "Membership is open to all matriculated alumni and members of the \
-Universities of Oxford and Cambridge.<br><br>\
+@dataclass
+class Membership:
+    category: str
+    annual_dues: decimal
+    description: str
+    qualification: str = None
+
+#list of Membership definitions (may be empty list - adjust as needed)
+MEMBERSHIPS = [
+    Membership('Full', 30, "Membership is open to all matriculated alumni and \
+members of the Universities of Oxford and Cambridge.<br><br>\
 Annual dues are $30 payable by subscription. In future years, you'll receive a \
-reminder a week before the next auto-payment is made. \
-Full time students, or those graduated within the last 12 months, qualify for student \
-membership at $10 (please note your course and graduation date).<br><br>"
+reminder a week before the next auto-payment is made."),
+    Membership('Student', 10, "Full time students, or those graduated within \
+the last 12 months, qualify for student membership at $10, renewable annually",
+"Please note details of your full-time course (current or graduated within last 12 months).")
+]
 
 GRACE_PERIOD = 45
 """

@@ -87,17 +87,26 @@ THREAD_SUPPORT = False
 # access levels for group administrators do not change
 ACCESS_LEVELS = ['read', 'write', 'accounting', 'admin']
 
-# Paid membership categories, else empty list:
-MEMBER_CATEGORIES = ['Full', 'Student']
-# set to '[]' if your organization doesn't have paid memberships
+from dataclasses import dataclass
+import decimal
 
-# html description of paid membership criteria:
-MEMBERSHIP = "Membership is open to all matriculated alumni and members of the \
-Universities of Oxford and Cambridge.<br><br>\
+@dataclass
+class Membership:
+    category: str
+    annual_dues: decimal
+    description: str
+    qualification: str = None
+
+#list of Membership definitions (may be empty list)
+MEMBERSHIPS = [
+    Membership('Full', 30, "Membership is open to all matriculated alumni and \
+members of the Universities of Oxford and Cambridge.<br><br>\
 Annual dues are $30 payable by subscription. In future years, you'll receive a \
-reminder a week before the next auto-payment is made. \
-Full time students, or those graduated within the last 12 months, qualify for student \
-membership at $10 (please note your course and graduation date).<br><br>"
+reminder a week before the next auto-payment is made."),
+    Membership('Student', 10, "Full time students, or those graduated within \
+the last 12 months, qualify for student membership at $10, renewable annually",
+"Please note details of your full-time course (current or graduated within last 12 months).")
+]
 
 GRACE_PERIOD = 45
 """
@@ -119,7 +128,7 @@ SMTP_BULK = SMTP_TRANS
 # logger settings
 LOGGERS = [
     "warning:stdout",
-     "info:oxcam.log:%(asctime)s - %(levelname)s - %(message)s"
+    "info:oxcam.log:%(asctime)s - %(levelname)s - %(message)s"
 ]  # syntax "severity:filename" filename can be stderr or stdout
 ALLOWED_ACTIONS = []    #disable Py4web's auth
 
@@ -152,7 +161,7 @@ possible also this [support guide](https://oxcamne.github.io/oxcam/support) as
 well as including organization specific information.
 
 1. In the prototype membership categories are included for full and student
-members. If you do not have paid memberships MEMBER_CATEGORIES should be an empty list, '[]'.
+members. Adjust as needed. If you do not have paid memberships MEMBERSHIPS should be an empty list, '[]'.
 
 1. The email settings configure two SMTP servers. One is used for transactional emails, such as login email verification, transaction confirms, and emails addressed explicitly, the other for bulk emails, sent to mailing list or filtered sets of members. OxCamNE uses an email service provider which, among other things, ensures that messages are authenticated by SPF and DKIM records. Small groups could use, e.g. a gmail address with an app password. In production, for transactional messages we use our google workspace account directly, whereas bulk messages are sent via our email service provider, mailgun. These settings should be present even if you are not using mailing list functionality.
 

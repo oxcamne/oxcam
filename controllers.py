@@ -1981,8 +1981,8 @@ def transactions(path=None):
 				member = db.Members[form.vars.get('Member')]
 				valid_dues = False
 				for membership in MEMBERSHIPS:
-					transaction.update_record(Paiddate = member.Paiddate, Membership=membership.category)
 					if new_amount == membership.annual_dues*int(new_amount/membership.annual_dues): #this membership category
+						transaction.update_record(Paiddate = member.Paiddate, Membership=membership.category)
 						if not member.Paiddate or member.Paiddate < datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()+datetime.timedelta(days=GRACE_PERIOD):
 							#compute new paiddate & record it and membership category (in case changing Student to Full)
 							member.update_record(Paiddate=newpaiddate(member.Paiddate, transaction.Timestamp, years=int(new_amount/membership.annual_dues)),

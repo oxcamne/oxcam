@@ -253,7 +253,7 @@ def members(path=None):
 		if qdesc:
 			header = CAT(header,
 				A(f"Send Notice to {qdesc}", _href=URL('composemail',
-					vars=dict(query=query, left=left or None, qdesc=qdesc,
+					vars=dict(query=query, left=left or '', qdesc=qdesc,
 					back=back))), XML('<br>'))
 		header = CAT(header,
 	       XML(f"Use filter to select a <a href={URL('email_lists/select')}>\
@@ -2165,10 +2165,8 @@ def bcc_export():
 	content_type = "text/plain"
 	filename = 'bcc.txt'
 	query = request.query.get('query')
-	mailing_list = 'Mailings.contains'in query
-	left = request.query.get('left') or "db.Emails.on(db.Emails.Member==db.Members.id)"
-	rows = db(eval(query)).select(db.Members.id, db.Emails.Email, left=eval(left) if left else None,
-			       orderby=db.Members.id|~db.Emails.Modified, distinct=True)
+	left = request.query.get('left')
+	rows = db(eval(query)).select(left=eval(left) if left else None, distinct=True)
 	writer=csv.writer(stream)
 	for row in rows:
 		email = row.get(db.Emails.Email) or primary_email(row.get(db.Members.id))

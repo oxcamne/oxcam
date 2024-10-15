@@ -25,7 +25,7 @@ from .common import db
 from .settings import SOCIETY_SHORT_NAME, STRIPE_SKEY, IS_PRODUCTION, ALLOWED_EMAILS, \
 	SUPPORT_EMAIL, LETTERHEAD, SOCIETY_NAME, DB_URL, DATE_FORMAT
 from .utilities import member_greeting, email_sender
-from .pay_processors import stripe_subscription_cancelled
+from .pay_processors import paymentprocessor
 from .models import primary_email
 
 def daily_maintenance():
@@ -62,7 +62,7 @@ If you have any questions, please contact {SUPPORT_EMAIL}"
 
 	subs = db((db.Members.Pay_subs!=None)&(db.Members.Pay_subs!='Cancelled')).select()
 	for m in subs:
-		if eval(f"{m.Pay_source}_subscription_cancelled(m)"):	#subscription no longer operational
+		if paymentprocessor(m.Pay_source).subscription_cancelled():	#subscription no longer operational
 			if IS_PRODUCTION:
 				text = f"{LETTERHEAD.replace('&lt;subject&gt;', 'Membership Renewal Failure')}{member_greeting(m)}"
 				text += f"<p>We have been unable to process your auto-renewal and as a result your membership has been cancelled. </p><p>\

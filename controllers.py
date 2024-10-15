@@ -50,8 +50,7 @@ from .utilities import email_sender, member_good_standing, ageband, newpaiddate,
 	encode_url, decode_url
 from .session import checkaccess
 #stripe items show unreferenced in vscode, but they are used via eval() - don't delete
-from .pay_processors import stripe_update_email, stripe_update_card, stripe_switched_card,\
-	stripe_process_charge, stripe_cancel_subscription, paymentprocessor
+from .pay_processors import paymentprocessor
 from py4web.utils.factories import Inject
 import datetime, re, csv, decimal, pickle, markdown, dateutil
 from io import StringIO
@@ -104,6 +103,14 @@ def index():
 			A('register', _href=URL(f'registration/{event.id}')), ' or ',
 			A('see details', _href=event.Page, _target='event'), XML('<br>'))
 	return locals()
+
+@action('view_card')
+@preferred
+@checkaccess(None)
+def view_card():
+	if not session.Pay_source:
+		redirect(URL('index'))
+	paymentprocessor().view_card
 
 @action('members/<path:path>', method=['POST', 'GET'])
 @preferred
@@ -516,7 +523,7 @@ def emails(ismember, member_id, path=None):
 
 	if path=='select':
 		member = db.Members[member_id]
-		eval(f"{member.Pay_source or PAYMENT_PROCESSOR}_update_email(member)")
+		paymentprocessor(member.Pay_source).update_email(member)
 		back = request.query.back
 	else:
 		back = decode_url(request.query._referrer)
@@ -1385,8 +1392,7 @@ def reservation(path=None):
 					msg_send(member, subject, message)	
 					flash.set('Thank you. Confirmation has been sent by email.')
 				redirect(URL(f'reservation/select'))
-			redirect(URL(f'{member.Pay_source or PAYMENT_PROCESSOR}_checkout',
-						vars=dict(back=request.url)))
+			paymentprocessor().checkout(request.url)
 	return locals()
 
 @action('doorlist_export/<event_id:int>', method=['GET'])
@@ -1908,7 +1914,7 @@ def bank_file(bank_id):
 					continue	#on to next transaction
 			else:	#try to identify charges
 				try:
-					amount, details = eval(f"{bank.Name.lower()}_process_charge(row, bank, reference, timestamp, amount, fee)")
+					amount, details = paymentprocessor(bank.Name.lower()).process_charge(row, bank, reference, timestamp, amount, fee)
 					if amount==0:
 						continue
 					if notes != details:
@@ -2432,7 +2438,7 @@ Please login with the email you used before{f'<em>, possibly {suggest}, </em>' i
 		if request.query.get('join_or_renew') or not event:	#collecting dues with event registration, or joining/renewing
 			#membership dues payment
 			#get the subscription plan id (Full membership) or 1-year price (Student) from Stripe Products
-			session['dues'] = str(paymentprocessor().get_dues(form.vars.get('membership')))
+			session['dues'] = str(paymentprocessor(member.Pay_source).get_dues(form.vars.get('membership')))
 			session['membership'] = form.vars.get('membership')
 			#ensure the default mailing list subscriptions are in place in the primary email
 			email = db(db.Emails.Member==member.id).select(orderby=~db.Emails.Modified).first()
@@ -2451,8 +2457,7 @@ Please login with the email you used before{f'<em>, possibly {suggest}, </em>' i
 				redirect(URL('profile')) #gather profile info
 			if session.get('event_id'):
 				redirect(URL('reservation/new'))	#go create this member's reservation
-			redirect(URL(f'{member.Pay_source or PAYMENT_PROCESSOR}_checkout',
-						vars=dict(back=request.url)))
+			paymentprocessor().checkout(request.url)
 	return locals()
 	
 ######################################## Join/Renew/Profile Update ######################################
@@ -2509,8 +2514,7 @@ reached by using the join/renew link on our home page).<br>\
 		if session.get('dues'):
 			if session.get('event_id'):
 				redirect(URL('reservation/new'))	#go create this member's reservation
-			redirect(URL(f'{member.Pay_source or PAYMENT_PROCESSOR}_checkout',
-						vars=dict(back=request.url)))
+			paymentprocessor().checkout(request.url)
 		flash.set('Thank you for updating your profile information.')
 		notify_support(member.id, 'Member Profile Updated', member_profile(member))
 	
@@ -2540,8 +2544,7 @@ def cancel_subscription(member_id=None):
 	form = Form([], submit_value='Cancel Subscription')
 	
 	if form.accepted:
-		eval(f"{member.Pay_source or PAYMENT_PROCESSOR}_cancel_subscription(member)")
-		
+		paymentprocessor(member.Pay_source).cancel_subscription(member)
 		member.update_record(Pay_subs = 'Cancelled', Pay_next=None)
 		#if we simply cleared Pay_subs then the daily backup daemon might issue membership reminders!
 		if not member.Paiddate:	#just joined but changed their mind?

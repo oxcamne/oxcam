@@ -13,16 +13,16 @@ from .models import primary_email, member_name, event_unpaid
 from .controllers import checkaccess, form_style
 from .utilities import notify_support, newpaiddate, msg_header, msg_send, event_confirm
 from py4web.utils.form import Form
-from .settings import CURRENCY_SYMBOL, STRIPE_SKEY, STRIPE_PKEY, PaymentProcessor, PAYMENTPROCESSORS,\
-		STRIPE_PROD_FULL, STRIPE_PROD_STUDENT, PAGE_BANNER, HOME_URL, HELP_URL
+from .settings import CURRENCY_SYMBOL, PaymentProcessor, PAYMENTPROCESSORS, PAGE_BANNER, HOME_URL, HELP_URL
 from yatl.helpers import H5, BEAUTIFY, CAT, XML
 from py4web.utils.factories import Inject
 import stripe, decimal, datetime
 
 preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
 
-def paymentprocessor():
-	return next((p for p in PAYMENTPROCESSORS if p.name==session.pay_source)) if session.pay_source else PAYMENTPROCESSORS[0]
+#locate named or default processor
+def paymentprocessor(name=session.pay_source):
+	return next((p for p in PAYMENTPROCESSORS if p.name==name)) if name else PAYMENTPROCESSORS[0]
 
 def stripeprocessor():
 	return next((p for p in PAYMENTPROCESSORS if p.name=='stripe'))
@@ -59,50 +59,82 @@ class StripeProcessor(PaymentProcessor):
 		price = stripe.Price.retrieve(product.default_price)
 		return decimal.Decimal(price.unit_amount)/100
 	
-#update Stripe Customer Record with current primary email
-def stripe_update_email(member):
-	if member.Pay_cust:
-		try:	#check customer still exists on Stripe
-			stripe.Customer.modify(member.Pay_cust, email=primary_email(member.id))
-		except Exception as e:
-			member.update_record(Pay_cust=None, Pay_subs=None, Pay_next=None)
+	#update Stripe Customer Record with current primary email
+	def update_email(self, member):
+		if member.Pay_cust:
+			try:	#check customer still exists on Stripe
+				stripe.Customer.modify(member.Pay_cust, email=primary_email(member.id))
+			except Exception as e:
+				member.update_record(Pay_cust=None, Pay_subs=None, Pay_next=None)
 
-#process a Stripe transaction
-def stripe_process_charge(dict_csv, bank, reference, timestamp, amount, fee):
-	acdues = db(db.CoA.Name.ilike("Membership Dues")).select().first()
-	actkts = db(db.CoA.Name.ilike("Ticket sales")).select().first()
-	charge = stripe.Charge.retrieve(dict_csv['Source'])
-	member = db(db.Members.Pay_cust==charge.customer).select().first()
-	notes = f"{dict_csv['Source']}"
-	if dict_csv['Type']=='charge':
-		if (charge.description=='Subscription update' or (member.Charged and amount>=member.Charged)) and member.Membership:
-			#dues paid, charge may also cover an event (auto renewal or manual)
-			if (charge.description or '').startswith('Subscription'):
-				subscription = stripe.Subscription.list(customer=charge.customer).data[0]
-				notes += f' Subscription: {subscription.id}'
-				member.update_record(Pay_next=datetime.datetime.fromtimestamp(subscription.current_period_end).date())
-			product = stripe.Product.retrieve(eval(f"STRIPE_PROD_{member.Membership.upper()}"))
-			duesprice = stripe.Price.retrieve(product.default_price)
-			duesamount = decimal.Decimal(duesprice.unit_amount)/100
-			duesfee = (duesamount * fee)/amount	#prorate fee
-			nowpaid = newpaiddate(member.Paiddate, timestamp=timestamp)
-			db.AccTrans.insert(Bank = bank.id, Account = acdues.id, Amount = duesamount,
-					Member=member.id, Paiddate=member.Paiddate, Membership=member.Membership,
-					Fee = duesfee, Accrual = False, Timestamp = timestamp,
-					Reference = reference, Notes = notes)
-			member.update_record(Paiddate=nowpaid, Charged=None)
-			fee -= duesfee
-			amount -= duesamount
+	#process a Stripe transaction
+	def process_charge(self, dict_csv, bank, reference, timestamp, amount, fee):
+		acdues = db(db.CoA.Name.ilike("Membership Dues")).select().first()
+		actkts = db(db.CoA.Name.ilike("Ticket sales")).select().first()
+		charge = stripe.Charge.retrieve(dict_csv['Source'])
+		member = db(db.Members.Pay_cust==charge.customer).select().first()
+		notes = f"{dict_csv['Source']}"
+		if dict_csv['Type']=='charge':
+			if (charge.description=='Subscription update' or (member.Charged and amount>=member.Charged)) and member.Membership:
+				#dues paid, charge may also cover an event (auto renewal or manual)
+				if (charge.description or '').startswith('Subscription'):
+					subscription = stripe.Subscription.list(customer=charge.customer).data[0]
+					notes += f' Subscription: {subscription.id}'
+					member.update_record(Pay_next=datetime.datetime.fromtimestamp(subscription.current_period_end).date())
+				product = stripe.Product.retrieve(eval(f"STRIPE_PROD_{member.Membership.upper()}"))
+				duesprice = stripe.Price.retrieve(product.default_price)
+				duesamount = decimal.Decimal(duesprice.unit_amount)/100
+				duesfee = (duesamount * fee)/amount	#prorate fee
+				nowpaid = newpaiddate(member.Paiddate, timestamp=timestamp)
+				db.AccTrans.insert(Bank = bank.id, Account = acdues.id, Amount = duesamount,
+						Member=member.id, Paiddate=member.Paiddate, Membership=member.Membership,
+						Fee = duesfee, Accrual = False, Timestamp = timestamp,
+						Reference = reference, Notes = notes)
+				member.update_record(Paiddate=nowpaid, Charged=None)
+				fee -= duesfee
+				amount -= duesamount
 
-		if amount > 0:	#presumably apply to event reservations
-			resvtn=db((db.Reservations.Member==member.id)&(db.Reservations.Charged>=amount)).select(
-							orderby=db.Reservations.Modified).first()
-			if resvtn:
-				db.AccTrans.insert(Bank = bank.id, Account = actkts.id, Member=member.id, Amount = amount, Fee = fee,
-					Timestamp = timestamp, Event = resvtn.Event, Reference = reference, Accrual = False, Notes = notes)
-				resvtn.update_record(Charged = resvtn.Charged - amount, Checkout=None)
-				amount = 0
-	return (amount, notes)	#if amount not zero will be stored as unallocated
+			if amount > 0:	#presumably apply to event reservations
+				resvtn=db((db.Reservations.Member==member.id)&(db.Reservations.Charged>=amount)).select(
+								orderby=db.Reservations.Modified).first()
+				if resvtn:
+					db.AccTrans.insert(Bank = bank.id, Account = actkts.id, Member=member.id, Amount = amount, Fee = fee,
+						Timestamp = timestamp, Event = resvtn.Event, Reference = reference, Accrual = False, Notes = notes)
+					resvtn.update_record(Charged = resvtn.Charged - amount, Checkout=None)
+					amount = 0
+		return (amount, notes)	#if amount not zero will be stored as unallocated
+
+	def cancel_subscription(self, member):
+		if member.Pay_subs:	#delete Stripe subscription if applicable
+			try:
+				stripe.Subscription.delete(member.Pay_subs)
+			except Exception as e:
+				pass
+		return False
+
+	#daily maintence for subscriptions
+	def subscription_cancelled(self, member):	#return True if subscription no longer current
+		product = stripe.Product.retrieve(eval(f"STRIPE_PROD_{member.Membership.upper()}"))
+		if member.Pay_subs:	#delete Stripe subscription if applicable
+			try:
+				subscription = stripe.Subscription.retrieve(member.Pay_subs)
+
+				if subscription.plan.id!=product.default_price:
+					#dues payment to change with next renewal but not retroactively
+					stripe.SubscriptionItem.modify(subscription['items'].data[0].id, price=product.default_price, proration_behavior='none')
+
+				if not subscription.canceled_at:
+					return False		#canceled_at set when last payment 	attempt fails
+				#note after auto-pay fails and cancels the subsription, it can no longer be deleted from Stripe
+			except Exception as e:
+				pass
+		return True		#can't retrieve subscription
+	
+	def view_card(self):
+		redirect(URL('stripe_view_card'))
+
+	def checkout(self, back):
+		redirect(URL('stripe_checkout', vars=dict(back=back)))
 
 #display Stripe Checkout form to enter new card credentials
 @action('stripe_update_card', method=['GET'])
@@ -111,7 +143,7 @@ def stripe_process_charge(dict_csv, bank, reference, timestamp, amount, fee):
 def stripe_update_card():
 	access = session.access	#for layout.html
 	stripe_session_id = request.query.get('stripe_session_id')
-	stripe_pkey = STRIPE_PKEY
+	stripe_pkey = stripeprocessor().public_key
 	return locals()
 
 #new card successfully registered using checkout
@@ -172,32 +204,6 @@ def stripe_view_card():
 		session['stripe_session_id'] = stripe_session.stripe_id
 		redirect(URL('stripe_update_card', vars=dict(stripe_session_id=stripe_session.id)))
 	return locals()
-
-def stripe_cancel_subscription(member):
-	if member.Pay_subs:	#delete Stripe subscription if applicable
-		try:
-			stripe.Subscription.delete(member.Pay_subs)
-		except Exception as e:
-			pass
-	return False
-
-#daily maintence for subscriptions
-def stripe_subscription_cancelled(member):	#return True if subscription no longer current
-	product = stripe.Product.retrieve(eval(f"STRIPE_PROD_{member.Membership.upper()}"))
-	if member.Pay_subs:	#delete Stripe subscription if applicable
-		try:
-			subscription = stripe.Subscription.retrieve(member.Pay_subs)
-
-			if subscription.plan.id!=product.default_price:
-				#dues payment to change with next renewal but not retroactively
-				stripe.SubscriptionItem.modify(subscription['items'].data[0].id, price=product.default_price, proration_behavior='none')
-
-			if not subscription.canceled_at:
-				return False		#canceled_at set when last payment 	attempt fails
-			#note after auto-pay fails and cancels the subsription, it can no longer be deleted from Stripe
-		except Exception as e:
-			pass
-	return True		#can't retrieve subscription
 
 @action('stripe_checkout', method=['GET'])
 @action.uses("stripe_checkout.html", db, session, flash)
@@ -261,7 +267,7 @@ def stripe_checkout():
 	)
 	stripe_session_id = stripe_session.stripe_id		#for use in template
 	session['stripe_session_id'] = stripe_session.stripe_id
-	stripe_pkey = STRIPE_PKEY
+	stripe_pkey = stripeprocessor().public_key
 	return locals()
 
 @action('stripe_checkout_success', method=['GET'])

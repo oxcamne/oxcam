@@ -2369,7 +2369,7 @@ XML(f"This event is open to \
 			form.errors['join_or_renew'] = 'This event is for members only, please join/renew to attend'
 		if form.vars.get('membership'):
 			membership = next((m for m in MEMBERSHIPS if m.category==form.vars.get('membership')))
-			if not event and (not form.vars.get('notes') or form.vars.get('notes').strip()==''):
+			if membership.qualification and not form.vars.get('notes').strip():
 				form.errors['notes'] = membership.qualification
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")

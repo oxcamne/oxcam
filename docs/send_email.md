@@ -38,10 +38,10 @@ Fortunately there is a [free web tool](https://www.labnol.org/embed/google/drive
 
 You can use the *image_url* directly in Markdown, or if you want more complex formatting you can use html. You can set the image size (width) and make it a centered block, for example, thus:
 
-\<p>\<img src="*image_url*" alt="*alt_text*" width="300px" style="display:block; margin:auto">\</p>
+\<p style="text-align:center">\<img src="*image_url*" alt="*alt_text*" width="300px">\</p>
 
 Or you might wish to have the image on the left with the following text alongside, separated by a margin:
 
-\<p>\<img src="*image_url*" alt="*alt_text*" width="300px" style="float:left; margin: 0px 15px 0px 0px">\</p>
+\<p style="float:left; margin: 0px 15px 0px 0px">\<img src="*image_url*" alt="*alt_text*" width="300px">\</p>
 
 Note the margins specified are top, right, bottom, left.

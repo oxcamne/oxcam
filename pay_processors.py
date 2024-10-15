@@ -13,16 +13,22 @@ from .models import primary_email, member_name, event_unpaid
 from .controllers import checkaccess, form_style
 from .utilities import notify_support, newpaiddate, msg_header, msg_send, event_confirm
 from py4web.utils.form import Form
-from .settings import CURRENCY_SYMBOL, STRIPE_SKEY, STRIPE_PKEY, \
+from .settings import CURRENCY_SYMBOL, STRIPE_SKEY, STRIPE_PKEY, PaymentProcessor, PAYMENTPROCESSORS,\
 		STRIPE_PROD_FULL, STRIPE_PROD_STUDENT, PAGE_BANNER, HOME_URL, HELP_URL
 from yatl.helpers import H5, BEAUTIFY, CAT, XML
 from py4web.utils.factories import Inject
 import stripe, decimal, datetime
 
-stripe.api_key = STRIPE_SKEY
-stripe.api_version = '2023-10-16'
-
 preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
+
+def paymentprocessor():
+	return next((p for p in PAYMENTPROCESSORS if p.name==session.pay_source)) if session.pay_source else PAYMENTPROCESSORS[0]
+
+def stripeprocessor():
+	return next((p for p in PAYMENTPROCESSORS if p.name=='stripe'))
+
+stripe.api_key = stripeprocessor().secret_key
+stripe.api_version = '2023-10-16'
 
 # stripe_tool (diagnostic tool)
 @action('stripe_tool', method=['GET', 'POST'])
@@ -45,11 +51,13 @@ def stripe_tool():
 			flash.set(str(e))
 	return locals()
 
-#get dues details for membership type
-def stripe_get_dues(membership):
-	product = stripe.Product.retrieve(eval(f"STRIPE_PROD_{membership.upper()}"))
-	price = stripe.Price.retrieve(product.default_price)
-	return decimal.Decimal(price.unit_amount)/100
+class StripeProcessor(PaymentProcessor):
+
+	#get dues details for membership type
+	def get_dues(self, membership):
+		product = stripe.Product.retrieve(stripeprocessor().dues_products.get(membership))
+		price = stripe.Price.retrieve(product.default_price)
+		return decimal.Decimal(price.unit_amount)/100
 	
 #update Stripe Customer Record with current primary email
 def stripe_update_email(member):
@@ -303,3 +311,8 @@ def stripe_checkout_success():
 		#I think this is CSRF protection at work.
 		#redirect(URL(f"emails/Y/{member.id}/edit/{db(db.Emails.Member == member.id).select(orderby=~db.Emails.Modified).first().id}"))
 	redirect(URL('index'))
+
+#install implementation in base class
+PAYMENTPROCESSORS = [StripeProcessor(
+	p.name, p.public_key, p.secret_key, p.dues_products
+) if p.name == 'stripe' else p for p in PAYMENTPROCESSORS]

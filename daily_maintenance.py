@@ -25,7 +25,7 @@ from .common import db
 from .settings import SOCIETY_SHORT_NAME, STRIPE_SKEY, IS_PRODUCTION, ALLOWED_EMAILS, \
 	SUPPORT_EMAIL, LETTERHEAD, SOCIETY_NAME, DB_URL, DATE_FORMAT
 from .utilities import member_greeting, email_sender
-from .stripe_interface import stripe_subscription_cancelled
+from .pay_processors import stripe_subscription_cancelled
 from .models import primary_email
 
 def daily_maintenance():

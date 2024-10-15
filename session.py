@@ -126,9 +126,12 @@ def validate(id, token):
 	session.email = user.email
 	session.access = None
 	session.member_id = None
+	session.pay_source = None
 	if member_id:
+		member = db.Members[member_id]
 		session.member_id = int(member_id)
-		session.access = db.Members[member_id].Access
+		session.access = member.Access
+		session.pay_source = member.Pay_source
 	log =f"login verified {request.remote_addr} {user.email} {request.query.url or ''} {request.environ.get('HTTP_USER_AGENT')}"
 	logger.info(log)
 	redirect(request.query.url)

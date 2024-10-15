@@ -50,8 +50,8 @@ from .utilities import email_sender, member_good_standing, ageband, newpaiddate,
 	encode_url, decode_url
 from .session import checkaccess
 #stripe items show unreferenced in vscode, but they are used via eval() - don't delete
-from .stripe_interface import stripe_update_email, stripe_update_card, stripe_switched_card,\
-	stripe_get_dues, stripe_process_charge, stripe_cancel_subscription
+from .pay_processors import stripe_update_email, stripe_update_card, stripe_switched_card,\
+	stripe_process_charge, stripe_cancel_subscription, paymentprocessor
 from py4web.utils.factories import Inject
 import datetime, re, csv, decimal, pickle, markdown, dateutil
 from io import StringIO
@@ -2432,7 +2432,7 @@ Please login with the email you used before{f'<em>, possibly {suggest}, </em>' i
 		if request.query.get('join_or_renew') or not event:	#collecting dues with event registration, or joining/renewing
 			#membership dues payment
 			#get the subscription plan id (Full membership) or 1-year price (Student) from Stripe Products
-			session['dues'] = str(eval(f"{PAYMENT_PROCESSOR}_get_dues(form.vars.get('membership'))"))
+			session['dues'] = str(paymentprocessor().get_dues(form.vars.get('membership')))
 			session['membership'] = form.vars.get('membership')
 			#ensure the default mailing list subscriptions are in place in the primary email
 			email = db(db.Emails.Member==member.id).select(orderby=~db.Emails.Modified).first()

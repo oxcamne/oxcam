@@ -9,7 +9,7 @@ from .models import db
 from .settings import THREAD_SUPPORT
 
 # by importing controllers you expose the actions defined in it
-from . import controllers, stripe_interface, tools, website, session, email_daemon, daily_maintenance
+from . import controllers, pay_processors, tools, website, session, email_daemon, daily_maintenance
 from .email_daemon import email_daemon
 
 # optional parameters

@@ -8,7 +8,7 @@ Stripe provides separate production and developments so that payment functions c
 
 ### The Payment Processor Interface
 
-The connection between a running OxCam instance and Stripe is made based on the settings in [settings_private.py](install.md#configure-the-software-for-your-organization). All the logic implementing the payment interface is contained in stripe_interface.py.
+The connection between a running OxCam instance and Stripe is made based on the settings in [settings_private.py](install.md#configure-the-software-for-your-organization). All the logic implementing the payment interface is contained in the StripeProcessor class in pay_processors.py.
 
 Implementing a different payment interface, say PayPal, would involve changing the PAYMENT_PROCESSOR setting in settings_private.py to 'paypal' and defining its keys, etc. as PAYPAL_... definitions, and creating paypal_interface.py containing paypal_... functions and controllers corresponding to the stripe_... functions in stripe_inteface.py. The payment processor used by each member is recorded in each member record, so a payment processor transition could be accomplished by leaving members with Stripe subscriptions with Stripe but implementing a different processor for others.
 

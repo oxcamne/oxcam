@@ -20,7 +20,7 @@ The **static** folder contains css files and other static content. It also conta
 
 I have not implemented any multi-language support so the **translations** folder is simply a copy of what is in the _scaffold application.
 
-**\__init__**.py is the startup script. It differs from the one in _scaffold mainly in that I have put the controllers into multiple files, controllers.py, tools.py, session.py, stripe_interface.py and website.py.
+**\__init__**.py is the startup script. It differs from the one in _scaffold mainly in that I have put the controllers into multiple files, controllers.py, tools.py, session.py, pay_processors.py and website.py.
 
 **session.py** has the logic around login, email validation, and logout, and importantly the **@checkaccess** decorator which ensures users are logged in and controls access to administrative functions.
 

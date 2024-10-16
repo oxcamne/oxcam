@@ -97,7 +97,7 @@ class Membership:
     description: str
     qualification: str = None
 
-#list of Membership definitions (may be empty list)
+#list of Membership definitions (may be empty list - adjust as needed)
 MEMBERSHIPS = [
     Membership('Full', 30, "Membership is open to all matriculated alumni and \
 members of the Universities of Oxford and Cambridge.<br><br>\
@@ -106,6 +106,25 @@ reminder a week before the next auto-payment is made."),
     Membership('Student', 10, "Full time students, or those graduated within \
 the last 12 months, qualify for student membership at $10, renewable annually",
 "Please note details of your full-time course (current or graduated within last 12 months).")
+]
+
+class PaymentProcessor:
+	def __init__(self, name, public_key, secret_key, dues_products):
+		self.name = name	#should be lower case, single word (underscore allowed)
+		self.public_key = public_key
+		self.secret_key = secret_key
+		self.dues_products = dues_products
+
+""" available processors, first is defaault: """
+PAYMENTPROCESSORS = [
+	PaymentProcessor(name = 'stripe',
+		public_key = "<--- live Stripe public key --->" if IS_PRODUCTION else "<--- test Stripe public key --->d",
+		secret_key = "<--- live Stripe secret key --->" if IS_PRODUCTION else "<--- test Stripe secret key --->",
+		dues_products = {
+			'Full': "<-- live Stripe product id -->G" if IS_PRODUCTION else "<-- test Stripe product id -->",
+			'Student': "<-- live Stripe product id -->" if IS_PRODUCTION else "<-- test Stripe product id -->Z"
+		}
+	)
 ]
 
 GRACE_PERIOD = 45
@@ -127,19 +146,11 @@ SMTP_BULK = SMTP_TRANS
 
 # logger settings
 LOGGERS = [
-    "warning:stdout",
-    "info:oxcam.log:%(asctime)s - %(levelname)s - %(message)s"
-]  # syntax "severity:filename" filename can be stderr or stdout
-ALLOWED_ACTIONS = []    #disable Py4web's auth
+	"warning:stdout",
+	"info:oxcam.log:%(asctime)s - %(levelname)s - %(message)s"
+]  # syntax "severity:filename:format" filename can be stderr or stdout
 
-# payment processor (currently only stripe implemented):
-PAYMENT_PROCESSOR='stripe'  
-#Stripe settings development keys and id's
-STRIPE_PKEY = "<--- Stripe public key --->"
-STRIPE_SKEY = "<--- Stripe secret key --->"
-# specific products for membership dues
-STRIPE_PROD_FULL = "<--- Stripe product id -->"  #Annual, autorenews
-STRIPE_PROD_STUDENT = "<--- Stripe product id -->"    #Annual, no autorenew
+ALLOWED_ACTIONS = []    #disable Py4web's auth
 ```
 
 Notes:
@@ -161,11 +172,11 @@ possible also this [support guide](https://oxcamne.github.io/oxcam/support) as
 well as including organization specific information.
 
 1. In the prototype membership categories are included for full and student
-members. Adjust as needed. If you do not have paid memberships MEMBERSHIPS should be an empty list, '[]'.
+members, as used by OxCamNE. Adjust as needed. If you do not have paid memberships MEMBERSHIPS should be an empty list, '[]'.
 
 1. The email settings configure two SMTP servers. One is used for transactional emails, such as login email verification, transaction confirms, and emails addressed explicitly, the other for bulk emails, sent to mailing list or filtered sets of members. OxCamNE uses an email service provider which, among other things, ensures that messages are authenticated by SPF and DKIM records. Small groups could use, e.g. a gmail address with an app password. In production, for transactional messages we use our google workspace account directly, whereas bulk messages are sent via our email service provider, mailgun. These settings should be present even if you are not using mailing list functionality.
 
-1. There is a group of settings for the Stripe payment processor, which is currently the only supported payment processor. These include public and private account keys, and product identifiers corresponding to the membership categories. Go [here](stripe.md) for more information on setting up and using Stripe.
+1. PaymentProcessor is a base class for all payment processors that might be supported. Each supported payment processor will be implemented as a subclass of PaymentProcessor. PAYMENTPROCESSORS is a list of payment processor instances, currently only Stripe has been written. The first one in the list is the default for new customers. The implementations are in pay_processors.py. Go [here](stripe.md) for more information on setting up and using Stripe.
 
 ### Start the database
 

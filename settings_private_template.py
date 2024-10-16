@@ -86,6 +86,25 @@ the last 12 months, qualify for student membership at $10, renewable annually",
 "Please note details of your full-time course (current or graduated within last 12 months).")
 ]
 
+class PaymentProcessor:
+	def __init__(self, name, public_key, secret_key, dues_products):
+		self.name = name	#should be lower case, single word (underscore allowed)
+		self.public_key = public_key
+		self.secret_key = secret_key
+		self.dues_products = dues_products
+
+""" available processors, first is defaault: """
+PAYMENTPROCESSORS = [
+	PaymentProcessor(name = 'stripe',
+		public_key = "<--- live Stripe public key --->" if IS_PRODUCTION else "<--- test Stripe public key --->d",
+		secret_key = "<--- live Stripe secret key --->" if IS_PRODUCTION else "<--- test Stripe secret key --->",
+		dues_products = {
+			'Full': "<-- live Stripe product id -->G" if IS_PRODUCTION else "<-- test Stripe product id -->",
+			'Student': "<-- live Stripe product id -->" if IS_PRODUCTION else "<-- test Stripe product id -->Z"
+		}
+	)
+]
+
 GRACE_PERIOD = 45
 """
 Renewal within this number of days after expiration extends membership
@@ -105,15 +124,8 @@ SMTP_BULK = SMTP_TRANS
 
 # logger settings
 LOGGERS = [
-     "info:oxcam.log:%(asctime)s - %(levelname)s - %(message)s"
+	"warning:stdout",
+	"info:oxcam.log:%(asctime)s - %(levelname)s - %(message)s"
 ]  # syntax "severity:filename:format" filename can be stderr or stdout
-ALLOWED_ACTIONS = []    #disable Py4web's auth
 
-# payment processor (currently only stripe implemented):
-PAYMENT_PROCESSOR='stripe'  
-#Stripe settings development keys and id's
-STRIPE_PKEY = "<--- Stripe public key --->"
-STRIPE_SKEY = "<--- Stripe secret key --->"
-# specific products for membership dues
-STRIPE_PROD_FULL = "<--- Stripe product id -->"  #Annual, autorenews
-STRIPE_PROD_STUDENT = "<--- Stripe product id -->"    #Annual, no autorenew
+ALLOWED_ACTIONS = []    #disable Py4web's auth

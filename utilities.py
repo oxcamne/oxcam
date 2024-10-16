@@ -4,7 +4,7 @@ This file contains functions shared by multiple controllers
 from py4web import URL, request
 from .common import db
 from .settings import TIME_ZONE, SUPPORT_EMAIL, LETTERHEAD, GRACE_PERIOD, CURRENCY_SYMBOL,\
-	DB_URL, SOCIETY_SHORT_NAME, MEMBERSHIPS, DATE_FORMAT, SMTP_TRANS, STRIPE_SKEY, SOCIETY_NAME
+	DB_URL, SOCIETY_SHORT_NAME, MEMBERSHIPS, DATE_FORMAT, SMTP_TRANS, PAGE_BANNER
 from .models import primary_email, event_cost, member_name, res_selection,\
 	res_unitcost, event_revenue
 from yatl.helpers import A, TABLE, TH, THEAD, H6, TR, TD, CAT, HTML, XML
@@ -281,7 +281,7 @@ def member_greeting(member):
 
 import hashlib
 def generate_hash(email):
-    return hashlib.sha1((email + STRIPE_SKEY).encode()).hexdigest()
+    return hashlib.sha1((email + PAGE_BANNER).encode()).hexdigest()
 
 def get_list(list, index):
 	try:

@@ -22,8 +22,7 @@ import datetime
 import os
 from pathlib import Path
 from .common import db
-from .settings import SOCIETY_SHORT_NAME, STRIPE_SKEY, IS_PRODUCTION, ALLOWED_EMAILS, \
-	SUPPORT_EMAIL, LETTERHEAD, SOCIETY_NAME, DB_URL, DATE_FORMAT
+from .settings import SOCIETY_SHORT_NAME, IS_PRODUCTION, SUPPORT_EMAIL, LETTERHEAD, SOCIETY_NAME, DB_URL, DATE_FORMAT
 from .utilities import member_greeting, email_sender
 from .pay_processors import paymentprocessor
 from .models import primary_email

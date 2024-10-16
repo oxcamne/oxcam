@@ -34,8 +34,7 @@ from py4web import action, request, response, redirect, URL, Field
 from yatl.helpers import H5, H6, XML, TABLE, TH, TD, THEAD, TR, HTML, P, BUTTON
 from .common import db, session, flash
 from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
-	MEMBERSHIPS, TIME_ZONE,\
-	PAYMENT_PROCESSOR, PAGE_BANNER, HOME_URL, HELP_URL, IS_PRODUCTION,\
+	MEMBERSHIPS, TIME_ZONE, PAGE_BANNER, HOME_URL, HELP_URL, IS_PRODUCTION,\
 	ALLOWED_EMAILS, DATE_FORMAT, CURRENCY_SYMBOL
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
 	member_affiliations, member_emails, primary_affiliation, primary_email,\

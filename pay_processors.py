@@ -284,7 +284,11 @@ def stripe_checkout_success():
 		#redirect(URL(f"emails/Y/{member.id}/edit/{db(db.Emails.Member == member.id).select(orderby=~db.Emails.Modified).first().id}"))
 	redirect(URL('index'))
 
-#install implementation in base class
+"""
+install implementation in base class
+NOTE this creates a local instance containing the implementing subclass instances,
+which should be accessed using paymentprocessor() or stripeprocessor()
+"""
 PAYMENTPROCESSORS = [StripeProcessor(
 	p.name, p.public_key, p.secret_key, p.dues_products
 ) if p.name == 'stripe' else p for p in PAYMENTPROCESSORS]

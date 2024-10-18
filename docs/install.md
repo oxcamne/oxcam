@@ -97,35 +97,51 @@ class Membership:
     description: str
     qualification: str = None
 
-#list of Membership definitions (may be empty list - adjust as needed)
+"""
+list of Membership definitions (may be empty list)
+NOTE <dues> in description will be replaced by the figure in e.g. Stripe's dues products.
+"""
 MEMBERSHIPS = [
-    Membership('Full', 30, "Membership is open to all matriculated alumni and \
-members of the Universities of Oxford and Cambridge.<br><br>\
-Annual dues are $30 payable by subscription. In future years, you'll receive a \
-reminder a week before the next auto-payment is made."),
-    Membership('Student', 10, "Full time students, or those graduated within \
-the last 12 months, qualify for student membership at $10, renewable annually",
+    Membership('Full', "all matriculated alumni and members of the Universities of \
+Oxford and Cambridge. Annual dues are <dues> payable by subscription. In future years, you'll \
+receive a reminder a week before the next auto-payment is made."),
+    Membership('Student', "full time students (current or graduated within \
+the last 12 months). Annual dues are <dues>, renewable annually",
 "Please note details of your full-time course (current or graduated within last 12 months).")
 ]
 
 class PaymentProcessor:
-	def __init__(self, name, public_key, secret_key, dues_products):
-		self.name = name	#should be lower case, single word (underscore allowed)
-		self.public_key = public_key
-		self.secret_key = secret_key
-		self.dues_products = dues_products
+    def __init__(self, name, public_key, secret_key, dues_products):
+        self.name = name	#should be lower case, single word (underscore allowed)
+        self.public_key = public_key
+        self.secret_key = secret_key
+        self.dues_products = dues_products
 
-""" available processors, first is defaault: """
+""" available processors, first is defaault: 
+NOTE the local copy in pay_processors module contains the full implementions.
+Access using the functions paymentprocessor(name) in the pay_procesors module
+"""
 PAYMENTPROCESSORS = [
-	PaymentProcessor(name = 'stripe',
-		public_key = "<--- live Stripe public key --->" if IS_PRODUCTION else "<--- test Stripe public key --->d",
-		secret_key = "<--- live Stripe secret key --->" if IS_PRODUCTION else "<--- test Stripe secret key --->",
-		dues_products = {
-			'Full': "<-- live Stripe product id -->G" if IS_PRODUCTION else "<-- test Stripe product id -->",
-			'Student': "<-- live Stripe product id -->" if IS_PRODUCTION else "<-- test Stripe product id -->Z"
-		}
-	)
+    PaymentProcessor(name = 'stripe',
+        public_key = "<-- stripe production public key -->" if IS_PRODUCTION else "<-- stripe test public key -->",
+        secret_key = "<-- stripe production secret key -->" if IS_PRODUCTION else "<-- stripe test secret key -->",
+        dues_products = {
+            'Full': "<-- stripe production product id -->" if IS_PRODUCTION else "<-- stripe test product id -->",
+            'Student': "<-- stripe production product id -->" if IS_PRODUCTION else "<-- stripe test product id -->"
+        }
+    )
 ]
+
+GRACE_PERIOD = 45
+"""
+Renewal within this number of days after expiration extends membership
+continuously from the expiration date.
+Also, member can renew this number of days prior to expiration. 
+Renewal notices are sent at expiration plus -9, 0, 9, 18 days.
+Auto renewal will be attempted multiple times at the anniversary of payment
+and during following 3 weeks. So we set the grace period to cover 18+21 \
+days.
+"""
 
 GRACE_PERIOD = 45
 """
@@ -146,8 +162,8 @@ SMTP_BULK = SMTP_TRANS
 
 # logger settings
 LOGGERS = [
-	"warning:stdout",
-	"info:oxcam.log:%(asctime)s - %(levelname)s - %(message)s"
+    "warning:stdout",
+    "info:oxcam.log:%(asctime)s - %(levelname)s - %(message)s"
 ]  # syntax "severity:filename:format" filename can be stderr or stdout
 
 ALLOWED_ACTIONS = []    #disable Py4web's auth

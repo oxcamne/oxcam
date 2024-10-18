@@ -36,6 +36,7 @@ from .common import db, session, flash
 from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
 	MEMBERSHIPS, TIME_ZONE, PAGE_BANNER, HOME_URL, HELP_URL, IS_PRODUCTION,\
 	ALLOWED_EMAILS, DATE_FORMAT, CURRENCY_SYMBOL
+from .pay_processors import paymentprocessor
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
 	primary_matriculation, event_revenue, event_unpaid,\
@@ -48,8 +49,6 @@ from .utilities import email_sender, member_good_standing, ageband, newpaiddate,
 	society_emails, emailparse, notification, notify_support, member_profile, generate_hash,\
 	encode_url, decode_url
 from .session import checkaccess
-#stripe items show unreferenced in vscode, but they are used via eval() - don't delete
-from .pay_processors import paymentprocessor
 from py4web.utils.factories import Inject
 import datetime, re, csv, decimal, pickle, markdown, dateutil
 from io import StringIO
@@ -1986,11 +1985,12 @@ def transactions(path=None):
 				member = db.Members[form.vars.get('Member')]
 				valid_dues = False
 				for membership in MEMBERSHIPS:
-					if new_amount == membership.annual_dues*int(new_amount/membership.annual_dues): #this membership category
+					annual_dues = paymentprocessor(membership.category).get_dues(membership.category)
+					if new_amount == annual_dues*int(new_amount/annual_dues): #this membership category
 						transaction.update_record(Paiddate = member.Paiddate, Membership=membership.category)
 						if not member.Paiddate or member.Paiddate < datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()+datetime.timedelta(days=GRACE_PERIOD):
 							#compute new paiddate & record it and membership category (in case changing Student to Full)
-							member.update_record(Paiddate=newpaiddate(member.Paiddate, transaction.Timestamp, years=int(new_amount/membership.annual_dues)),
+							member.update_record(Paiddate=newpaiddate(member.Paiddate, transaction.Timestamp, years=int(new_amount/annual_dues)),
 								Membership=membership.category)
 						#else assume member record updated manually when check received
 					valid_dues = True
@@ -2319,8 +2319,8 @@ XML(f"This event is open to \
 {' and members of sponsoring organizations (list at the top of the Affiliations dropdown)' if event.Sponsors else ''}\
 {' and their guests' if not event.Guests or event.Guests>1 else ''}.<br>"))
 	elif not request.query.get('mail_lists'):
-		header = CAT(header, XML('<br>'.join([f"<b>{m.category} Membership</b> is open to {m.description}" for m in MEMBERSHIPS])))
-		
+		header = CAT(header, XML('<br>'.join([f"<b>{m.category} Membership</b> is open to {m.description.replace('<dues>', CURRENCY_SYMBOL+str(paymentprocessor(name=None).get_dues(m.category)))}" for m in MEMBERSHIPS])))
+
 	#gather the person's information as necessary (may have only email)
 	fields=[]
 	fields.append(Field('firstname', 'string', requires = [IS_NOT_EMPTY(), CLEANUP()],

@@ -10,7 +10,7 @@ or developers. They are accessed using the URL, not via menus
 from py4web import action, response, redirect, Field, request
 from py4web.utils.factories import Inject
 from .common import db, session, flash
-from .controllers import checkaccess, form_style
+from .session import checkaccess
 from py4web.utils.form import Form, FormStyleDefault
 from py4web.utils.grid import Grid, GridClassStyle
 from yatl.helpers import XML, H5

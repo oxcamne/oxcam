@@ -10,7 +10,7 @@ interface
 from py4web import action, redirect, Field, request, URL
 from .common import db, session, flash
 from .models import primary_email, event_unpaid
-from .controllers import checkaccess, form_style
+from .session import checkaccess
 from .utilities import notify_support, newpaiddate, msg_header, msg_send, event_confirm
 from py4web.utils.form import Form
 from .settings import CURRENCY_SYMBOL, PaymentProcessor, PAYMENTPROCESSORS, PAGE_BANNER, HOME_URL, HELP_URL

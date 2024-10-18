@@ -10,7 +10,7 @@ Stripe provides separate production and developments so that payment functions c
 
 The connection between a running OxCam instance and Stripe is made based on the settings in [settings_private.py](install.md#configure-the-software-for-your-organization). All the logic implementing the payment interface is contained in the StripeProcessor class in pay_processors.py.
 
-Implementing a different payment interface, say PayPal, would involve changing the PAYMENT_PROCESSOR setting in settings_private.py to 'paypal' and defining its keys, etc. as PAYPAL_... definitions, and creating paypal_interface.py containing paypal_... functions and controllers corresponding to the stripe_... functions in stripe_inteface.py. The payment processor used by each member is recorded in each member record, so a payment processor transition could be accomplished by leaving members with Stripe subscriptions with Stripe but implementing a different processor for others.
+Implementing a different payment interface, say PayPal, would involve adding a 'paypal' item to the PAYMENTPROCESSORS list in settings_private.py, including its keys, etc., and adding a PayPalProcessor class to pay_processors.py, modelled on StripeProcessor. The payment processor used by each member is recorded in each member record, so a payment processor migration could be accomplished by leaving members with Stripe subscriptions with Stripe but implementing a different processor for others, and placing the new processor at the front of the PAYMENTPROCESSORS list to make it the new default.
 
 ### The Stripe Dashboard
 
@@ -21,6 +21,8 @@ The top line has a powerful search box, into which you might put identifiers for
 The left side menu items most commonly used include 'payments', the 'all transactions' tab of which is used to download transactions for upload into the database; and 'balances' used to view and reconcile the Stripe balance with that shown in the database and using the 'pay out funds' button to transfer funds to the linked bank account.
 
 I also keep the product catalog and invoices items pinned to the menu.
+
+Note that there is also a workbench included in the dashboard, which supercedes the functionality of the old stripe_tool controller in a much more powerful way and is invaluable for development.
 
 ### Stripe Products
 

@@ -16,6 +16,6 @@ For managing and supporting the database there are a number of tools:
 
 - the **Py4web dashboard** will be used primarily to examine any failure tickets. It can also be used for some database administration tasks.
 
-- there are various admin tools built into oxcam. These include [**db_restore**](db_restore.md), [**db_backup**](db_backup.md), [**db_tool**](db_tool.md).
+- there are various admin tools built into oxcam. These include [**db_restore**](db_restore.md), [**db_backup**](db_backup.md), and [**db_tool**](db_tool.md).
 
 - a log file is maintained in **py4web/oxcam.log**. In a PythonAnywhere environment it contains only info logging which includes recording logins, together with some Stripe related messages. In other environments it may also include warning and error messages, and info from the daily_maintenance task.

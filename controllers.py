@@ -1985,7 +1985,7 @@ def transactions(path=None):
 				member = db.Members[form.vars.get('Member')]
 				valid_dues = False
 				for membership in MEMBERSHIPS:
-					annual_dues = paymentprocessor(membership.category).get_dues(membership.category)
+					annual_dues = paymentprocessor().get_dues(membership.category)
 					if new_amount == annual_dues*int(new_amount/annual_dues): #this membership category
 						transaction.update_record(Paiddate = member.Paiddate, Membership=membership.category)
 						if not member.Paiddate or member.Paiddate < datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()+datetime.timedelta(days=GRACE_PERIOD):

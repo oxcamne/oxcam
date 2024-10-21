@@ -183,14 +183,14 @@ def tickets_sold(ticket_id):
 
 db.define_table('Event_Tickets',
 	Field('Event', 'reference Events', writable=False),
-	Field('Ticket', requires=IS_NOT_EMPTY(),
+	Field('Ticket', 'string', requires=IS_NOT_EMPTY(),
 	   comment="can specify membership, e.g. full/student/non-member"),
-	Field('Short_name', comment="short name for doorlist"),	#short name for use in doorlist
+	Field('Short_name', 'string', comment="short name for doorlist"),	#short name for use in doorlist
 	Field('Price', 'decimal(5,2)', requires=IS_DECIMAL_IN_RANGE(0)),
 	Field('Count', 'integer', requires=IS_EMPTY_OR(IS_INT_IN_RANGE(1)),
 	   comment="to limit number of tickets at this price"),
 	Field('Waiting', 'boolean', comment="set when limit for this ticket type breached"),
-	Field('Qualify',
+	Field('Qualify', 'string',
 	   comment="use if qualification required in notes"),
 	Field('Allow_as_guest', 'boolean', default=True,
 	   comment="clear if ticket can't apply to a guest"),
@@ -199,16 +199,16 @@ db.define_table('Event_Tickets',
 
 db.define_table('Event_Selections',
 	Field('Event', 'reference Events', writable=False),
-	Field('Selection', requires=IS_NOT_EMPTY(), comment="for form dropdown"),
-	Field('Short_name', requires=IS_NOT_EMPTY(), comment="for doorlist"),
+	Field('Selection', 'string', requires=IS_NOT_EMPTY(), comment="for form dropdown"),
+	Field('Short_name', 'string', requires=IS_NOT_EMPTY(), comment="for doorlist"),
 	format='%(Short_name)s'
 )
 
 db.define_table('Event_Survey',
 	Field('Event', 'reference Events', writable=False),
-	Field('Item', requires=IS_NOT_EMPTY(),
+	Field('Item', 'string', requires=IS_NOT_EMPTY(),
 	   comment="first is question, remainder answer choices"),
-	Field('Short_name', requires=IS_NOT_EMPTY(), comment="for doorlist"),
+	Field('Short_name', 'string', requires=IS_NOT_EMPTY(), comment="for doorlist"),
 	format='%(Short_name)s'
 )
 

@@ -942,11 +942,11 @@ def event_reservations(event_id, path=None):
 			Field('selection', 'reference Event_Selections', default = request.query.get('selection'),
 					requires=IS_EMPTY_OR(IS_IN_DB(db(db.Event_Selections.Event==event_id), db.Event_Selections.id,
 								'%(Short_name)s', zero="selection?"))))
-	if db(db.Event_Survey.Event==event_id).count()>0:
-		search_fields.append(
-			Field('survey', 'reference Event_Survey', default = request.query.get('survey'),
-					requires=IS_EMPTY_OR(IS_IN_DB(db((db.Event_Survey.Event==event_id)&~db.Event_Survey.Item.startswith('Please select')), db.Event_Survey.id,
-								'%(Short_name)s', zero="survey?"))))
+	survey = db(db.Event_Survey.Event==event_id).select()
+	if len(survey)>0:
+		event_survey = [(s.id, s.Short_name) for s in survey[1:]]
+		search_fields.append(Field('survey', requires=IS_IN_SET(event_survey, zero="survey?",
+			error_message='Please make a selection'), default = request.query.get('survey')))
 	if tbc!='[]':
 		search_fields.append(
 			Field('tbc', 'boolean', default = request.query.get('tbc')))

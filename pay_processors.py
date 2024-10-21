@@ -258,7 +258,7 @@ def stripe_checkout_success():
 			subscription = subscriptions.data[0]
 			next = datetime.datetime.fromtimestamp(subscription.current_period_end).date()
 		member.update_record(Membership=request.query.get('membership'),
-			Pay_subs=subscription.id, Pay_next=next, Charged=dues)
+			Pay_subs=subscription.id if subscription else None, Pay_next=next, Charged=dues)
 		message += 'Thank you, your membership is now current.</b><br>'
 		
 	if tickets_tbc>0:

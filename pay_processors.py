@@ -253,6 +253,7 @@ def stripe_checkout_success():
 	
 	if dues>0:
 		next = None
+		subscription = None
 		subscriptions = stripe.Subscription.list(customer=member.Pay_cust)
 		if subscriptions:
 			subscription = subscriptions.data[0]

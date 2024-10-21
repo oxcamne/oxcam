@@ -1993,8 +1993,8 @@ def transactions(path=None):
 							member.update_record(Paiddate=newpaiddate(member.Paiddate, transaction.Timestamp, years=int(new_amount/annual_dues)),
 								Membership=membership.category)
 						#else assume member record updated manually when check received
-					valid_dues = True
-					break
+						valid_dues = True
+						break
 				if not valid_dues:
 					form.errors['Amount'] = "not a valid dues payment"
 		if form.vars.get('Account')==actkts:

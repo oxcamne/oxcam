@@ -62,7 +62,7 @@ THREAD_SUPPORT = False
 # these processes as scheduled tasks. Set True if your
 # environment supports threads.
 
-# access levels for group administrators do not change
+# access levels for group administrators DO NOT CHANGE, used in @checkaccess(None|any)
 ACCESS_LEVELS = ['read', 'write', 'accounting', 'admin']
 
 from dataclasses import dataclass
@@ -71,7 +71,6 @@ import decimal
 @dataclass
 class Membership:
     category: str
-    annual_dues: decimal
     description: str
     qualification: str = None
 
@@ -121,10 +120,10 @@ and during following 3 weeks. So we set the grace period to cover 18+21 \
 days.
 """
 
-#SMTP host connection for transactional messages
+#SMTP host connection for transactional messages (e.g. a gmail account)
 SMTP_TRANS = ('smtp.somewhere.com', 'port', 'username', 'password')
 
-#SMTP host connection for bulk messages
+#SMTP host connection for bulk messages (e.g. a mailing service such as mailgun)
 SMTP_BULK = SMTP_TRANS
 
 # logger settings

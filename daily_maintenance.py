@@ -61,7 +61,7 @@ If you have any questions, please contact {SUPPORT_EMAIL}"
 
 	subs = db((db.Members.Pay_subs!=None)&(db.Members.Pay_subs!='Cancelled')).select()
 	for m in subs:
-		if paymentprocessor(m.Pay_source).subscription_cancelled():	#subscription no longer operational
+		if paymentprocessor(m.Pay_source).subscription_cancelled(m):	#subscription no longer operational
 			if IS_PRODUCTION:
 				text = f"{LETTERHEAD.replace('&lt;subject&gt;', 'Membership Renewal Failure')}{member_greeting(m)}"
 				text += f"<p>We have been unable to process your auto-renewal and as a result your membership has been cancelled. </p><p>\

@@ -2089,9 +2089,9 @@ def composemail():
 				" formatting, and you can also include HTML.", XML('<br>'),
 				"There are custom tags <letterhead>, <subject>, <greeting>, <member>, <reservation>, and <email> ",
 				"available, depending on the context.", XML('<br>'),
-				"Convert shareable image links from Google Drive using ",
-				A('this tool', _href="https://www.labnol.org/embed/google/drive/", _target="LinkTool"),
-				", they won't work directly!")))
+				"For information on including graphics ",
+				A('see here.', _href="https://oxcamne.github.io/oxcam/send_email.html#embedding-images-in-email")
+				)))
 	fields.append(Field('save', 'boolean', default=proto!=None, comment='store/update template'))
 	fields.append(Field('attachment', 'upload', uploadfield=False))
 	if proto:

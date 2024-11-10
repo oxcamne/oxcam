@@ -32,9 +32,7 @@ def checkaccess(requiredaccess):
 				member = db(db.Members.id == member_id).select(db.Members.Access).first()
 				if member:
 					session.access = member.Access
-				else:
-					redirect(URL('login', vars=dict(url=request.url)))
-			if not(session.logged_in and (not member_id or member)):    #not logged in, or member deleted
+			if not (session.logged_in and (not member_id or member)):    #not logged in, or member deleted
 				redirect(URL('login', vars=dict(url=request.url)))
 
 			#check access
@@ -56,15 +54,22 @@ def login():
 	possible_emails = [r.users.email for r in db(db.users.remote_addr==request.remote_addr).select(orderby=~db.Emails.id|~db.users.when_issued,
 			left=db.Emails.on(db.Emails.Email==db.users.email))]
 			#not currently used
-	form = Form([Field('email', 'string',
-					requires=IS_EMAIL())
-				],
-				formstyle=FormStyleBulma)
+
+	#rate limit the IP, impose 5 minute delay between login attempts
+	last = db(db.users.remote_addr==request.remote_addr).select(db.users.when_issued, orderby=~db.users.when_issued).first()
+	if last and datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) < last.when_issued + datetime.timedelta(minutes=5):
+		redirect(URL('login_try_again'))
+	
+	form = Form([Field('email', 'string', requires=IS_EMAIL())], formstyle=FormStyleBulma)
 	header = P(XML(f"Please specify your email to login.<br />If you have signed in previously, please use the \
 same email as this identifies your record.<br />You can change your email after logging in via 'My account'.<br />If \
 you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}."))
  
 	if form.accepted:
+		#rate limit login requests for email address
+		last = db(db.users.email==form.vars['email']).select(db.users.when_issued, orderby=~db.users.when_issued).first()
+		if last and datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) < last.when_issued + datetime.timedelta(minutes=5):
+			redirect(URL('login_try_again'))
 		redirect(URL('send_email_confirmation', vars=dict(email=form.vars['email'], url=request.query.url,
 						timestamp=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))))
 	return locals()
@@ -75,7 +80,7 @@ you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _h
 def send_email_confirmation():
 	access = None	#for layout.html
 	timestamp = request.query.get('timestamp')
-	if timestamp and datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) < datetime.datetime.fromisoformat(timestamp) + datetime.timedelta(seconds=1):
+	if timestamp and datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) < datetime.datetime.fromisoformat(timestamp) + datetime.timedelta(seconds=5):
 		#generate email unless this is a stale re-request from a browser
 		email = (request.query.get('email') or '').lower()
 		if not email:	#shouldn't happen, but can be generated perhaps by safelink mechanisms?
@@ -92,9 +97,9 @@ def send_email_confirmation():
 				email = email, when_issued = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))
 		link = URL('validate', user.id, token, scheme=True, vars=dict(url=request.query.url))
 		message = f"{LETTERHEAD.replace('&lt;subject&gt;', ' ')}<br><br>\
-Please click {A(link, _href=link)} to continue to {SOCIETY_SHORT_NAME}.<br><br>\
-If the link doesn't work, please try copy & pasting it to your browser's address bar.<br><br>\
-If you are unable to login or have other questions, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}."
+Please click {A(link, _href=link)} to continue to {SOCIETY_SHORT_NAME} \
+and complete your registration or other transaction.<br><br>\
+<em>If you did not initiate the request, please Reply to report this so that we can investigate</em>."
 		email_sender(to=email, sender=SUPPORT_EMAIL, subject='Please Confirm Email', body=message)
 	header = DIV(P("Please click the link sent to your email to continue. If you don't see the validation message, please check your spam folder."),
 				P('This link is valid for 15 minutes. You may close this window.'))
@@ -148,6 +153,13 @@ def accessdenied():
 	form = Form([], submit_value='OK')
 	if form.accepted:
 		redirect(URL('browser_back'))
+	return locals()
+
+@action('login_try_again')
+@preferred
+def login_try_again():
+	access = session.access	#for layout.html
+	header = "Sorry, we can't process this right now - please try again in a few minutes."
 	return locals()
 
 @action('browser_back')

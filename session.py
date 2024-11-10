@@ -159,7 +159,7 @@ def accessdenied():
 @preferred
 def login_try_again():
 	access = session.access	#for layout.html
-	header = "Sorry, we can't process this right now - please try again in a few minutes."
+	header = XML("Please wait a few minutes before retrying.<br><br><em>If you didn't find your verification email, please check your spam folder.</em>")
 	return locals()
 
 @action('browser_back')

@@ -2,17 +2,21 @@
 This file contains controllers used to manage the user's session
 """
 from py4web import URL, request, redirect, action, Field
-from .common import db, session, flash, logger
-from .settings import SUPPORT_EMAIL, TIME_ZONE, LETTERHEAD, SOCIETY_SHORT_NAME, PAGE_BANNER, HOME_URL, HELP_URL, DATE_FORMAT
+from .common import db, session, flash, logger, auth
+from .settings import SUPPORT_EMAIL, TIME_ZONE, LETTERHEAD, SOCIETY_SHORT_NAME, PAGE_BANNER, HOME_URL, HELP_URL, DATE_FORMAT,\
+		RECAPTCHA_KEY, RECAPTCHA_SECRET
 from .models import ACCESS_LEVELS, member_name, CAT
 from .utilities import email_sender
 from yatl.helpers import A, H6, XML, P, DIV
 from py4web.utils.form import Form, FormStyleBulma
 from pydal.validators import IS_IN_SET, IS_EMAIL, ANY_OF
 from py4web.utils.factories import Inject
+from py4web.utils.recaptcha import ReCaptcha
 import datetime, random
 
 preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
+
+mycaptcha = ReCaptcha(RECAPTCHA_KEY, RECAPTCHA_SECRET)
 
 """
 decorator for validating login & access permission using a one-time code
@@ -48,7 +52,8 @@ def checkaccess(requiredaccess):
 	return wrap
 
 @action('login', method=['POST', 'GET'])
-@preferred
+@action.uses("recaptcha_form.html", db, session, flash, auth, mycaptcha.fixture,
+	Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL, mycaptcha=mycaptcha))
 def login():
 	session['logged_in'] = False
 	possible_emails = [r.users.email for r in db(db.users.remote_addr==request.remote_addr).select(orderby=~db.Emails.id|~db.users.when_issued,
@@ -60,7 +65,8 @@ def login():
 	if last and datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) < last.when_issued + datetime.timedelta(minutes=5):
 		redirect(URL('login_try_again'))
 	
-	form = Form([Field('email', 'string', requires=IS_EMAIL())], formstyle=FormStyleBulma)
+	fields = [Field('email', 'string', requires=IS_EMAIL()), mycaptcha.field]
+	form = Form(fields)
 	header = P(XML(f"Please specify your email to login.<br />If you have signed in previously, please use the \
 same email as this identifies your record.<br />You can change your email after logging in via 'My account'.<br />If \
 you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}."))

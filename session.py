@@ -7,16 +7,13 @@ from .settings import SUPPORT_EMAIL, TIME_ZONE, LETTERHEAD, SOCIETY_SHORT_NAME, 
 		RECAPTCHA_KEY, RECAPTCHA_SECRET
 from .models import ACCESS_LEVELS, member_name, CAT
 from .utilities import email_sender
-from yatl.helpers import A, H6, XML, P, DIV
+from yatl.helpers import A, H6, XML, P, DIV, INPUT
 from py4web.utils.form import Form, FormStyleBulma
 from pydal.validators import IS_IN_SET, IS_EMAIL, ANY_OF
 from py4web.utils.factories import Inject
-from py4web.utils.recaptcha import ReCaptcha
-import datetime, random
+import datetime, random, requests
 
 preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
-
-mycaptcha = ReCaptcha(RECAPTCHA_KEY, RECAPTCHA_SECRET)
 
 """
 decorator for validating login & access permission using a one-time code
@@ -52,8 +49,8 @@ def checkaccess(requiredaccess):
 	return wrap
 
 @action('login', method=['POST', 'GET'])
-@action.uses("recaptcha_form.html", db, session, flash, auth, mycaptcha.fixture,
-	Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL, mycaptcha=mycaptcha))
+@action.uses("recaptcha_form.html", db, session, flash,
+	Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL, RECAPTCHA_KEY=RECAPTCHA_KEY))
 def login():
 	session['logged_in'] = False
 	possible_emails = [r.users.email for r in db(db.users.remote_addr==request.remote_addr).select(orderby=~db.Emails.id|~db.users.when_issued,
@@ -64,9 +61,28 @@ def login():
 	last = db(db.users.remote_addr==request.remote_addr).select(db.users.when_issued, orderby=~db.users.when_issued).first()
 	if last and datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) < last.when_issued + datetime.timedelta(minutes=5):
 		redirect(URL('login_try_again'))
-	
-	fields = [Field('email', 'string', requires=IS_EMAIL()), mycaptcha.field]
-	form = Form(fields)
+
+	def verify_captcha(captchaData=None):
+		if captchaData is None:
+			return False
+		data = {"secret": RECAPTCHA_SECRET, "response": captchaData}
+		res = requests.post("https://www.google.com/recaptcha/api/siteverify", data=data)
+		try:
+			if res.json()["success"]:
+				return True
+		except Exception as exc:
+			pass
+		return False
+
+	def validate_user_form(form):
+		if verify_captcha(form.vars['captcha_data']):
+			return
+		form.errors['email'] ="You are probably a Robot"	
+
+	fields = [Field('email', 'string', requires=IS_EMAIL())]
+	form = Form(fields, validation=validate_user_form)
+	form.structure.insert(0, INPUT(_name='captcha_data',_id='captcha_data', _hidden=True, _value='a'))
+
 	header = P(XML(f"Please specify your email to login.<br />If you have signed in previously, please use the \
 same email as this identifies your record.<br />You can change your email after logging in via 'My account'.<br />If \
 you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}."))
@@ -78,6 +94,7 @@ you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _h
 			redirect(URL('login_try_again'))
 		redirect(URL('send_email_confirmation', vars=dict(email=form.vars['email'], url=request.query.url,
 						timestamp=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))))
+
 	return locals()
 
 #send email confirmation message

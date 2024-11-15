@@ -1,4 +1,5 @@
 [[extend 'layout.html']]
 [[=header]]
 [[=form]]
-[[=XML(mycaptcha)]]
+<div class="g-recaptcha" data-sitekey="[[=RECAPTCHA_KEY]]"></div>
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>

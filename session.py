@@ -77,7 +77,7 @@ def login():
 	def validate_user_form(form):
 		if verify_captcha(form.vars['captcha_data']):
 			return
-		form.errors['email'] ="You are probably a Robot"	
+		form.errors['email'] ="Please verify you are not a robot"	
 
 	fields = [Field('email', 'string', requires=IS_EMAIL())]
 	form = Form(fields, validation=validate_user_form)
@@ -182,7 +182,7 @@ def accessdenied():
 @preferred
 def login_try_again():
 	access = session.access	#for layout.html
-	header = XML("Please wait a few minutes before retrying.<br><br><em>If you didn't find your verification email, please check your spam folder.</em>")
+	header = XML("<em>If you didn't find your verification email, please check your spam folder.</em><br><br>If you still can't find it, please wait a few minutes before retrying.")
 	return locals()
 
 @action('browser_back')

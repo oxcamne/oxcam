@@ -53,9 +53,7 @@ def checkaccess(requiredaccess):
 	Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL, RECAPTCHA_KEY=RECAPTCHA_KEY))
 def login():
 	session['logged_in'] = False
-	possible_emails = [r.users.email for r in db(db.users.remote_addr==request.remote_addr).select(orderby=~db.Emails.id|~db.users.when_issued,
-			left=db.Emails.on(db.Emails.Email==db.users.email))]
-			#not currently used
+	trusted = db((db.users.remote_addr==request.remote_addr) & (db.users.trusted==True)).select().first() != None
 
 	#rate limit the IP, impose 5 minute delay between login attempts
 	last = db(db.users.remote_addr==request.remote_addr).select(db.users.when_issued, orderby=~db.users.when_issued).first()
@@ -75,13 +73,15 @@ def login():
 		return False
 
 	def validate_user_form(form):
-		if verify_captcha(form.vars['captcha_data']):
+		if trusted or verify_captcha(form.vars['g-recaptcha-response']):
 			return
-		form.errors['email'] ="Please verify you are not a robot"	
+		if not form.errors.get('email'):
+			form.errors['email'] ="Please verify you are not a robot"	
 
 	fields = [Field('email', 'string', requires=IS_EMAIL())]
 	form = Form(fields, validation=validate_user_form)
-	form.structure.insert(0, INPUT(_name='captcha_data',_id='captcha_data', _hidden=True, _value='a'))
+	if not trusted:
+		form.structure.insert(0, INPUT(_name='g-recaptcha-response',_id='g-recaptcha-response', _hidden=True, _value='a'))
 
 	header = P(XML(f"Please specify your email to login.<br />If you have signed in previously, please use the \
 same email as this identifies your record.<br />You can change your email after logging in via 'My account'.<br />If \
@@ -137,6 +137,7 @@ def validate(id, token):
 			#user.remote_addr != request.remote_addr:	#this check may be too strong,
 			#there may be configurations where the IP switches between browser and email??
 		redirect(URL('index'))
+	user.update_record(trusted = True)
 	rows = db((db.Members.id == db.Emails.Member) & db.Emails.Email.ilike(user.email)).select(
 				db.Members.ALL, distinct=True)
 	header = H6("Please select which of you is signing in:")

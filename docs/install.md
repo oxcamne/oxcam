@@ -112,7 +112,7 @@ the last 12 months). Annual dues are <dues>, renewable annually",
 
 class PaymentProcessor:
     def __init__(self, name, public_key, secret_key, dues_products):
-        self.name = name	#should be lower case, single word (underscore allowed)
+        self.name = name    #should be lower case, single word (underscore allowed)
         self.public_key = public_key
         self.secret_key = secret_key
         self.dues_products = dues_products
@@ -167,6 +167,10 @@ LOGGERS = [
 ]  # syntax "severity:filename:format" filename can be stderr or stdout
 
 ALLOWED_ACTIONS = []    #disable Py4web's auth
+
+#Gooogle reCAPTCHA keys (set all to None if not using Captcha)
+RECAPTCHA_KEY = "production_recaptcha_site_key" if IS_PRODUCTION else "develomemnt_recaptcha_site_key"
+RECAPTCHA_SECRET = "production_recaptcha_secret" if IS_PRODUCTION else "develomemnt_recaptcha_secret"
 ```
 
 Notes:
@@ -193,6 +197,8 @@ members, as used by OxCamNE. Adjust as needed. If you do not have paid membershi
 1. The email settings configure two SMTP servers. One is used for transactional emails, such as login email verification, transaction confirms, and emails addressed explicitly, the other for bulk emails, sent to mailing list or filtered sets of members. OxCamNE uses an email service provider which, among other things, ensures that messages are authenticated by SPF and DKIM records. Small groups could use, e.g. a gmail address with an app password. In production, for transactional messages we use our google workspace account directly, whereas bulk messages are sent via our email service provider, mailgun. These settings should be present even if you are not using mailing list functionality.
 
 1. PaymentProcessor is a base class for all payment processors that might be supported. Each supported payment processor will be implemented as a subclass of PaymentProcessor. PAYMENTPROCESSORS is a list of payment processor instances, currently only Stripe has been written. The first one in the list is the default for new customers. The implementations are in pay_processors.py. Go [here](stripe.md) for more information on setting up and using Stripe.
+
+1. You can set up Google ReCaptcha for production and development. Once a user successfully signs in, the IP address will be trusted for 90 days and Captcha will not be enforced during that period.
 
 ### Start the database
 

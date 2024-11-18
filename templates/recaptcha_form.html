@@ -1,5 +1,7 @@
 [[extend 'layout.html']]
 [[=header]]
 [[=form]]
-<div class="g-recaptcha" data-sitekey="[[=RECAPTCHA_KEY]]"></div>
-<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+[[if not trusted:]]
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <div class="g-recaptcha" data-sitekey="[[=RECAPTCHA_KEY]]"></div>
+[[pass]]

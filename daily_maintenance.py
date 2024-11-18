@@ -22,7 +22,8 @@ import datetime
 import os
 from pathlib import Path
 from .common import db
-from .settings import SOCIETY_SHORT_NAME, IS_PRODUCTION, SUPPORT_EMAIL, LETTERHEAD, SOCIETY_NAME, DB_URL, DATE_FORMAT
+from .settings import SOCIETY_SHORT_NAME, IS_PRODUCTION, SUPPORT_EMAIL, LETTERHEAD,\
+		SOCIETY_NAME, DB_URL, DATE_FORMAT, TIME_ZONE
 from .utilities import member_greeting, email_sender
 from .pay_processors import paymentprocessor
 from .models import primary_email
@@ -36,6 +37,13 @@ def daily_maintenance():
 	for i in items:
 		if (i.endswith(dname) and (datetime.date.today().day != 1)) or i.endswith(yname):
 			os.remove(i)
+
+	trusted_date = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) - datetime.timedelta(days = 90)
+	db((db.users.trusted == True) & (db.users.when_issued < trusted_date)).delete()
+		#record trusted IP's for 90 days, no reCaptcha challenge
+	untrusted_date = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) - datetime.timedelta(days = 7)
+	db((db.users.trusted == False) & (db.users.when_issued < untrusted_date)).delete()
+		#keep unvalidated users only a week
 
 	#send renewal reminders at 9 day intervals from one interval before to two intervals after renewal date
 	#note that full memberships will generally be auto renewing Stripe subscriptions, but legacy memberships and

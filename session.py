@@ -53,12 +53,7 @@ def checkaccess(requiredaccess):
 	Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL, RECAPTCHA_KEY=RECAPTCHA_KEY))
 def login():
 	session['logged_in'] = False
-	trusted = db((db.users.remote_addr==request.remote_addr) & (db.users.trusted==True)).select().first() != None
-
-	#rate limit the IP, impose 5 minute delay between login attempts
-	last = db(db.users.remote_addr==request.remote_addr).select(db.users.when_issued, orderby=~db.users.when_issued).first()
-	if last and datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) < last.when_issued + datetime.timedelta(minutes=5):
-		redirect(URL('login_try_again'))
+	trusted = not RECAPTCHA_KEY or db((db.users.remote_addr==request.remote_addr) & (db.users.trusted==True)).select().first() != None
 
 	def verify_captcha(captchaData=None):
 		if captchaData is None:
@@ -78,8 +73,8 @@ def login():
 		if not form.errors.get('email'):
 			form.errors['email'] ="Please verify you are not a robot"	
 
-	fields = [Field('email', 'string', requires=IS_EMAIL())]
-	form = Form(fields, validation=validate_user_form)
+	fields = [Field('email', 'string', default=session.get('email'), requires=IS_EMAIL())]
+	form = Form(fields, validation=validate_user_form, keep_values=True)
 	if not trusted:
 		form.structure.insert(0, INPUT(_name='g-recaptcha-response',_id='g-recaptcha-response', _hidden=True, _value='a'))
 
@@ -88,12 +83,15 @@ same email as this identifies your record.<br />You can change your email after 
 you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}."))
  
 	if form.accepted:
-		#rate limit login requests for email address
-		last = db(db.users.email==form.vars['email']).select(db.users.when_issued, orderby=~db.users.when_issued).first()
-		if last and datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) < last.when_issued + datetime.timedelta(minutes=5):
-			redirect(URL('login_try_again'))
-		redirect(URL('send_email_confirmation', vars=dict(email=form.vars['email'], url=request.query.url,
+		#rate limit the IP and email, impose 3 minute delay between login attempts
+		last = db((db.users.remote_addr==request.remote_addr)|(db.users.email==form.vars['email'])).select(db.users.when_issued, orderby=~db.users.when_issued).first()
+		if not(last and datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) < last.when_issued + datetime.timedelta(minutes=3)):
+			session['email'] = form.vars['email']
+			redirect(URL('send_email_confirmation', vars=dict(email=form.vars['email'], url=request.query.url,
 						timestamp=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))))
+		flash.set("<em>If you didn't find your verification email, please check \
+for typos in your email, or check in the spam folder.</em><br>\
+If you still can't find it, please wait a few minutes before retrying.", sanitize=False)
 
 	return locals()
 
@@ -177,13 +175,6 @@ def accessdenied():
 	form = Form([], submit_value='OK')
 	if form.accepted:
 		redirect(URL('browser_back'))
-	return locals()
-
-@action('login_try_again')
-@preferred
-def login_try_again():
-	access = session.access	#for layout.html
-	header = XML("<em>If you didn't find your verification email, please check your spam folder.</em><br><br>If you still can't find it, please wait a few minutes before retrying.")
 	return locals()
 
 @action('browser_back')

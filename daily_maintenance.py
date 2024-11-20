@@ -42,7 +42,7 @@ def daily_maintenance():
 	db((db.users.trusted == True) & (db.users.when_issued < trusted_date)).delete()
 		#record trusted IP's for 90 days, no reCaptcha challenge
 	untrusted_date = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) - datetime.timedelta(days = 7)
-	db((db.users.trusted == False) & (db.users.when_issued < untrusted_date)).delete()
+	db(((db.users.trusted==None) | (db.users.trusted!=True)) & (db.users.when_issued < untrusted_date)).delete()
 		#keep unvalidated users only a week
 
 	#send renewal reminders at 9 day intervals from one interval before to two intervals after renewal date
@@ -80,9 +80,9 @@ If you have any questions, please contact {SUPPORT_EMAIL}"
 					 bcc=SUPPORT_EMAIL, subject='Membership Renewal Failure', body=text)
 			print(f"Membership Subscription Cancelled {primary_email(m.id)}")
 			m.update_record(Pay_subs = 'Cancelled', Pay_next=None, Modified=datetime.datetime.now())
+				
+	db.commit()
 
 	file=open(f'{SOCIETY_SHORT_NAME}_backup_{datetime.date.today().strftime("%Y%m%d")}.csv',
 					'w', encoding='utf-8', newline='')
 	db.export_to_csv_file(file)
-				
-	db.commit()

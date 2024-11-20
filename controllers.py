@@ -1190,17 +1190,18 @@ def reservation(path=None):
 		adding = 0
 		waitlist = event.Waiting
 		for row in all_guests:
-			if row.Ticket_ and row.Provisional:
+			if (not tickets or row.Ticket_) and row.Provisional:
 				ticket = tickets.find(lambda t: t.id==row.Ticket_).first()
 				adding += 1
-				provisional_ticket_cost += ticket.Price
-				if ticket.id in tickets_available:
-					tickets_available[ticket.id] -= 1
-					if tickets_available[ticket.id] == 0:
-						flash.set(f"There are no further {ticket.Ticket} tickets for additional guests.")
-					elif tickets_available[ticket.id] < 0:
-						flash.set(f"Insufficient {ticket.Ticket} tickets available: please Edit to select a different ticket type or Checkout to add unconfirmed guests to the waitlist.")
-						waitlist = True
+				if ticket:
+					provisional_ticket_cost += ticket
+					if ticket.id in tickets_available:
+						tickets_available[ticket.id] -= 1
+						if tickets_available[ticket.id] == 0:
+							flash.set(f"There are no further {ticket.Ticket} tickets for additional guests.")
+						elif tickets_available[ticket.id] < 0:
+							flash.set(f"Insufficient {ticket.Ticket} tickets available: please Edit to select a different ticket type or Checkout to add unconfirmed guests to the waitlist.")
+							waitlist = True
 		if datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.Booking_Closed:
 			waitlist = True
 			flash.set("Registration is closed, please use +New and Checkout to add new guests to the waitlist.")

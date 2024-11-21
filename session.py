@@ -4,7 +4,7 @@ This file contains controllers used to manage the user's session
 from py4web import URL, request, redirect, action, Field
 from .common import db, session, flash, logger, auth
 from .settings import SUPPORT_EMAIL, TIME_ZONE, LETTERHEAD, SOCIETY_SHORT_NAME, PAGE_BANNER, HOME_URL, HELP_URL, DATE_FORMAT,\
-		RECAPTCHA_KEY, RECAPTCHA_SECRET
+		RECAPTCHA_KEY, RECAPTCHA_SECRET, VERIFY_TIMEOUT
 from .models import ACCESS_LEVELS, member_name, CAT
 from .utilities import email_sender
 from yatl.helpers import A, H6, XML, P, DIV, INPUT
@@ -79,19 +79,21 @@ def login():
 		form.structure.insert(0, INPUT(_name='g-recaptcha-response',_id='g-recaptcha-response', _hidden=True, _value='a'))
 
 	header = P(XML(f"Please specify your email to login.<br />If you have signed in previously, please use the \
-same email as this identifies your record.<br />You can change your email after logging in via 'My account'.<br />If \
+same email as this identifies your record.<br />You can change your email of record after logging in via 'My account'.<br />If \
 you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}."))
+
+	last = db((db.users.remote_addr==request.remote_addr)|(db.users.email==form.vars.get('email'))).select(db.users.when_issued, orderby=~db.users.when_issued).first()
  
 	if form.accepted:
 		#rate limit the IP and email, impose 3 minute delay between login attempts
-		last = db((db.users.remote_addr==request.remote_addr)|(db.users.email==form.vars['email'])).select(db.users.when_issued, orderby=~db.users.when_issued).first()
-		if not(last and datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) < last.when_issued + datetime.timedelta(minutes=3)):
+		if not (VERIFY_TIMEOUT and last and datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) < last.when_issued + datetime.timedelta(minutes=VERIFY_TIMEOUT)):
 			session['email'] = form.vars['email']
 			redirect(URL('send_email_confirmation', vars=dict(email=form.vars['email'], url=request.query.url,
 						timestamp=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))))
+		flash.set(f"<em>Please wait a bit, there is a {VERIFY_TIMEOUT} minute time-out between sending verification messages</em>", sanitize=False)
+	elif last and datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) < last.when_issued + datetime.timedelta(minutes=5):
 		flash.set("<em>If you didn't find your verification email, please check \
-for typos in your email, or check in the spam folder.</em><br>\
-If you still can't find it, please wait a few minutes before retrying.", sanitize=False)
+for typos in your address, and check in the spam folder.</em><br>", sanitize=False)
 
 	return locals()
 

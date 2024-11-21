@@ -171,6 +171,8 @@ ALLOWED_ACTIONS = []    #disable Py4web's auth
 #Gooogle reCAPTCHA keys (set all to None if not using Captcha)
 RECAPTCHA_KEY = "production_recaptcha_site_key" if IS_PRODUCTION else "develomemnt_recaptcha_site_key"
 RECAPTCHA_SECRET = "production_recaptcha_secret" if IS_PRODUCTION else "develomemnt_recaptcha_secret"
+
+VERIFY_TIMEOUT = 3	#minutes enforced between verification emails
 ```
 
 Notes:
@@ -198,7 +200,9 @@ members, as used by OxCamNE. Adjust as needed. If you do not have paid membershi
 
 1. PaymentProcessor is a base class for all payment processors that might be supported. Each supported payment processor will be implemented as a subclass of PaymentProcessor. PAYMENTPROCESSORS is a list of payment processor instances, currently only Stripe has been written. The first one in the list is the default for new customers. The implementations are in pay_processors.py. Go [here](stripe.md) for more information on setting up and using Stripe.
 
-1. You can set up Google ReCaptcha for production and development. Once a user successfully signs in, the IP address will be trusted for 90 days and Captcha will not be enforced during that period.
+1. You can set up Google reCaptcha for production and development. Once a user successfully signs in, the IP address will be trusted for 90 days and Captcha will not be enforced during that period.
+
+1. Setting VERIFY_TIMEOUT to a non-zero value enforces a time-out between sending verification emails to a particular email address or IP address. Like reCaptcha, this is an anti-spammer tool.
 
 ### Start the database
 

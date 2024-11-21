@@ -1194,7 +1194,7 @@ def reservation(path=None):
 				ticket = tickets.find(lambda t: t.id==row.Ticket_).first()
 				adding += 1
 				if ticket:
-					provisional_ticket_cost += ticket
+					provisional_ticket_cost += ticket.Price
 					if ticket.id in tickets_available:
 						tickets_available[ticket.id] -= 1
 						if tickets_available[ticket.id] == 0:

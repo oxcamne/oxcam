@@ -2099,7 +2099,19 @@ def composemail():
 		form=''
 		fields.append(Field('delete', 'boolean', comment='tick to delete template; sends no message'))
 
+	def checktags(body):	#check the custom tags
+		body = XML(body, sanitize=True).text
+		m = re.match(r"^(.*)\&lt\;(.*)\&gt\;.*$", body, flags=re.DOTALL)
+		if m:			#found custom tag
+			if m.group(2) not in ["letterhead", "subject", "greeting", "reservation", "member", "email"]:
+				return f"<{m.group(2)}> is not a valid custom tag"
+			return checktags(m.group(1))
+		return None
+
 	def validate(form2):
+		bad_tag = checktags(form2.vars.get('body'))
+		if bad_tag:
+			form2.errors['body'] = bad_tag
 		if form2.vars.get('delete'):
 			db(db.EMProtos.id == proto.id).delete()
 			flash.set("Template deleted: "+ proto.Subject)

@@ -2184,7 +2184,12 @@ def bcc_export():
 	filename = 'bcc.txt'
 	query = request.query.get('query')
 	left = request.query.get('left')
-	rows = db(eval(query)).select(left=eval(left) if left else None, distinct=True)
+	select_fields = [db.Members.id]
+	mailing = re.search(r"Mailings\.contains\((\d+)\)", query)
+	if mailing:		#using a mailing list
+		select_fields.append(db.Emails.Email)
+		select_fields.append(db.Emails.id)
+	rows = db(eval(query)).select(*select_fields, left=eval(left) if left else None, distinct=True)
 	writer=csv.writer(stream)
 	for row in rows:
 		email = row.get(db.Emails.Email) or primary_email(row.get(db.Members.id))

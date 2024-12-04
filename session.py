@@ -86,7 +86,13 @@ you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _h
  
 	if form.accepted:
 		#rate limit the IP and email, impose 3 minute delay between login attempts
-		if not (VERIFY_TIMEOUT and last and datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) < last.when_issued + datetime.timedelta(minutes=VERIFY_TIMEOUT)):
+		now = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
+		if not (VERIFY_TIMEOUT and last and now < last.when_issued + datetime.timedelta(minutes=VERIFY_TIMEOUT)):
+			if last:
+				last.update_record(when_issued=now)
+			else:
+				db.users.insert(email=form.vars['email'], remote_addr=request.remote_addr, when_issued=now)
+			db.commit()
 			session['email'] = form.vars['email']
 			redirect(URL('send_email_confirmation', vars=dict(email=form.vars['email'], url=request.query.url,
 						timestamp=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))))

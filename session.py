@@ -82,7 +82,7 @@ def login():
 same email as this identifies your record.<br />You can change your email of record after logging in via 'My account'.<br />If \
 you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _href='mailto:'+SUPPORT_EMAIL)}."))
 
-	last = db((db.users.remote_addr==request.remote_addr)|(db.users.email==form.vars.get('email'))).select(db.users.when_issued, orderby=~db.users.when_issued).first()
+	last = db((db.users.remote_addr==request.remote_addr)|(db.users.email==form.vars.get('email'))).select(orderby=~db.users.when_issued).first()
  
 	if form.accepted:
 		#rate limit the IP and email, impose 3 minute delay between login attempts

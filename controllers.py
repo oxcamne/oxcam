@@ -2118,12 +2118,12 @@ def composemail():
 			redirect(request.query.back)
 		if not IS_PRODUCTION:
 			if form2.vars.get('to'):
-				to = re.compile('[^,;\s]+').findall(form2.vars['to'])
+				to = re.compile('[^,;\s]+').findall(form2.vars['to']) if isinstance(form2.vars['to'], str) else form2.vars['to']
 				for em in to:
 					if not em in ALLOWED_EMAILS:
 						form2.errors['to'] = f"{em} is not an allowed address in this environment"
 			if form2.vars.get('bcc'):
-				bcc = re.compile('[^,;\s]+').findall(form2.vars['bcc'])
+				bcc = re.compile('[^,;\s]+').findall(form2.vars['bcc']) if isinstance(form2.vars['bcc'], str) else form2.vars['bcc']
 				for em in bcc:
 					if not em in ALLOWED_EMAILS:
 						form2.errors['bcc'] = f"{em} is not an allowed address in this environment"
@@ -2143,7 +2143,7 @@ def composemail():
 				db.EMProtos.insert(Subject=form2.vars['subject'], Body=form2.vars['body'])
 				flash.set("Template stored: "+ form2.vars['subject'])
 
-		bcc = re.compile('[^,;\s]+').findall(form2.vars.get('bcc') or '')
+		bcc = re.compile('[^,;\s]+').findall(form2.vars.get('bcc')) if isinstance(form2.vars['bcc'], str) else form2.vars['bcc'] or ''
 
 		try:
 			bodyparts = emailparse(form2.vars['body'], form2.vars['subject'], query)
@@ -2165,7 +2165,7 @@ def composemail():
 					Scheme=URL('index', scheme=True).replace('index', ''))
 				flash.set(f"email notice sent to '{qdesc}' ({query_count})")
 			else:
-				to = re.compile('[^,;\s]+').findall(form2.vars['to'])
+				to = re.compile('[^,;\s]+').findall(form2.vars['to']) if isinstance(form2.vars['to'], str) else form2.vars['to']
 				body = ''
 				for part in bodyparts:
 					body += part[0]
@@ -2273,7 +2273,8 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 		if not event or \
 				(datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.DateTime and \
 	 				not (member_id and event_unpaid(event_id, member_id) > 0)) or \
-				(datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.Booking_Closed and not event_attend(event_id)):
+				(datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.Booking_Closed and not event_attend(event_id)) or \
+				event.AdCom_only and not access:
 			flash.set('Event is not open for booking.')
 			redirect(URL('index'))
 		if datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.Booking_Closed:
@@ -2307,11 +2308,12 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 						session['membership'] = checkout.get('membership')
 						session['dues'] = str(checkout.get('dues')) if checkout.get('dues') else None
 				redirect(URL('reservation/select'))	#go add guests and/or checkout
-			if member.Access if event.AdCom_only else \
-			   member_good_standing(member, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()) or sponsor \
-					or ((affinity or member.Membership) and not event.Members_only and not event.Allow_join):
-				#members in good standing, or members of sponsor organizations, or
-				#membership-eligible and event open to all alums then no need to gather member information
+			if sponsor or (affinity and affinity.Matr or member.Membership and not affinity) and \
+			   		(member_good_standing(member, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()) \
+						or not event.Members_only and not event.Allow_join):
+				#members of sponsor organizations, or membership eligible and member in good standing, or 
+				#event open to all alums and not offering join option, then no need to gather member information
+				#ALSO collect Matr if missing from affinity, and allow approved unaffiliated members
 				redirect(URL('reservation/new'))	#go create this member's reservation
 
 		elif request.query.get('mail_lists'):

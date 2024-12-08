@@ -2077,11 +2077,11 @@ def composemail():
 		footer = A("Export bcc list for use in email", _href=URL('bcc_export',
 						vars=dict(query=query, left=left or '')))
 	else:
-		fields.append(Field('to', 'string',
+		fields.append(Field('to', 'list:string',
 			comment='Include spaces between multiple recipients',
    			requires=[IS_NOT_EMPTY(), IS_LIST_OF_EMAILS()]))
 	if not query or query_count==1:
-		fields.append(Field('bcc', 'string', requires=IS_LIST_OF_EMAILS()))
+		fields.append(Field('bcc', 'list:string', requires=IS_LIST_OF_EMAILS()))
 	fields.append(Field('subject', 'string', requires=IS_NOT_EMPTY(), default=proto.Subject if proto else ''))
 	fields.append(Field('body', 'text', requires=IS_NOT_EMPTY(),
 					 default=proto.Body if proto else "<letterhead>\n<greeting>\n\n" if query else "<letterhead>\n\n",
@@ -2118,12 +2118,12 @@ def composemail():
 			redirect(request.query.back)
 		if not IS_PRODUCTION:
 			if form2.vars.get('to'):
-				to = re.compile('[^,;\s]+').findall(form2.vars['to']) if isinstance(form2.vars['to'], str) else form2.vars['to']
+				to = form2.vars['to']
 				for em in to:
 					if not em in ALLOWED_EMAILS:
 						form2.errors['to'] = f"{em} is not an allowed address in this environment"
 			if form2.vars.get('bcc'):
-				bcc = re.compile('[^,;\s]+').findall(form2.vars['bcc']) if isinstance(form2.vars['bcc'], str) else form2.vars['bcc']
+				bcc = form2.vars['bcc']
 				for em in bcc:
 					if not em in ALLOWED_EMAILS:
 						form2.errors['bcc'] = f"{em} is not an allowed address in this environment"
@@ -2143,7 +2143,7 @@ def composemail():
 				db.EMProtos.insert(Subject=form2.vars['subject'], Body=form2.vars['body'])
 				flash.set("Template stored: "+ form2.vars['subject'])
 
-		bcc = re.compile('[^,;\s]+').findall(form2.vars.get('bcc')) if isinstance(form2.vars['bcc'], str) else form2.vars['bcc'] or ''
+		bcc = form2.vars['bcc']
 
 		try:
 			bodyparts = emailparse(form2.vars['body'], form2.vars['subject'], query)
@@ -2165,7 +2165,7 @@ def composemail():
 					Scheme=URL('index', scheme=True).replace('index', ''))
 				flash.set(f"email notice sent to '{qdesc}' ({query_count})")
 			else:
-				to = re.compile('[^,;\s]+').findall(form2.vars['to']) if isinstance(form2.vars['to'], str) else form2.vars['to']
+				to = form2.vars['to']
 				body = ''
 				for part in bodyparts:
 					body += part[0]

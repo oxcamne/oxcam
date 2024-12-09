@@ -142,7 +142,8 @@ def validate(id, token):
 			datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > user.when_issued + datetime.timedelta(minutes = 15) or \
 			user.remote_addr != request.remote_addr:	#this last check may be too strong,
 			#there may be configurations where the IP switches between browser and email??
-		redirect(URL('send_http_error'))
+		flash.set("Verification expired or from a different IP address.")
+		redirect(URL('login', vars=dict(url=request.query.url)))
 	user.update_record(trusted = True)
 	rows = db((db.Members.id == db.Emails.Member) & db.Emails.Email.ilike(user.email)).select(
 				db.Members.ALL, distinct=True)

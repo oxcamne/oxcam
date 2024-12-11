@@ -2152,7 +2152,7 @@ def composemail():
 				db.EMProtos.insert(Subject=form2.vars['subject'], Body=form2.vars['body'])
 				flash.set("Template stored: "+ form2.vars['subject'])
 
-		bcc = form2.vars['bcc']
+		bcc = form2.vars.get('bcc')
 
 		try:
 			bodyparts = emailparse(form2.vars['body'], form2.vars['subject'], query)

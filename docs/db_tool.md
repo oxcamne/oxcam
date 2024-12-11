@@ -41,3 +41,11 @@ update: Mailings=row.Mailings.remove(2)
 ```
 
 Might be used to remove all subscriptions to the mailing list with id==2.
+
+In another example, the tool may be used to identify ***members attending an event as guests of another member*** (e.g. to establish AGM quorum). Use the values
+
+query: (db.Reservations.Event==169)&(db.Reservations.Host==False)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)&(db.Members.id>0)
+
+left: db.Members.on((db.Members.Lastname==db.Reservations.Lastname)&(db.Members.Firstname.contains(db.Reservations.Firstname))&(db.Members.Membership!=None))
+
+The potential guest member records will be displayed.

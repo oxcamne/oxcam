@@ -10,12 +10,13 @@ The back link returns to the previous context. Transactions are displayed in a g
 
 There is a search box at the top that allows transactions to be filtered, e.g. to specific accounts, members, and/or events, or by searching the Notes field for name or email address.
 
-Accrued entries that have not yet been reconciled are marked and are deleteable as well as editable. The Add Record button allows accrued entries to be created when writing a check and displaying the bank's transactions.
+The grid contains both Reconciled entries and manually entered Accrued entries. Reconciled entries are created by uploading transaction files obtained from the institution, which matches them up with accrued items in the case of check or charge payments, or with recorded charges in the case of membership dues or event registration payments made by members online.
 
-Reconciled entries are created by uploading transaction files obtained from the institution, which matches them up with accrued items in the case of check payments, or with recorded charges in the case of membership dues or event registrations paid via Stripe.
+Accrued entries are created manually using the **+New button** when writing a check or making a purchase using the Society's bank credit/debit card. As noted above, the charge will be reconciled when the record of the charge or check deposit is later uploaded (reconciled).
+Accrued entries can be edited/deleted. Checks should be recorded along with the check number, which will be used in reconciliation, and can be split across different accounting categories as described below, e.g. if the check is reimbursement for a set of different expenses. Credit/Debit charges should not be split between accounts.
 
-In the case of incoming checks, when they are uploaded to the database after being deposited, they will initially be unallocated.
+There is no way to accrue for deposited incoming checks or charges, these should be allocated once they are uploaded from the institution and recorded as unallocated.
 
-Editing an uploaded dues payment check by assigning to the 'membership dues' account and specifying the member automatically updates the member record status. Similarly, editing an event registration check by assigning it to the 'ticket sales' account and specifying both the member and the event updates the associated reservation record to reflect the payment.
+Editing an uploaded dues payment check by assigning to the 'membership dues' account and specifying the member automatically updates the member record Paiddate if necessary. Editing an event registration check by assigning it to the 'ticket sales' account and specifying both the member and the event associates it with the event registration which will now show as paid.
 
-Uploaded transactions can be split to assign portions of the amount to different accounts. To do this edit the transaction, specifying a split size and the associated account. A new transaction with the original characteristics and reduced amount will be created for the balance. Any fee is divided proportionally.
+Uploaded transactions that need to be manually assigned can be split to assign portions of the amount to different accounts. To do this edit the transaction, specifying a split size and the associated account. A new transaction with the original characteristics and reduced amount will be created for the balance. Any fee is divided proportionally.

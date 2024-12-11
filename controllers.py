@@ -1906,7 +1906,8 @@ def bank_file(bank_id):
 			if checknumber:		#see if there is an accrued and possibly split entry
 				rows = db((db.AccTrans.Accrual==True)&(db.AccTrans.Bank==bank.id)&(db.AccTrans.CheckNumber==checknumber)).select()
 				accrued=0
-				for trans in rows: accrued+=trans.Amount
+				for trans in rows:
+					accrued+=trans.Amount
 				if accrued==amount:
 					for trans in rows:
 						trans.update_record(Accrual=False, Timestamp=timestamp, Reference=reference)
@@ -1920,6 +1921,15 @@ def bank_file(bank_id):
 						notes = f"{details} {notes}"
 				except Exception as e:
 					pass	#if fails, leave unallocated
+				#Check for matching accrued charge
+				rows = db((db.AccTrans.Accrual==True)&(db.AccTrans.Bank==bank.id)).select()
+				for trans in rows:
+					if trans.Amount == amount:
+						trans.update_record(Accrual=False, Timestamp=timestamp, Reference=reference)
+						amount = 0
+						break
+				if amount==0:
+					continue	#on to next transaction
 				
 			db.AccTrans.insert(Bank = bank.id, Account = account, Amount = amount,
 					Fee = fee if fee!=0 else None, Timestamp = timestamp,
@@ -1967,7 +1977,6 @@ def transactions(path=None):
 			db.AccTrans.Amount.comment='enter full amount of check as a negative number; split using Edit if multiple accounts',
 			db.AccTrans.Timestamp.writable=True
 			db.AccTrans.Amount.requires=IS_DECIMAL_IN_RANGE(-100000, 0)
-			db.AccTrans.CheckNumber.requires=IS_NOT_EMPTY()
 			db.AccTrans.Bank.default = session['bank_id']
 	
 	header = CAT(A('back', _href=back), H5('Accounting Transactions'))

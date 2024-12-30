@@ -80,7 +80,7 @@ def send_notice(notice):
 		exception = None
 		while True:
 			try:
-				email_sender(host=SMTP_BULK, subject=notice.Subject, sender=notice.Sender, to=to, bcc=eval(notice.Bcc) if notice.Bcc else None,
+				email_sender(host=SMTP_BULK, subject=notice.Subject, sender=notice.Sender, to=to, bcc=eval(notice.Bcc),
 					body=body, attachment=attachment, attachment_filename=notice.Attachment_Filename,
 					list_unsubscribe=f"<{list_unsubscribe_uri}>" if mailing else None,
 					list_unsubscribe_post="List-Unsubscribe=One-Click" if mailing else None,

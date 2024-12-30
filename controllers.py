@@ -2087,8 +2087,8 @@ def composemail():
 						vars=dict(query=query, left=left or '')))
 	else:
 		fields.append(Field('to', 'list:string',
-			comment='Include spaces between multiple recipients',
-   			requires=[IS_NOT_EMPTY(), IS_LIST_OF_EMAILS()]))
+			comment='Include comma between multiple recipients',
+   			requires=[IS_LIST_OF_EMAILS(), IS_NOT_EMPTY()]))
 	if not query or query_count==1:
 		fields.append(Field('bcc', 'list:string', requires=IS_LIST_OF_EMAILS()))
 	fields.append(Field('subject', 'string', requires=IS_NOT_EMPTY(), default=proto.Subject if proto else ''))
@@ -2108,31 +2108,19 @@ def composemail():
 		form=''
 		fields.append(Field('delete', 'boolean', comment='tick to delete template; sends no message'))
 
-	def checktags(body):	#check the custom tags
-		body = XML(body, sanitize=True).text
-		m = re.match(r"^(.*)\&lt\;(.*)\&gt\;.*$", body, flags=re.DOTALL)
-		if m:			#found custom tag
-			if m.group(2) not in ["letterhead", "subject", "greeting", "reservation", "member", "email"]:
-				return f"<{m.group(2)}> is not a valid custom tag"
-			return checktags(m.group(1))
-		return None
-
 	def validate(form2):
-		bad_tag = checktags(form2.vars.get('body'))
-		if bad_tag:
-			form2.errors['body'] = bad_tag
 		if form2.vars.get('delete'):
 			db(db.EMProtos.id == proto.id).delete()
 			flash.set("Template deleted: "+ proto.Subject)
 			redirect(request.query.back)
 		if not IS_PRODUCTION:
-			if form2.vars.get('to'):
-				to = form2.vars['to']
+			to = form2.vars.get('to')
+			if to:
 				for em in to:
 					if not em in ALLOWED_EMAILS:
 						form2.errors['to'] = f"{em} is not an allowed address in this environment"
-			if form2.vars.get('bcc'):
-				bcc = form2.vars['bcc']
+			bcc = form2.vars.get('bcc')
+			if bcc:
 				for em in bcc:
 					if not em in ALLOWED_EMAILS:
 						form2.errors['bcc'] = f"{em} is not an allowed address in this environment"
@@ -2170,7 +2158,7 @@ def composemail():
 			if query:
 				db.Email_Queue.insert(Subject=form2.vars['subject'], Body=form2.vars['body'], Sender=sender,
 			 		Attachment=pickle.dumps(attachment), Attachment_Filename=attachment_filename,
-					Bcc=bcc, Query=query, Left=left, Qdesc=qdesc,
+					Bcc=str(bcc), Query=query, Left=left, Qdesc=qdesc,
 					Scheme=URL('index', scheme=True).replace('index', ''))
 				flash.set(f"email notice sent to '{qdesc}' ({query_count})")
 			else:

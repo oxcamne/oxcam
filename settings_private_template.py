@@ -120,11 +120,18 @@ and during following 3 weeks. So we set the grace period to cover 18+21 \
 days.
 """
 
+@dataclass
+class Email_Account:
+	server: str
+	port: int
+	username: str
+	password: str
+
 #SMTP host connection for transactional messages (e.g. a gmail account)
-SMTP_TRANS = ('smtp.somewhere.com', 'port', 'username', 'password')
+SMTP_TRANS = Email_Account('smtp.somewhere.com', 'port', 'username', 'password')
 
 #SMTP host connection for bulk messages (e.g. a mailing service such as mailgun)
-SMTP_BULK = SMTP_TRANS
+SMTP_BULK = Email_Account('smtp.somewhere.com', 'port', 'username', 'password')
 
 # logger settings
 LOGGERS = [

@@ -50,10 +50,9 @@ def email_sender(
 	list_unsubscribe_post = None
 ):
 	if not connection:
-		smtp_server, port, login, password = host
-		server = smtplib.SMTP(smtp_server, port)
+		server = smtplib.SMTP(host.server, host.port)
 		server.starttls()
-		server.login(login, password)
+		server.login(host.username, host.password)
 	else:
 		server = connection
 

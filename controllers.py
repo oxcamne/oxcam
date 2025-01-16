@@ -35,7 +35,7 @@ from yatl.helpers import H5, H6, XML, TABLE, TH, TD, THEAD, TR, HTML, P, BUTTON
 from .common import db, session, flash
 from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
 	MEMBERSHIPS, TIME_ZONE, PAGE_BANNER, HOME_URL, HELP_URL, IS_PRODUCTION,\
-	ALLOWED_EMAILS, DATE_FORMAT, CURRENCY_SYMBOL
+	ALLOWED_EMAILS, DATE_FORMAT, CURRENCY_SYMBOL, SMTP_TRANS
 from .pay_processors import paymentprocessor
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
@@ -2062,11 +2062,7 @@ def composemail():
 	left = request.query.get('left')
 
 	header = CAT(A('back', _href=request.query.get('back')), H5("Send Email"))
-	source = society_emails(session.member_id)
-
-	if len(source) == 0:
-		flash.set('Sorry, you cannot send email without a Society email address')
-		redirect(URL('accessdenied'))
+	source = society_emails(session.member_id) or [SMTP_TRANS.username]
 	
 	form = Form(
 		[Field('template', 'reference EMProtos',

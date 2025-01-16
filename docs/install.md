@@ -154,11 +154,18 @@ and during following 3 weeks. So we set the grace period to cover 18+21 \
 days.
 """
 
+@dataclass
+class Email_Account:
+    server: str
+    port: int
+    username: str
+    password: str
+
 #SMTP host connection for transactional messages
-SMTP_TRANS = ('smtp.somewhere.com', 'port', 'username', 'password')
+SMTP_TRANS = Email_Account('smtp.somewhere.com', 'port', 'username', 'password')
 
 #SMTP host connection for bulk messages
-SMTP_BULK = SMTP_TRANS
+SMTP_BULK = Email_Account('smtp.somewhere.com', 'port', 'username', 'password')
 
 # logger settings
 LOGGERS = [
@@ -172,7 +179,7 @@ ALLOWED_ACTIONS = []    #disable Py4web's auth
 RECAPTCHA_KEY = "production_recaptcha_site_key" if IS_PRODUCTION else "develomemnt_recaptcha_site_key"
 RECAPTCHA_SECRET = "production_recaptcha_secret" if IS_PRODUCTION else "develomemnt_recaptcha_secret"
 
-VERIFY_TIMEOUT = 3	#minutes enforced between verification emails
+VERIFY_TIMEOUT = 3  #minutes enforced between verification emails
 ```
 
 Notes:

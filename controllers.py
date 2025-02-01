@@ -99,7 +99,8 @@ def index():
 		pass
 		header = CAT(header, event.DateTime.strftime('%A, %B %d '), event.Description, waitlist,
 			A('register', _href=URL(f'registration/{event.id}')), ' or ',
-			A('see details', _href=event.Page, _target='event'), XML('<br>'))
+			A('see details',
+	 			_href=URL(f"event_page/{event.id}") if event.Details else event.Page, _target='event'), XML('<br>'))
 	return locals()
 
 @action('view_card')
@@ -259,11 +260,14 @@ def members(path=None):
 			header = CAT(header,
 				A(f"Send Notice to {qdesc}", _href=URL('composemail',
 					vars=dict(query=query, left=left or '', qdesc=qdesc,
+			   		event_details=request.query.get('event') or '' if request.query.get('mailing_list') else '',
 					back=back))), XML('<br>'))
 		header = CAT(header,
 	       XML(f"Use filter to select a <a href={URL('email_lists/select')}>\
-mailing list</a> or apply other filters.<br>Selecting an event selects \
-(or excludes from a mailing list) attendees.<br>You can filter on a member record field \
+mailing list</a> or apply other filters.<br>Selecting an event selects attendees; \
+selecting an event AND a mailing list selects the mailing list less attendees \
+AND includes the event Details in email notices.<br>\
+You can filter on a member record field \
 using an optional operator (=, <, >, <=, >=) together with a value."))
 		footer = CAT(A("View Recent New Members", _href=URL('new_members/select')), XML('<br>'),
 			A("Export Membership Analytics", _href=URL('member_analytics')), XML('<br>'),
@@ -702,10 +706,13 @@ def events(path=None):
 		if path=='new':
 			header = CAT(A('back', _href=back), H5('New Event'))
 		else:
-			url = URL('registration', path[path.find('/')+1:], scheme=True)
 			event_id = path[path.find('/')+1:]
+			event = db.Events[event_id]
+			url = URL('registration', path[path.find('/')+1:], scheme=True)
+			urlpage = URL(f"event_page/{event.id}", scheme=True) if event.Details else event.Page
 			header = CAT(A('back', _href=back), H5('Event Record'),
 						"Booking link is ", A(url, _href=url), XML('<br>'),
+						"Event page is ", A(urlpage, _href=urlpage), XML('<br>'),
 						A('Ticket Types', _href=URL(f'tickets/{event_id}/select',
 								vars=dict(back=request.url))), XML('<br>'),
 						A('Selections', _href=URL(f'selections/{event_id}/select',
@@ -716,6 +723,8 @@ def events(path=None):
 								vars=dict(_referrer=request.query._referrer))))
 
 	def validation(form):
+		if not (form.vars.get('Page') or form.vars.get('Details')):
+			form.errors['Details']="Please provide either an external Page or Details"
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
@@ -734,7 +743,8 @@ def events(path=None):
 					Column('Wait', lambda row: event_wait(row.id) or '')],
 			search_queries=[["Event", lambda value: db.Events.Description.ilike(f'%{value}%')],
 		    				["Venue", lambda value: db.Events.Venue.ilike(f'%{value}%')],
-						    ["Speaker", lambda value: db.Events.Speaker.ilike(f'%{value}%')]],
+						    ["Speaker", lambda value: db.Events.Speaker.ilike(f'%{value}%')],
+							["Details", lambda value: db.Events.Details.ilike(f'%{value}%')]],
 			details=not write, editable=write, create=write,
 			deletable=lambda r: write and db(db.Reservations.Event == r['id']).count() == 0 and db(db.AccTrans.Event == r['id']).count() == 0,
 			validation=validation,
@@ -742,6 +752,14 @@ def events(path=None):
 			formstyle=form_style,
 			)
 	grid.render()
+	return locals()
+
+@action('event_page/<event_id:int>', method=['GET'])
+@preferred
+def event_page(event_id):
+	access = session.access	#for layout.html
+	event = db.Events[event_id]
+	header = XML(markdown.markdown(event.Details))
 	return locals()
 	
 @action('tickets/<event_id:int>/<path:path>', method=['POST', 'GET'])
@@ -1437,7 +1455,7 @@ def event_copy(event_id):
 	selections = db(db.Event_Selections.Event==event_id).select()
 	survey = db(db.Event_Survey.Event==event_id).select()
 	new_event_id = db.Events.insert(Page=event.Page, Description='Copy of '+event.Description, DateTime=event.DateTime,
-				Booking_Closed=event.Booking_Closed, Members_only=event.Members_only, AdCom_only=event.AdCom_only,
+				Booking_Closed=event.Booking_Closed, Details=event.Details, Members_only=event.Members_only, AdCom_only=event.AdCom_only,
 				Allow_join=event.Allow_join, Guest=event.Guests, Sponsors=event.Sponsors, Venue=event.Venue,
 				Capacity=event.Capacity, Speaker=event.Speaker, Notes=event.Notes, Comment=event.Comment)
 	for t in tickets:
@@ -2088,8 +2106,12 @@ def composemail():
 	if not query or query_count==1:
 		fields.append(Field('bcc', 'list:string', requires=IS_LIST_OF_EMAILS()))
 	fields.append(Field('subject', 'string', requires=IS_NOT_EMPTY(), default=proto.Subject if proto else ''))
-	fields.append(Field('body', 'text', requires=IS_NOT_EMPTY(),
-					 default=proto.Body if proto else "<letterhead>\n<greeting>\n\n" if query else "<letterhead>\n\n",
+	body_default = proto.Body if proto else "<letterhead>\n<greeting>\n\n" if query else "<letterhead>\n\n"
+	if request.query.get('event_details'):
+		event = db.Events[request.query.get('event_details')]
+		if event.Details:
+			body_default = f"<letterhead>\n<greeting>\n\n{event.Details}"
+	fields.append(Field('body', 'text', requires=IS_NOT_EMPTY(), default=body_default,
 				comment=CAT("You can use ",
 				A('Markdown', _href='https://www.markdownguide.org/basic-syntax/', _target='Markdown'),
 				" formatting, and you can also include HTML.", XML('<br>'),

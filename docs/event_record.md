@@ -8,7 +8,9 @@ This page is reached through the Edit button on an event row of the [Events Page
 
 The **back** link will take you back to the events page.
 
-The booking link is the registration link which would be linked from the event page on the website. This example is taken from the development environment and links to the local test environment.
+The booking link is the registration link which would be linked from the event page. This example is taken from the development environment and links to the local test environment.
+
+Similarly, the event page link is shown; it may be external (on the group website, specified in the Page field of the record), or internal to the database (Details field of the event record).
 
 The [**Ticket Types**](tickets.md), [**Selections**](selections.md), and [**Survey**](survey.md) links take you to the pages for managing ticket categories, menu selections, and multiple choice survey questions to appear on the registration and checkout pages. These data are all held in seperate records referencing the event record itself.
 
@@ -16,7 +18,7 @@ The **Make a Copy of This Event** link creates a new event record (and it's subr
 
 Below the menu appear the fields of the main event record.
 
-**Page** contains the link to the descriptive event page on the organization's public web site. This is used in constructing the 'past events' page embedded in the public web site.
+**Page** as noted above, this field should contain the URL for the event page if implemented within the group's static website.
 
 **Description** contains the name of the event.
 
@@ -24,7 +26,11 @@ Below the menu appear the fields of the main event record.
 
 Once registration is opened, **Booking Closed** indicates the date and time when registration will close. When an event if first set up this is usually set to a past time, disabling the booking link and preventing the event from appearing as a registration link on the 'My Accounts' page until we are ready to open registration.
 
-Registration is opened by editing Booking Closed to reflect the end of the registration period. After that point until the event itself the registration link will allow users to place themselves on the **waitlist**. Below this:
+Registration is opened by editing Booking Closed to reflect the end of the registration period. After that point until the event itself the registration link will allow users to place themselves on the **waitlist**.
+
+**Details** is used to implement the event page within the database, and also automatically supplies content when the event notice is sent out to the mailing list. This avoids having to provide the information in two different contexts and formats. As with emails sent using the database, a combination of Markdown formatting and html can be used. Below the field the comment includes a link to [Markdown documentation](https://www.markdownguide.org/basic-syntax/); also [see here](send_email.md#embedding-images-in-email) for a discussion of including images.
+
+Below this:
 
 ![event_record_2](images/event_record_2.png)
 

@@ -6,6 +6,8 @@ This screen, reached from the [member record](./member_record.md) or from a numb
 
 ![send_email](images/send_email.png)
 
+Members with 'write' access to the database can send email. If they have a dedicated Society email (or alias) the email will be send 'reply-to' that address. If they have multiple Society addresses they can select which should be used for 'reply-to'.
+
 The template form at the top allows you to load a pre-prepared message, which can then be adjusted if necessary. You can save your work as a template by ticking the save box near the bottom of the form.
 
 For an explicitly addressed message 'To:' will be a box allowing the entry of one or more email addresses separated by comma or space. If you are sending a notice to a mailing list or to any filtered list of members, it will describe the pre-selected target list.

@@ -6,7 +6,7 @@ The @action(path) decorator exposed the function at URL:
 
 The actions in this file are pages embedded in the Society's public website
 """
-from py4web import action
+from py4web import action, URL
 from .common import db
 from yatl.helpers import H5, A, TABLE, TR, TD, CAT, XML
 import datetime, markdown
@@ -19,13 +19,15 @@ from .utilities import society_emails
 def history():
 	message = H5('Past Event Highlights:')
 	since = datetime.datetime(2019, 3, 31)
-	events = db((db.Events.DateTime < datetime.datetime.now()) & (db.Events.DateTime >= since) & (db.Events.Page != None)).select(orderby = ~db.Events.DateTime)
+	events = db((db.Events.DateTime < datetime.datetime.now()) & (db.Events.DateTime >= since) & \
+			 ((db.Events.Page != None)|(db.Events.Details != None))).select(orderby = ~db.Events.DateTime)
 
 	table_rows = []
 	for event in events:
 		table_rows.append(TR(
 							TD(event.DateTime.strftime('%A, %B %d, %Y')),
-							TD(A(event.Description, _href=event.Page.lower(), _target='booking'))))
+							TD(A(event.Description,
+				_href=URL(f"event_page/{event.id}") if event.Details else event.Page, _target='booking'))))
 	message = CAT(message, TABLE(*table_rows))
 	return locals()
 

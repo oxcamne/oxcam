@@ -2112,14 +2112,14 @@ def composemail():
 		if event.Details:
 			body_default = f"<letterhead>\n<greeting>\n\n{event.Details}"
 	fields.append(Field('body', 'text', requires=IS_NOT_EMPTY(), default=body_default,
-				comment=CAT("You can use ",
-				A('Markdown', _href='https://www.markdownguide.org/basic-syntax/', _target='Markdown'),
-				" formatting, and you can also include HTML.", XML('<br>'),
+				comment = CAT(" format using ",
+				A('Markdown', _href='https://www.markdownguide.org/basic-syntax/', _target='doc'),
+				" and ",
+				A('HTML', _href='https://oxcamne.github.io/oxcam/send_email.html#embedding-images-in-email', _target='doc'),
+				" for additional formatting.",
+				XML('<br>'),
 				"There are custom tags <letterhead>, <subject>, <greeting>, <member>, <reservation>, and <email> ",
-				"available, depending on the context.", XML('<br>'),
-				"For information on including graphics ",
-				A('see here.', _href="https://oxcamne.github.io/oxcam/send_email.html#embedding-images-in-email")
-				)))
+				"available, depending on the context.")))
 	fields.append(Field('save', 'boolean', default=proto!=None, comment='store/update template'))
 	fields.append(Field('attachment', 'upload', uploadfield=False))
 	if proto:

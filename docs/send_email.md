@@ -30,20 +30,20 @@ Ticking the 'save/update template' box allows the content to be saved for later 
 
 ### Embedding Images in Email
 
-The Markdown syntax \!\[alt_text](image_url) is a simple way to include images. They are displayed as a block, i.e. text does not wrap alongside them, and at full size or, depending on the email client, scaled to occupy the available display width. Either make sure the image is not too large, or specify the display width using HTML as discussed below!
+The Markdown syntax \!\[alt_text](image_url) is a simple way to include images. They are displayed as a block, i.e. text does not wrap alongside them, and at full size or, depending on the email client, scaled to occupy the available display width. Either make sure the image is not too large, or specify the display width using HTML as discussed below! Note that Markdown does not apply formatting within HTML tags.
 
-Although Google Drive was not designed to be an image server, this can be done. You first make the image publicly available by right clicking, selecting share and then share again in the resulting menu, which produces a pop up box. If necessary, change General Access from 'Restricted' to 'Anyone with the link'. Then click Copy link followed by done. The saved link will be something like: <https://drive.google.com/file/d/1bPvuOwCA8BEwP1-s53Yc2zM1tru8rkaR/view?usp=sharing>. This includes an *image_id* `1bPvuOwCA8BEwP1-s53Yc2zM1tru8rkaR`.
+Although Google Drive was not designed to be an image server, this can be done. You first make the image publicly available by right clicking, selecting share and then share again in the resulting menu, which produces a pop up box. If necessary, change General Access from 'Restricted' to 'Anyone with the link'. Then click Copy link followed by done. The copied link will be something like: <https://drive.google.com/file/d/1bPvuOwCA8BEwP1-s53Yc2zM1tru8rkaR/view?usp=sharing>. This includes an *image_id* `1bPvuOwCA8BEwP1-s53Yc2zM1tru8rkaR`.
 
-You cannot use this Google Drive link directly, as it opens the image in google drive. Theoretically one should be able to construct an *image_url* as <https://drive.google.com/uc?export=view&id=image_id> but unfortunately at the time of writing many email clients will not display the image obtained this way (it is in SVG format). The alternative <https://drive.google.com/thumbnail?sz=w800&id=image_id> seems to work and is the prefered solution now.
-
-There is a [free web tool](https://www.labnol.org/embed/google/drive/) to convert the Google Drive link to one that does work. Open the tool and paste the google drive link into the top box (make sure to clear the box first). Then click Generate Embed Code, after dealing with the captcha. Click the button to copy the Direct Image Link, which is your *image_url* something like: <https://drive.google.com/drive-viewer/AKGpihYTP_pp-bWTHyWYIYpor9HDsVe2gDPKdYWVShRSrZyWtDINGfbEcUDtJIcZVpRlKSr0mtMJ6HF92ezmLQOrX-5choJQoTogyrw=s2560>. However this tool no longer appears to work.
-
-You can use the *image_url* directly in Markdown, or if you want more complex formatting you can use html. You can set the image size (width) and make it a centered block, for example, thus:
+You cannot use this Google Drive link directly, as it opens the image in google drive. Theoretically one should be modify the link to <https://drive.google.com/uc?export=view&id=image_id> but unfortunately at the time of writing many email clients will not display the image obtained this way (it is in SVG format). Instead modify the copied link to <https://drive.google.com/thumbnail?sz=w800&id=image_id>. Note that sz=w800 sets the resulting image width in pixels, equivalent to width="800px" in the img tag; set whatever size you want. You can use this url directly in Markdown, or if you want more complex formatting you can use html. You can set the image size (width) and make it a centered block, for example, thus:
 
 \<p style="text-align:center">\<img src="*image_url*" alt="*alt_text*" width="300px">\</p>
+
+(If you are embedding from Google Drive, you can use the sz= parameter and don't need the width option)
 
 Or you might wish to have the image on the left with the following text alongside, separated by a margin:
 
 \<p style="float:left; margin: 0px 15px 0px 0px">\<img src="*image_url*" alt="*alt_text*" width="300px">\</p>
 
 Note the margins specified are top, right, bottom, left.
+
+You can see other examples of html usage in recent event record Details.

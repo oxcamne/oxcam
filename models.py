@@ -157,16 +157,18 @@ def event_attend(event_id):
 	attend = db((db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).count()
 	return attend
 
-markdown = CAT(" (optional) use ",
-			   A('Markdown', _href='https://www.markdownguide.org/basic-syntax/', _target='Markdown'),
-			   " and html to create event page")
+markdown_comment = CAT(" (optional) create event page using ",
+			   A('Markdown', _href='https://www.markdownguide.org/basic-syntax/', _target='doc'),
+			   " and ",
+			   A('HTML', _href='https://oxcamne.github.io/oxcam/send_email.html#embedding-images-in-email', _target='doc'),
+			   " for additional formatting ")
 			
 db.define_table('Events',
 	Field('Page', 'string', comment=" (optional) Link to external event page"),
 	Field('Description', 'string', requires=IS_NOT_EMPTY(), comment=" Shown on website, confirmations, and financials"),
 	Field('DateTime', 'datetime', requires=[IS_NOT_EMPTY(), IS_DATETIME()], comment=" Event Date and Time, use 24-hour clock"),
 	Field('Booking_Closed', 'datetime'),
-	Field('Details', 'text', comment=markdown),
+	Field('Details', 'text', comment=markdown_comment),
 	Field('Members_only', 'boolean', default=True, comment=" members and their guests only"),
 	Field('AdCom_only', 'boolean', default=False, comment=" advisory committee and guests only"),
 	Field('Allow_join', 'boolean', default=True, comment=" offer join option in registration"),

@@ -21,8 +21,7 @@ SUPPORT_EMAIL = 'your_support_email'
 # html letterhead for email/notices:
 LETTERHEAD = f'<h2><span style="color: blue"><em>{SOCIETY_NAME}</em></span> \
 <img src="{DB_URL}/static/images/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" />\
-</h2><h3><span style="color: blue"><em>&lt;subject&gt;</em></span></h3>'
-    #NOTE 'subject' replaced by full subject line in emails/notices
+</h2><br>'
 # html trailer for email notices:
 VISIT_WEBSITE_INSTRUCTIONS = f"<br><br>Visit us at {HOME_URL} or your_social_media"
 

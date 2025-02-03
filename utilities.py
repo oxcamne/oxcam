@@ -159,12 +159,10 @@ def emailparse(body, subject, query=None):
 #	where function will build html format from the results of the query,
 #	markdown and HTML will be passed directly into the output
 #	The special tags such as <reservation> etc are parsed out separatly.
-	m = re.match(r"^(.*)<(letterhead|subject|greeting|reservation|member|email)>(.*)$", body, flags=re.DOTALL)
+	m = re.match(r"^(.*)<(letterhead|greeting|reservation|member|email)>(.*)$", body, flags=re.DOTALL)
 	if m:			#found something to expand
 		text = func = None
-		if m.group(2)=='subject':
-			text = subject
-		elif m.group(2)=='greeting' or m.group(2)=='email' or m.group(2)=='member' or m.group(2)=='reservation':
+		if m.group(2)=='greeting' or m.group(2)=='email' or m.group(2)=='member' or m.group(2)=='reservation':
 			if not query or m.group(2)=='reservation' and not ('Reservations.Event' in query):
 				raise Exception(f"<{m.group(2)}> can't be used in this context")
 			func=m.group(2) #will be generated individually for each target later

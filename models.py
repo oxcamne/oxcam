@@ -157,7 +157,7 @@ def event_attend(event_id):
 	attend = db((db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).count()
 	return attend
 
-markdown_comment = CAT(" (optional) create event page using ",
+markdown_comment = CAT(" (optional) create page using ",
 			   A('Markdown', _href='https://www.markdownguide.org/basic-syntax/', _target='doc'),
 			   " and ",
 			   A('HTML', _href='https://oxcamne.github.io/oxcam/send_email.html#embedding-images-in-email', _target='doc'),
@@ -218,6 +218,27 @@ db.define_table('Event_Survey',
 	   comment="first is question, remainder answer choices"),
 	Field('Short_name', 'string', requires=IS_NOT_EMPTY(), comment="for doorlist"),
 	format='%(Short_name)s'
+)
+
+def page_name(page_id):
+	return db.Pages[page_id].Page if page_id else ''
+
+db.define_table('Pages',
+	Field('Page', 'string', requires=IS_NOT_EMPTY()),
+	Field('Root', 'reference Pages',
+	   requires=IS_EMPTY_OR(IS_IN_SET(lambda: {r.id: r.Page for r in db(db.Pages.Root==None).select()})),
+	   comment="select root page, e.g. 'Home' or 'Help'"),
+	Field.Virtual('Root_name', lambda r: page_name(r.Root)),
+	Field('Parent', 'reference Pages',
+	   requires=IS_EMPTY_OR(IS_IN_SET(lambda: {r.id: r.Page for r in db(db.Pages.id>0).select()})),
+	   comment="select parent page if in submenu"),
+	Field.Virtual('Parent_name', lambda r: page_name(r.Parent)),
+	Field('Link', 'string', comment="external URL or link to dynamic page"),
+	Field('Content', 'text', requires=IS_NOT_EMPTY(), comment=markdown_comment),
+	Field('Created', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),
+	Field('Modified', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None),
+       			update=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),
+	format='%(Page)s'
 )
 
 db.define_table('Affiliations',

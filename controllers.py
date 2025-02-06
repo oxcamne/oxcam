@@ -47,13 +47,14 @@ from pydal.validators import IS_LIST_OF_EMAILS, IS_EMPTY_OR, IS_IN_DB, IS_IN_SET
 from .utilities import email_sender, member_good_standing, ageband, newpaiddate,\
 	tdnum, get_banks, financial_content, event_confirm, msg_header, msg_send,\
 	society_emails, emailparse, notification, notify_support, member_profile, generate_hash,\
-	encode_url, decode_url
+	encode_url, decode_url, pages_menu
 from .session import checkaccess
 from py4web.utils.factories import Inject
 import datetime, re, csv, decimal, pickle, markdown, dateutil
 from io import StringIO
 
 preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
+preferred_public = action.uses("gridform_public.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
 
 @action('index')
 @preferred
@@ -670,7 +671,6 @@ def email_lists(path=None):
 			grid_class_style=grid_style,
 			formstyle=form_style,
 			)
-	grid.render()
 	return locals()
 	
 @action('email_list_copy/<list_id:int>', method=['GET'])
@@ -751,7 +751,6 @@ def events(path=None):
 			grid_class_style=grid_style,
 			formstyle=form_style,
 			)
-	grid.render()
 	return locals()
 
 @action('event_page/<event_id:int>', method=['GET'])
@@ -1488,6 +1487,56 @@ def events_export():
 			writer.writerow(data)
 	except Exception as e:
 		flash.set(e)
+	return locals()
+	
+@action('pages/<path:path>', method=['POST', 'GET'])
+@preferred
+@checkaccess('read')
+def pages(path=None):
+	access = session.access	#for layout.html
+	write = ACCESS_LEVELS.index(session.access) >= ACCESS_LEVELS.index('write')
+
+	header = CAT(H5('Pages'), "Public Website Pages")
+
+	if path=='select':
+		back = request.url
+	else:
+		back = decode_url(request.query._referrer)
+		if path=='new':
+			header = CAT(A('back', _href=back), H5('New Public Page'))
+		else:
+			page_id = path[path.find('/')+1:]
+			page = db.Pages[page_id]
+			urlpage = URL(f"page_show/{page.id}", scheme=True) if page.Content else page.Link
+			header = CAT(A('back', _href=back), H5('Page Record'),
+						"Public page is ", A(urlpage, _href=urlpage), XML('<br>')
+			)
+
+	def validation(form):
+		if not (form.vars.get('Link') or form.vars.get('Content')):
+			form.errors['Content']="Please provide either an external link or Content"
+		if len(form.errors)>0:
+			flash.set("Error(s) in form, please check")
+			return
+
+	grid = Grid(path, db.Pages.id>0,
+			columns=[db.Pages.Page, db.Pages.Root_name, db.Pages.Parent_name, db.Pages.Link],
+			search_queries=[["Page", lambda value: db.Pages.Page.contains(value)],
+							["Content", lambda value: db.Pages.Content.contains(value)]],
+			details=not write, editable=write, create=write,
+			deletable=lambda r: write,
+			validation=validation,
+			grid_class_style=grid_style,
+			formstyle=form_style,
+			)
+	return locals()
+
+@action('page_show/<page_id:int>', method=['GET'])
+@preferred_public
+def page_show(page_id):
+	page = db.Pages[page_id]
+	menu = pages_menu(page)	#for layout_publc.html
+	header = XML(markdown.markdown(page.Content))
 	return locals()
 	
 @action('get_date_range', method=['POST', 'GET'])

@@ -261,6 +261,30 @@ def event_confirm(event_id, member_id, dues=0, event_only=False):
 		body += markdown.markdown(event.Notes)
 	return body
 
+def add_page(menu, page):
+	url = URL(f'page_show/{page.id}')
+	menu += f"<li><a href={url}>{page.Page}"
+	#subpages:
+	subpages = db(db.Pages.Parent==page.id).select(db.Pages.id, db.Pages.Page, orderby=db.Pages.Modified)
+	if subpages:
+		menu += '<ul>'
+		for subpage in subpages:
+			menu = add_page(menu, subpage)
+		menu += '</ul>'
+	menu += '</li>'
+	return menu
+
+def pages_menu(forpage):
+	#build menu of pages for layout_public
+	#appropriate root level pages:
+	root = forpage.Root or forpage.id
+	pages = db(db.Pages.Parent==None).select(db.Pages.id, db.Pages.Page, db.Pages.Root, orderby=db.Pages.Modified)
+	menu = ''
+	for page in pages:
+		if (page.id == root) or (page.Root == root):	
+			menu = add_page(menu, page)
+	return menu
+
 def society_emails(member_id):
 	return [row['Email'] for row in db((db.Emails.Member == member_id) & \
 	   (db.Emails.Email.contains(SOCIETY_SHORT_NAME.lower()))).select(

@@ -7,16 +7,15 @@ The @action(path) decorator exposed the function at URL:
 The actions in this file are pages embedded in the Society's public website
 """
 from py4web import action, URL
-from .common import db
+from .common import db, session
+from .settings import TIME_ZONE
 from yatl.helpers import H5, A, TABLE, TR, TD, CAT, XML
 import datetime, markdown
-from .models import primary_affiliation
+from .models import primary_affiliation, event_attend
 from .utilities import society_emails
 
 #embedded in Society Past Events Page
-@action('history', method=['GET'])
-@action.uses("message_embed.html", db)
-def history():
+def history_content():
 	message = H5('Past Event Highlights:')
 	since = datetime.datetime(2019, 3, 31)
 	events = db((db.Events.DateTime < datetime.datetime.now()) & (db.Events.DateTime >= since) & \
@@ -29,12 +28,16 @@ def history():
 							TD(A(event.Description,
 				_href=URL(f"event_page/{event.id}") if event.Details else event.Page, _target='booking'))))
 	message = CAT(message, TABLE(*table_rows))
+	return message
+
+@action('history', method=['GET'])
+@action.uses("message_embed.html", db)
+def history():
+	message = history_content()
 	return locals()
 
 #embedded in Society About page
-@action('about', method=['GET'])
-@action.uses("message_embed.html", db)
-def about():
+def about_content():
 	def oxcamaddr(r):
 		return XML(str(markdown.markdown(', '.join([f'[{e}](mailto:{e})' for e in society_emails(r.id)])))[3:-4])	#remove <p>...,</p>
 			
@@ -72,4 +75,36 @@ def about():
 			TD(primary_affiliation(r.id)),
 			))
 	message = CAT(message, TABLE(*table_rows))
+	return message
+
+#embedded in Society About page
+@action('about', method=['GET'])
+@action.uses("message_embed.html", db)
+def about():
+	message = about_content()
 	return locals()
+
+#embedded in Society Home page and index page
+def upcoming_events():
+	member = db.Members[session.member_id] if session.member_id else None
+	header = ''
+	events = db(db.Events.DateTime>=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)).select(orderby = db.Events.DateTime)
+	for event in events:
+		if event.AdCom_only and not (member and member.Access):
+			continue
+		waitlist = ' '
+		savethedate = False
+		if event.Booking_Closed<datetime.datetime.now(TIME_ZONE).replace(tzinfo=None):
+			if event_attend(event.id):
+				waitlist = ' *Booking Closed, waitlisting* '
+			else:
+				waitlist = ' *Save the Date* '
+				savethedate = True
+		elif event.Capacity and (event_attend(event.id) or 0) >= event.Capacity:
+			waitlist = ' *Sold Out, waitlisting* '
+		header = CAT(header, event.DateTime.strftime('%A, %B %d '), event.Description)
+		if not savethedate:
+			header = CAT(header, ' ', A('[register]', _href=URL(f'registration/{event.id}')))
+		header = CAT(header, ' ', A('[see details]',
+	 			_href=URL(f"event_page/{event.id}") if event.Details else event.Page, _target='event'), waitlist, XML('<br>'))
+	return header

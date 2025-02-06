@@ -233,13 +233,13 @@ db.define_table('Pages',
 	   requires=IS_EMPTY_OR(IS_IN_SET(lambda: {r.id: r.Page for r in db(db.Pages.id>0).select()})),
 	   comment="select parent page if in submenu"),
 	Field.Virtual('Parent_name', lambda r: page_name(r.Parent)),
-	Field('Link', 'string', comment="external URL or link to dynamic page"),
-	Field('Content', 'text', requires=IS_NOT_EMPTY(), comment=markdown_comment),
+	Field('Link', 'string', comment="use external Link (leave Content empty)"),
+	Field('Content', 'text', 
+	   comment=CAT(markdown_comment, ", [[function_name]] for dynamic content")),
 	Field('Created', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),
 	Field('Modified', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None),
        			update=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),
-	format='%(Page)s'
-)
+	format='%(Page)s')
 
 db.define_table('Affiliations',
 	Field('Member', 'reference Members', writable=False),

@@ -49,12 +49,12 @@ from .utilities import email_sender, member_good_standing, ageband, newpaiddate,
 	society_emails, emailparse, notification, notify_support, member_profile, generate_hash,\
 	encode_url, decode_url, pages_menu
 from .session import checkaccess
+from .website import about_content, history_content, upcoming_events	#evalated by page_show
 from py4web.utils.factories import Inject
 import datetime, re, csv, decimal, pickle, markdown, dateutil
 from io import StringIO
 
 preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
-preferred_public = action.uses("gridform_public.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
 
 @action('index')
 @preferred
@@ -84,24 +84,9 @@ def index():
 		header = CAT(header, A("Cancel your membership",
 						 _href=URL(f'cancel_subscription/{member.id}', vars=dict(back=request.url))), XML('<br>'))
 
-	header = CAT(header, XML('<br>'),
-	       H6(XML(f"To register for events use links below:")),
-	       XML('<br>'))
-	events = db(db.Events.DateTime>=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)).select(orderby = db.Events.DateTime)
-	events = events.find(lambda e: e.Booking_Closed>=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) or event_attend(e.id))
-	for event in events:
-		if event.AdCom_only and not (member and member.Access):
-			continue
-		waitlist = ' '
-		if event.Booking_Closed < datetime.datetime.now(TIME_ZONE).replace(tzinfo=None):
-			waitlist = ' *Booking Closed, waitlisting* '
-		elif event.Capacity and (event_attend(event.id) or 0) >= event.Capacity:
-			waitlist = ' *Sold Out, waitlisting* '
-		pass
-		header = CAT(header, event.DateTime.strftime('%A, %B %d '), event.Description, waitlist,
-			A('register', _href=URL(f'registration/{event.id}')), ' or ',
-			A('see details',
-	 			_href=URL(f"event_page/{event.id}") if event.Details else event.Page, _target='event'), XML('<br>'))
+	header = CAT(header, 
+	    	H6(XML(f"To register for/view events use links below:")),
+			upcoming_events())
 	return locals()
 
 @action('view_card')
@@ -1469,7 +1454,7 @@ def event_copy(event_id):
 	redirect(URL(f'events/edit/{new_event_id}', vars=dict(_referrer=request.query._referrer)))
 
 @action('events_export', method=['GET'])
-@action.uses("download.html", db, session, flash, Inject(response=response))
+@action.uses("download.html2", db, session, flash, Inject(response=response))
 @checkaccess('write')
 def events_export():
 	stream = StringIO()
@@ -1496,7 +1481,10 @@ def pages(path=None):
 	access = session.access	#for layout.html
 	write = ACCESS_LEVELS.index(session.access) >= ACCESS_LEVELS.index('write')
 
-	header = CAT(H5('Pages'), "Public Website Pages")
+	header = CAT(H5('Pages'), "Public Website Pages.", XML('<br>'),
+			  "There may be multiple page trees, the root pages are shown first.", XML('<br>'),
+			  "Order of modification controls the ordering of both grid and menus.", XML('<br>'),
+			  "Tree roots appear on the Nav Bar, with their children in a dropdown menu.")
 
 	if path=='select':
 		back = request.url
@@ -1518,10 +1506,14 @@ def pages(path=None):
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
+		
+	trees = {r.Page: [r.id]+[s.id for s in db(db.Pages.Root==r.id).select(db.Pages.id)] for r in db(db.Pages.Root==None).select(db.Pages.id, db.Pages.Page)}
 
 	grid = Grid(path, db.Pages.id>0,
+			orderby=db.Pages.Root|db.Pages.Modified,
 			columns=[db.Pages.Page, db.Pages.Root_name, db.Pages.Parent_name, db.Pages.Link],
 			search_queries=[["Page", lambda value: db.Pages.Page.contains(value)],
+				   			["Tree", lambda value: db.Pages.id.belongs(trees.get(value.lower(), []))],
 							["Content", lambda value: db.Pages.Content.contains(value)]],
 			details=not write, editable=write, create=write,
 			deletable=lambda r: write,
@@ -1530,13 +1522,33 @@ def pages(path=None):
 			formstyle=form_style,
 			)
 	return locals()
+import re
+
+def replace_functions(text):
+    # Find all occurrences of [[some_function]] using a regular expression
+    pattern = re.compile(r'\[\[(.*?)\]\]')
+
+    # Function to replace each match with the result of eval(some_function)
+    def replace_match(match):
+        function_name = match.group(1)
+        try:
+            # Evaluate the function and convert the result to a string
+            result = str(eval(function_name+'()'))
+        except Exception as e:
+            result = f"Error: {e}"
+        return result
+
+    # Replace all matches in the text
+    replaced_text = pattern.sub(replace_match, text)
+    return replaced_text
 
 @action('page_show/<page_id:int>', method=['GET'])
-@preferred_public
+@action.uses("gridform_public.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
 def page_show(page_id):
 	page = db.Pages[page_id]
 	menu = pages_menu(page)	#for layout_publc.html
-	header = XML(markdown.markdown(page.Content))
+	content = replace_functions(page.Content)
+	header = XML(markdown.markdown(content))
 	return locals()
 	
 @action('get_date_range', method=['POST', 'GET'])

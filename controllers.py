@@ -1503,6 +1503,8 @@ def pages(path=None):
 	def validation(form):
 		if not (form.vars.get('Link') or form.vars.get('Content')):
 			form.errors['Content']="Please provide either an external link or Content"
+		if form.vars.get('Hide') and not form.vars.get('Root'):
+			form.errors['Hide']="Root pages should not be hidden"
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
@@ -1511,7 +1513,7 @@ def pages(path=None):
 
 	grid = Grid(path, db.Pages.id>0,
 			orderby=db.Pages.Root|db.Pages.Modified,
-			columns=[db.Pages.Page, db.Pages.Root_name, db.Pages.Parent_name, db.Pages.Link],
+			columns=[db.Pages.Page, db.Pages.Root_name, db.Pages.Parent_name, db.Pages.Hide, db.Pages.Link],
 			search_queries=[["Page", lambda value: db.Pages.Page.contains(value)],
 				   			["Tree", lambda value: db.Pages.id.belongs(trees.get(value.lower(), []))],
 							["Content", lambda value: db.Pages.Content.contains(value)]],

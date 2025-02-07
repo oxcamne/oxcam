@@ -265,7 +265,7 @@ def add_page(menu, page):
 	url = URL(f'page_show/{page.id}')
 	menu += f"<li><a href={url}>{page.Page}"
 	#subpages:
-	subpages = db(db.Pages.Parent==page.id).select(db.Pages.id, db.Pages.Page, orderby=db.Pages.Modified)
+	subpages = db((db.Pages.Parent==page.id)&(db.Pages.Hide!=True)).select(db.Pages.id, db.Pages.Page, db.Pages.Hide, orderby=db.Pages.Modified)
 	if subpages:
 		menu += '<ul>'
 		for subpage in subpages:

@@ -15,8 +15,7 @@ from .models import primary_affiliation, event_attend
 from .utilities import society_emails
 
 #embedded in Society Past Events Page
-def history_content():
-	message = H5('Past Event Highlights:')
+def history_content(message = ''):
 	since = datetime.datetime(2019, 3, 31)
 	events = db((db.Events.DateTime < datetime.datetime.now()) & (db.Events.DateTime >= since) & \
 			 ((db.Events.Page != None)|(db.Events.Details != None))).select(orderby = ~db.Events.DateTime)
@@ -25,15 +24,15 @@ def history_content():
 	for event in events:
 		table_rows.append(TR(
 							TD(event.DateTime.strftime('%A, %B %d, %Y')),
-							TD(A(event.Description,
-				_href=URL(f"event_page/{event.id}") if event.Details else event.Page, _target='booking'))))
+							TD(A(event.Description, _href=URL(f"event_page/{event.id}") \
+								if event.Details else event.Page, _target='booking'))))
 	message = CAT(message, TABLE(*table_rows))
 	return message
 
 @action('history', method=['GET'])
 @action.uses("message_embed.html", db)
 def history():
-	message = history_content()
+	message = CAT(H5('Past Event Highlights:'), history_content())
 	return locals()
 
 #embedded in Society About page

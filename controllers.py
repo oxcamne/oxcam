@@ -1514,7 +1514,7 @@ def pages(path=None):
 
 	grid = Grid(path, db.Pages.id>0,
 			orderby=db.Pages.Root|db.Pages.Modified,
-			columns=[db.Pages.Page, db.Pages.Root_name, db.Pages.Parent_name, db.Pages.Hide, db.Pages.Link],
+			columns=[db.Pages.Page, db.Pages.Root_name, db.Pages.Parent_name, db.Pages.Hide, db.Pages.Link, db.Pages.Views],
 			search_queries=[["Page", lambda value: db.Pages.Page.contains(value)],
 				   			["Tree", lambda value: db.Pages.id.belongs(trees.get(value.lower(), []))],
 							["Content", lambda value: db.Pages.Content.contains(value)]],

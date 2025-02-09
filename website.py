@@ -91,6 +91,8 @@ def upcoming_events():
 	member = db.Members[session.member_id] if session.member_id else None
 	header = ''
 	events = db(db.Events.DateTime>=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)).select(orderby = db.Events.DateTime)
+	if not events:
+		return CAT(header, XML(markdown.markdown('Please check again soon!')[3:-4]+'<br>'))
 	for event in events:
 		if event.AdCom_only and not (member and member.Access):
 			continue

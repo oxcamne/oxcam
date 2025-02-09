@@ -743,6 +743,7 @@ def events(path=None):
 def event_page(event_id):
 	access = session.access	#for layout.html
 	event = db.Events[event_id]
+	event.update_record(Views=event.Views+1)
 	header = XML(markdown.markdown(event.Details))
 	return locals()
 	
@@ -1548,6 +1549,7 @@ def replace_functions(text):
 @action.uses("gridform_public.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
 def page_show(page_id):
 	page = db.Pages[page_id]
+	page.update_record(Views = page.Views+1)
 	menu = pages_menu(page)	#for layout_publc.html
 	content = replace_functions(page.Content)
 	header = XML(markdown.markdown(content))

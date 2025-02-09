@@ -4,7 +4,7 @@
 
 This screen, reached from the [member record](./member_record.md) or from a number of other contexts, is used to send an individual email or an email notice:
 
-![send_email](images/send_email.png)
+![Send Email Page](images/send_email.png)
 
 Members with 'write' access to the database can send email. If they have a dedicated Society email (or alias) the email will be send 'reply-to' that address. If they have multiple Society addresses they can select which should be used for 'reply-to'.
 
@@ -34,7 +34,7 @@ The Markdown syntax \!\[alt_text](image_url) is a simple way to include images. 
 
 Although Google Drive was not designed to be an image server, this can be done. You first make the image publicly available by right clicking, selecting share and then share again in the resulting menu, which produces a pop up box. If necessary, change General Access from 'Restricted' to 'Anyone with the link'. Then click Copy link followed by done. The copied link will be something like: <https://drive.google.com/file/d/1bPvuOwCA8BEwP1-s53Yc2zM1tru8rkaR/view?usp=sharing>. This includes an *image_id* `1bPvuOwCA8BEwP1-s53Yc2zM1tru8rkaR`.
 
-You cannot use this Google Drive link directly, as it opens the image in google drive. Theoretically one should be modify the link to <https://drive.google.com/uc?export=view&id=image_id> but unfortunately at the time of writing many email clients will not display the image obtained this way (it is in SVG format). Instead modify the copied link to <https://drive.google.com/thumbnail?sz=w800&id=image_id>. Note that sz=w800 sets the resulting image width in pixels, equivalent to width="800px" in the img tag; set whatever size you want. You can use this url directly in Markdown, or if you want more complex formatting you can use html. You can set the image size (width) and make it a centered block, for example, thus:
+You cannot use this Google Drive link directly, as it opens the image in google drive. Theoretically one should be modify the link to <https://drive.google.com/uc?export=view&id=image_id> but unfortunately at the time of writing many email clients will not display the image obtained this way (it is in SVG format). Instead modify the copied link to <https://drive.google.com/thumbnail?sz=w800&id=image_id>. Note that sz=w800 sets the resulting image width in pixels, equivalent to width="800px" in the img tag; set whatever size you want. If you use Markdown formatting to display this image, but should use html. You can also set the image size (width) and make it a centered block, for example, thus:
 
 \<p style="text-align:center">\<img src="*image_url*" alt="*alt_text*" width="300px">\</p>
 

@@ -9,7 +9,7 @@ The actions in this file are pages embedded in the Society's public website
 from py4web import action, URL
 from .common import db, session
 from .settings import TIME_ZONE
-from yatl.helpers import H5, A, TABLE, TR, TD, CAT, XML
+from yatl.helpers import H5, A, TABLE, TR, TD, CAT, XML, EM
 import datetime, markdown
 from .models import primary_affiliation, event_attend
 from .utilities import society_emails
@@ -18,7 +18,8 @@ from .utilities import society_emails
 def history_content(message = ''):
 	since = datetime.datetime(2019, 3, 31)
 	events = db((db.Events.DateTime < datetime.datetime.now()) & (db.Events.DateTime >= since) & \
-			 ((db.Events.Page != None)|(db.Events.Details != None))).select(orderby = ~db.Events.DateTime)
+			 ((db.Events.Page != None)|(db.Events.Details != None)) & \
+				(db.Events.AdCom_only==False)).select(orderby = ~db.Events.DateTime)
 
 	table_rows = []
 	for event in events:
@@ -26,6 +27,8 @@ def history_content(message = ''):
 							TD(event.DateTime.strftime('%A, %B %d, %Y')),
 							TD(A(event.Description, _href=URL(f"event_page/{event.id}") \
 								if event.Details else event.Page, _target='booking'))))
+		if event.Speaker:
+			table_rows.append(TR(TD(''), TD(event.Speaker)))
 	message = CAT(message, TABLE(*table_rows))
 	return message
 
@@ -91,19 +94,17 @@ def upcoming_events():
 	for event in events:
 		if event.AdCom_only and not (member and member.Access):
 			continue
-		waitlist = ' '
-		savethedate = False
+		attend = event_attend(event.id)
+		line = f"{event.DateTime.strftime('%A, %B %d ')} **[{event.Description}]({URL(f'event_page/{event.id}') if event.Details else event.Page})**"
 		if event.Booking_Closed<datetime.datetime.now(TIME_ZONE).replace(tzinfo=None):
-			if event_attend(event.id):
-				waitlist = ' *Booking Closed, waitlisting* '
+			if not attend:
+				line = f"{event.DateTime.strftime('%A, %B %d ')} **{event.Description}** *Save the Date*"
 			else:
-				waitlist = ' *Save the Date* '
-				savethedate = True
-		elif event.Capacity and (event_attend(event.id) or 0) >= event.Capacity:
-			waitlist = ' *Sold Out, waitlisting* '
-		header = CAT(header, event.DateTime.strftime('%A, %B %d '), event.Description)
-		if not savethedate:
-			header = CAT(header, ' ', A('[register]', _href=URL(f'registration/{event.id}')))
-		header = CAT(header, ' ', A('[see details]',
-	 			_href=URL(f"event_page/{event.id}") if event.Details else event.Page, _target='event'), waitlist, XML('<br>'))
+				line += ' *Booking Closed, waitlisting*'
+		else:
+			url = URL(f"registration/{event.id}")
+			line+= f" [(register here)]({url})"
+			if event.Capacity and (attend or 0) >= event.Capacity:
+				line +=' *Sold Out, waitlisting*'
+		header = CAT(header, XML(markdown.markdown(line)[3:-4]+'<br>'))
 	return header

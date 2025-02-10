@@ -278,7 +278,7 @@ def pages_menu(forpage):
 	#build menu of pages for layout_public
 	#appropriate root level pages:
 	root = forpage.Root or forpage.id
-	pages = db(db.Pages.Parent==None).select(db.Pages.id, db.Pages.Page, db.Pages.Root, orderby=db.Pages.Modified)
+	pages = db(db.Pages.Parent==None).select(db.Pages.id, db.Pages.Page, db.Pages.Root, orderby=db.Pages.Root|db.Pages.Modified)
 	menu = ''
 	for page in pages:
 		if (page.id == root) or (page.Root == root):	

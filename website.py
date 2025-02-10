@@ -97,15 +97,15 @@ def upcoming_events():
 		if event.AdCom_only and not (member and member.Access):
 			continue
 		attend = event_attend(event.id)
-		line = f"{event.DateTime.strftime('%A, %B %d ')} **[{event.Description}]({URL(f'event_page/{event.id}') if event.Details else event.Page})**"
+		line = f"{event.DateTime.strftime('%A, %B %d ')} **[{event.Description}]({URL(f'event_page/{event.id}') if event.Details else event.Page})**".strip()
 		if event.Booking_Closed<datetime.datetime.now(TIME_ZONE).replace(tzinfo=None):
 			if not attend:
-				line = f"{event.DateTime.strftime('%A, %B %d ')} **{event.Description}** *Save the Date*"
+				line = f"{event.DateTime.strftime('%A, %B %d ')} **{event.Description.strip()}** *Save the Date*"
 			else:
 				line += ' *Booking Closed, waitlisting*'
 		else:
 			url = URL(f"registration/{event.id}")
-			line+= f" [(register here)]({url})"
+			line+= f" register [here]({url})"
 			if event.Capacity and (attend or 0) >= event.Capacity:
 				line +=' *Sold Out, waitlisting*'
 		header = CAT(header, XML(markdown.markdown(line)[3:-4]+'<br>'))

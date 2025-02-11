@@ -1510,7 +1510,7 @@ def pages(path=None):
 			flash.set("Error(s) in form, please check")
 			return
 		
-	trees = {r.Page: [r.id]+[s.id for s in db(db.Pages.Root==r.id).select(db.Pages.id)] for r in db(db.Pages.Root==None).select(db.Pages.id, db.Pages.Page)}
+	trees = {r.Page.lower(): [r.id]+[s.id for s in db(db.Pages.Root==r.id).select(db.Pages.id)] for r in db(db.Pages.Root==None).select(db.Pages.id, db.Pages.Page)}
 
 	grid = Grid(path, db.Pages.id>0,
 			orderby=db.Pages.Root|db.Pages.Modified,

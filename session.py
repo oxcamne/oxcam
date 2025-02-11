@@ -88,16 +88,11 @@ you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _h
 		#rate limit the IP and email, impose 3 minute delay between login attempts
 		now = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
 		if not (VERIFY_TIMEOUT and last and now < last.when_issued + datetime.timedelta(minutes=VERIFY_TIMEOUT)):
-			if last:
-				last.update_record(when_issued=now)
-			else:
-				db.users.insert(email=form.vars['email'], remote_addr=request.remote_addr, when_issued=now)
-			db.commit()
 			session['email'] = form.vars['email']
 			redirect(URL('send_email_confirmation', vars=dict(email=form.vars['email'], url=request.query.url,
 						timestamp=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))))
 		flash.set(f"<em>Please wait a bit, there is a {VERIFY_TIMEOUT} minute time-out between sending verification messages</em>", sanitize=False)
-	elif last and datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) < last.when_issued + datetime.timedelta(minutes=5):
+	elif last and datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) < last.when_issued + datetime.timedelta(minutes=VERIFY_TIMEOUT):
 		flash.set("<em>If you didn't find your verification email, please check \
 for typos in your address, and check in the spam folder.</em><br>", sanitize=False)
 
@@ -116,7 +111,7 @@ def send_email_confirmation():
 			redirect(URL('login'))
 		user = db(db.users.email==email).select().first()
 		if user:
-			user.update_record(remote_addr = request.remote_addr)
+			user.update_record(remote_addr = request.remote_addr, trusted = False)
 			if datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > user.when_issued + datetime.timedelta(minutes = 15):
 				user.update_record(tokens=None)	#clear old expired tokens
 		else:

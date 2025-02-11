@@ -1,4 +1,4 @@
-# Oxford/Cambridge Alumni Group Database - User Guide
+# Oxford/Cambridge Alumni Group Application - User Guide
 
 The OxCam web application implements both the public web site for an Oxford and/or Cambridge alumni group and an underlying database for membership data and other functions. Note that a group may elect to create a separate public facing website but still use this application for its other capabilities.
 

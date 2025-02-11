@@ -2170,12 +2170,14 @@ def composemail():
    			requires=[IS_LIST_OF_EMAILS(), IS_NOT_EMPTY()]))
 	if not query or query_count==1:
 		fields.append(Field('bcc', 'list:string', requires=IS_LIST_OF_EMAILS()))
-	fields.append(Field('subject', 'string', requires=IS_NOT_EMPTY(), default=proto.Subject if proto else ''))
+	subject_default = proto.Subject if proto else ''
 	body_default = proto.Body if proto else "<letterhead>\n<greeting>\n\n" if query else "<letterhead>\n\n"
 	if request.query.get('event_details'):
 		event = db.Events[request.query.get('event_details')]
 		if event.Details:
 			body_default = f"<letterhead>\n<greeting>\n\n{event.Details}"
+			subject_default = event.Description
+	fields.append(Field('subject', 'string', requires=IS_NOT_EMPTY(), default=subject_default))
 	fields.append(Field('body', 'text', requires=IS_NOT_EMPTY(), default=body_default,
 				comment = CAT(" format using ",
 				A('Markdown', _href='https://www.markdownguide.org/basic-syntax/', _target='doc'),

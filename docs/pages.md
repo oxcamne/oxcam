@@ -1,4 +1,4 @@
-# [Oxford/Cambridge Alumni Group Database](index.md)
+# [Oxford/Cambridge Alumni Group Application](index.md)
 
 ## Pages Page
 
@@ -6,7 +6,7 @@ This grid is reached from 'Pages' button on the blue navigation bar. Initially i
 
 ![pages grid](images/pages.png)
 
-The **+New** button is used to create a new page.
+The **+New** button is used to create a new page. Go to [Pages Record](pages_record.md) for information on constructing and editing Content.
 
 Multiple sites can be constructed in the database, though the example shows only one, the main public website 'home'. I will also be migrating the organizers' help site shortly. Note that these two web sites' addresses are configured in the settings_private.py file.
 

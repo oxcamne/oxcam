@@ -53,7 +53,7 @@ def checkaccess(requiredaccess):
 	Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL, RECAPTCHA_KEY=RECAPTCHA_KEY))
 def login():
 	session['logged_in'] = False
-	trusted = not RECAPTCHA_KEY or db((db.users.remote_addr==request.remote_addr) & (db.users.trusted==True)).select().first() != None
+	challenge = RECAPTCHA_KEY and request.query.get('challenge')
 
 	def verify_captcha(captchaData=None):
 		if captchaData is None:
@@ -68,14 +68,14 @@ def login():
 		return False
 
 	def validate_user_form(form):
-		if trusted or verify_captcha(form.vars['g-recaptcha-response']):
+		if not challenge or verify_captcha(form.vars['g-recaptcha-response']):
 			return
 		if not form.errors.get('email'):
 			form.errors['email'] ="Please verify you are not a robot"	
 
 	fields = [Field('email', 'string', default=session.get('email'), requires=IS_EMAIL())]
 	form = Form(fields, validation=validate_user_form, keep_values=True)
-	if not trusted:
+	if challenge:
 		form.structure.insert(0, INPUT(_name='g-recaptcha-response',_id='g-recaptcha-response', _hidden=True, _value='a'))
 
 	header = P(XML(f"Please specify your email to login.<br />If you have signed in previously, please use the \
@@ -89,6 +89,9 @@ you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _h
 		now = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
 		if not (VERIFY_TIMEOUT and last and now < last.when_issued + datetime.timedelta(minutes=VERIFY_TIMEOUT)):
 			session['email'] = form.vars['email']
+			if RECAPTCHA_KEY and not challenge and not db((db.users.remote_addr==request.remote_addr) &\
+								(db.users.email==form.vars['email']) & (db.users.trusted==True)).select().first():
+				redirect(URL('login', vars=dict(challenge=True, url=request.query.url)))	#not trusted email/IP, challenge with recaptcha
 			redirect(URL('send_email_confirmation', vars=dict(email=form.vars['email'], url=request.query.url,
 						timestamp=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))))
 		flash.set(f"<em>Please wait a bit, there is a {VERIFY_TIMEOUT} minute time-out between sending verification messages</em>", sanitize=False)

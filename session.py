@@ -1,7 +1,7 @@
 """
 This file contains controllers used to manage the user's session
 """
-from py4web import URL, request, redirect, action, Field
+from py4web import URL, request, redirect, action, Field, HTTP
 from .common import db, session, flash, logger, auth
 from .settings import SUPPORT_EMAIL, TIME_ZONE, LETTERHEAD, SOCIETY_SHORT_NAME, PAGE_BANNER, HOME_URL, HELP_URL, DATE_FORMAT,\
 		RECAPTCHA_KEY, RECAPTCHA_SECRET, VERIFY_TIMEOUT
@@ -74,7 +74,12 @@ def login():
 			form.errors['email'] ="Please verify you are not a robot"	
 
 	fields = [Field('email', 'string', default=session.get('email'), requires=IS_EMAIL())]
-	form = Form(fields, validation=validate_user_form, keep_values=True)
+	try:
+		form = Form(fields, validation=validate_user_form, keep_values=True)
+	except Exception as e:
+		# badly formed POST request from a bot
+		# Return a 404 Not Found response
+		raise HTTP(404, "Page Not Found")
 	if challenge:
 		form.structure.insert(0, INPUT(_name='g-recaptcha-response',_id='g-recaptcha-response', _hidden=True, _value='a'))
 

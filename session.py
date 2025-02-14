@@ -127,6 +127,7 @@ def send_email_confirmation():
 Please click {A(link, _href=link)} to continue to {SOCIETY_SHORT_NAME} \
 and complete your registration or other transaction.<br><br>\
 <em>If you did not initiate the request, please Reply to report this so that we can investigate</em>."
+		db.commit()
 		email_sender(to=email, sender=SUPPORT_EMAIL, subject='Please Confirm Email', body=message)
 	header = DIV(P("Please click the link sent to your email to continue. If you don't see the validation message, please check your spam folder."),
 				P('This link is valid for 15 minutes. You may close this window.'))

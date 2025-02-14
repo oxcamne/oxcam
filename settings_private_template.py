@@ -143,3 +143,5 @@ ALLOWED_ACTIONS = []    #disable Py4web's auth
 #Gooogle reCAPTCHA keys (set all to None if not using Captcha)
 RECAPTCHA_KEY = "production_recaptcha_site_key" if IS_PRODUCTION else "develomemnt_recaptcha_site_key"
 RECAPTCHA_SECRET = "production_recaptcha_secret" if IS_PRODUCTION else "develomemnt_recaptcha_secret"
+
+VERIFY_TIMEOUT = 3	#minutes enforced between verification emails

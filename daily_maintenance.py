@@ -76,6 +76,7 @@ If you have any questions, please contact {SUPPORT_EMAIL}"
 We hope you will <a href={DB_URL}> reinstate your membership</a>, \
 but in any case we are grateful for your past support!</p>\
 If you have any questions, please contact {SUPPORT_EMAIL}"
+				db.commit()
 				email_sender(to=primary_email(m.id), sender=SUPPORT_EMAIL,
 					 bcc=SUPPORT_EMAIL, subject='Membership Renewal Failure', body=text)
 			print(f"Membership Subscription Cancelled {primary_email(m.id)}")

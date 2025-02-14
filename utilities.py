@@ -77,6 +77,7 @@ def email_sender(
 
 def notify_support(member_id, subject, body):
 	message = f"{member_name(member_id)} id {member_id}<br>{body}"
+	db.commit()
 	email_sender(to=SUPPORT_EMAIL, sender=SUPPORT_EMAIL, subject=subject, body=message)
 
 #notifications to Member & Support_Email of member actions
@@ -213,6 +214,7 @@ def msg_send(member,subject, message):
 	email = primary_email(member.id)
 	if not email:
 		return
+	db.commit()
 	email_sender(to=email, sender=SUPPORT_EMAIL, bcc=SUPPORT_EMAIL, subject=subject, body=message)
 	
 #create confirmation of event

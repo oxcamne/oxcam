@@ -12,7 +12,7 @@ list, etc.
 or using autopay subscriptions, and collecting dues payments through a payment processor such as
 Stripe. Members are provided access to an online directory.
 - By uploading transaction files (in .csv format) from banks and payment processors oxcam can maintain comprehensive accounts.
-- It can provide dynamic content for the group's web site, for example [about](https://www.oxcamne.org/about), [past_events](https://www.oxcamne.org/history/past-events).
+- It can provide dynamic content for the group's web site, for example [about](https://oxcamne.pythonanywhere.com/oxcam/page_show/2), [recent events](https://oxcamne.pythonanywhere.com/oxcam/page_show/4).
 
 A group can choose how much of the above to implement and can expand it's use over time.
 

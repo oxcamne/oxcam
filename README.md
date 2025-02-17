@@ -2,17 +2,16 @@
 
 ## Introduction
 
-OxCam is a web based database app designed to support Oxford and/or Cambridge Alumni groups and Societies.
+OxCam is Oxford and/or Cambridge Alumni groups and Societies and provides a simple but comprehensive for maintaining a web site and managing the various operations common to such groups.
+
 It can be deployed on low cost cloud services such as PythonAnywhere or Linode (Akamai) at very low cost.
 
-- At it's simplest it can be used to maintain mailing lists and send out notices.
+- It can implement a public facing web site, with pages created using a combination of Markdown and HTML, or it can work in combination with an external web site. In the latter case, it can serve dynamic content for embedding in the external site (examples would be a calendar of future events, a listing of past events)
+- At it's simplest it can simply be used to maintain mailing lists and send out notices.
 - It can track events and provide registration capabilities including payment collection, maintaining a wait
 list, etc.
-- One or more paid membership categories can be implemented, either sending renewal reminders
-or using autopay subscriptions, and collecting dues payments through a payment processor such as
-Stripe. Members are provided access to an online directory.
-- By uploading transaction files (in .csv format) from banks and payment processors oxcam can maintain comprehensive accounts.
-- It can provide dynamic content for the group's web site, for example [about](https://oxcamne.pythonanywhere.com/oxcam/page_show/2), [recent events](https://oxcamne.pythonanywhere.com/oxcam/page_show/4).
+- One or more paid membership categories can be implemented, either sending renewal reminders or using autopay subscriptions, and collecting dues payments through a payment processor such as Stripe. Members are provided access to an online directory.
+- By uploading transaction files (in .csv format) from banks and payment processors oxcam it can maintain comprehensive accounts.
 
 A group can choose how much of the above to implement and can expand it's use over time.
 
@@ -41,7 +40,6 @@ For support information including installation, please see [https://oxcamne.gith
 
 ## Contributors and Collaborators
 
-The software was developed by David Manns for use in running the Oxford & Cambridge Society of New England. It is Oxford & Cambridge centric in that it is designed for matriculated alumni, who must provide their Oxbridge
-College and matriculation list in order to subscribe to mailing lists, register for events, etc.
+The software was developed by David Manns for use in running the Oxford & Cambridge Society of New England. It is Oxford & Cambridge centric in that it is designed for matriculated alumni, who must provide their Oxbridge College and matriculation list in order to subscribe to mailing lists, register for events, etc.
 
 For support, questions, or if you wish to collaborate on improving the software please contact <secretary@oxcamne.org>.

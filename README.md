@@ -2,7 +2,7 @@
 
 ## Introduction
 
-OxCam is Oxford and/or Cambridge Alumni groups and Societies and provides a simple but comprehensive for maintaining a web site and managing the various operations common to such groups.
+OxCam is for Oxford and/or Cambridge Alumni groups and Societies and provides a simple but comprehensive solution for maintaining a web site and managing the various operations common to such groups.
 
 It can be deployed on low cost cloud services such as PythonAnywhere or Linode (Akamai) at very low cost.
 

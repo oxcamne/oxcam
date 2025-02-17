@@ -14,8 +14,8 @@ import datetime, markdown
 from .models import primary_affiliation, event_attend
 from .utilities import society_emails
 
-#embedded in Society Past Events Page
-def history_content(message = ''):
+#embedded in Society Recent Events Page
+def history_content():
 	since = datetime.datetime(2019, 3, 31)
 	events = db((db.Events.DateTime < datetime.datetime.now()) & (db.Events.DateTime >= since) & \
 			 ((db.Events.Page != None)|(db.Events.Details != None)) & \
@@ -29,54 +29,58 @@ def history_content(message = ''):
 								if event.Details else event.Page, _target='booking'))))
 		if event.Speaker:
 			table_rows.append(TR(TD(''), TD(event.Speaker)))
-	message = CAT(message, TABLE(*table_rows))
+	message = TABLE(*table_rows)
 	return message
 
 @action('history', method=['GET'])
 @action.uses("message_embed.html", db)
 def history():
-	message = CAT(H5('Past Event Highlights:'), history_content())
+	message = history_content()
 	return locals()
 
 #embedded in Society About page
-def about_content():
+def about_content(board_name='Board', committee_name='Advisory'):
 	def oxcamaddr(r):
 		return XML(str(markdown.markdown(', '.join([f'[{e}](mailto:{e})' for e in society_emails(r.id)])))[3:-4])	#remove <p>...,</p>
-			
-	rows = db(db.Members.Committees.ilike('%advisory%')).select(orderby=db.Members.Lastname|db.Members.Firstname)
-				
-	board = rows.find(lambda r: (r.Committees or '').lower().find('board') >= 0)
-	message = H5(f'Current Board Members ({len(board)}):')
-	table_rows = []
-	for r in board:
-		table_rows.append(TR(
-			TD((r.Title or '')+' '+r.Firstname+' '+r.Lastname+' '+(r.Suffix or '')),
-			TD(primary_affiliation(r.id)),
-			TD(oxcamaddr(r))
-			))
-	adv = rows.find(lambda r: (r.Committees or '').lower().find('board') < 0)
-	message = CAT(message, TABLE(*table_rows),
-	       			H5(f'Additional Members of the Advisory Committee ({len(adv)}):'))
 
-	table_rows = []
-	for r in adv:
-		table_rows.append(TR(
-			TD((r.Title or '')+' '+r.Firstname+' '+r.Lastname+' '+(r.Suffix or '')),
-			TD(primary_affiliation(r.id)),
-			TD(oxcamaddr(r))
-			))
+	message = ''			
+	board_pattern = f"%{board_name}%"
+	board = db(db.Members.Committees.ilike(board_pattern)).select(orderby=db.Members.Lastname|db.Members.Firstname)
+	if board:
+		message = H5(f'{board_name} Members ({len(board)}):')
+		table_rows = []
+		for r in board:
+			table_rows.append(TR(
+				TD((r.Title or '')+' '+r.Firstname+' '+r.Lastname+' '+(r.Suffix or '')),
+				TD(primary_affiliation(r.id)),
+				TD(oxcamaddr(r))
+				))
+		message = CAT(message, TABLE(*table_rows))
+	
+	committee_pattern = f"%{committee_name}%"
+	committee = db(db.Members.Committees.ilike(committee_pattern) & ~db.Members.Committees.ilike(board_pattern)).select(orderby=db.Members.Lastname|db.Members.Firstname)
+	if committee:
+		message = CAT(message, H5(f'Additional {committee_name} Members ({len(committee)}):'))
+		table_rows = []
+		for r in committee:
+			table_rows.append(TR(
+				TD((r.Title or '')+' '+r.Firstname+' '+r.Lastname+' '+(r.Suffix or '')),
+				TD(primary_affiliation(r.id)),
+				TD(oxcamaddr(r))
+				))
+		message = CAT(message, TABLE(*table_rows))
+
 	pres = db(db.Members.President!=None).select(orderby=~db.Members.President)
-	message = CAT(message, TABLE(*table_rows),
-					H5(f'Past Presidents of the Society ({len(pres)}):'))
-
-	table_rows = []
-	for r in pres:
-		table_rows.append(TR(
-			TD(r.President),
-			TD((r.Title or '')+' '+r.Firstname+' '+r.Lastname+' '+(r.Suffix or '')),
-			TD(primary_affiliation(r.id)),
-			))
-	message = CAT(message, TABLE(*table_rows))
+	if pres:
+		message = CAT(message, H5(f'Past Presidents of the Society ({len(pres)}):'))
+		table_rows = []
+		for r in pres:
+			table_rows.append(TR(
+				TD(r.President),
+				TD((r.Title or '')+' '+r.Firstname+' '+r.Lastname+' '+(r.Suffix or '')),
+				TD(primary_affiliation(r.id)),
+				))
+		message = CAT(message, TABLE(*table_rows))
 	return message
 
 #embedded in Society About page
@@ -110,3 +114,9 @@ def upcoming_events():
 				line +=' *Sold Out, waitlisting*'
 		header = CAT(header, XML(markdown.markdown(line)[3:-4]+'<br>'))
 	return header
+
+@action('calendar', method=['GET'])
+@action.uses("message_embed.html", db)
+def calendar():
+	message = upcoming_events()
+	return locals()

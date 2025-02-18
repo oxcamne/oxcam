@@ -85,7 +85,7 @@ def index():
 						 _href=URL(f'cancel_subscription/{member.id}', vars=dict(back=request.url))), XML('<br>'))
 
 	header = CAT(header, 
-	    	H6(XML(f"To register for/view events use links below:")),
+			H6(XML(f"To register for/view events use links below:")),
 			upcoming_events())
 	return locals()
 
@@ -154,7 +154,7 @@ def members(path=None):
 			member_id = path[path.find('/')+1:]
 			member = db.Members[member_id]
 			header= CAT(header, 
-	       			A('Member reservations', _href=URL(f'member_reservations/{member_id}/select',
+		   			A('Member reservations', _href=URL(f'member_reservations/{member_id}/select',
 								vars=dict(back=request.url))), XML('<br>'),
 					A('OxCam affiliation(s)', _href=URL(f'affiliations/N/{member_id}/select',
 								vars=dict(back=request.url))), XML('<br>'),
@@ -249,7 +249,7 @@ def members(path=None):
 			   		event_details=request.query.get('event') or '' if request.query.get('mailing_list') else '',
 					back=back))), XML('<br>'))
 		header = CAT(header,
-	       XML(f"Use filter to select a <a href={URL('email_lists/select')}>\
+		   XML(f"Use filter to select a <a href={URL('email_lists/select')}>\
 mailing list</a> or apply other filters.<br>Selecting an event selects attendees; \
 selecting an event AND a mailing list selects the mailing list less attendees \
 AND includes the event Details in email notices.<br>\
@@ -279,10 +279,10 @@ using an optional operator (=, <, >, <=, >=) together with a value."))
 			return	#adding record
 		
 	grid = Grid(path, eval(query), left=eval(left) if left else None,
-	     	orderby=db.Members.Lastname|db.Members.Firstname,
+		 	orderby=db.Members.Lastname|db.Members.Firstname,
 			columns=[Column('Name', lambda r: member_name(r['id'])),
-	    			db.Members.Membership, db.Members.Paiddate,
-				    Column('Affiliations', lambda r: member_affiliations(r['id'])),
+					db.Members.Membership, db.Members.Paiddate,
+					Column('Affiliations', lambda r: member_affiliations(r['id'])),
 					db.Members.Access],
 			headings=['Name', 'Status', 'Until', 'College', 'Access'],
 			details=not write, editable=write, create=write, show_id=True,
@@ -373,7 +373,7 @@ def member_reservations(member_id, path=None):
 	access = session.access	#for layout.html
 	header = CAT(A('back', _href=request.query.back),
 				H5('Member Reservations'),
-	      		H6(member_name(member_id)),
+		  		H6(member_name(member_id)),
 				A('Add New Reservation', _href=URL(f'add_member_reservation/{member_id}',
 					vars=dict(back=request.url), scheme=True)))
 
@@ -381,14 +381,14 @@ def member_reservations(member_id, path=None):
 			left=db.Events.on(db.Events.id == db.Reservations.Event),
 			orderby=~db.Events.DateTime,
 			columns=[db.Events.DateTime,
-	    			Column('event', lambda row: A(db.Events[row.Reservations.Event].Description,
+					Column('event', lambda row: A(db.Events[row.Reservations.Event].Description,
 								_href=URL(f"manage_reservation/{member_id}/{row.Reservations.Event}/select",
 				  					vars=dict(back=request.url)),
 								_style="white-space: normal")),
-				    Column('wait', lambda row: res_wait(member_id, row.Reservations.Event) or '', required_fields=[db.Reservations.Event]),
-				    Column('conf', lambda row: res_conf(member_id, row.Reservations.Event) or ''),
-				    Column('cost', lambda row: event_cost(row.Reservations.Event, member_id) or ''),
-				    Column('tbc', lambda row: event_unpaid(row.Reservations.Event, member_id) or '')],
+					Column('wait', lambda row: res_wait(member_id, row.Reservations.Event) or '', required_fields=[db.Reservations.Event]),
+					Column('conf', lambda row: res_conf(member_id, row.Reservations.Event) or ''),
+					Column('cost', lambda row: event_cost(row.Reservations.Event, member_id) or ''),
+					Column('tbc', lambda row: event_unpaid(row.Reservations.Event, member_id) or '')],
 			grid_class_style=grid_style,
 			formstyle=form_style,
 			details=False, editable = False, create = False, deletable = False)
@@ -401,14 +401,14 @@ def add_member_reservation(member_id):
 	access = session.access	#for layout.html
 	back = request.query.back
 	header = CAT(A('back', _href=back),
-	      		H5('Add New Reservation'),
-	      		H6(member_name(member_id)),
+		  		H5('Add New Reservation'),
+		  		H6(member_name(member_id)),
 				)
 
 	form=Form([Field('event', 'reference db.Events',
 		  requires=IS_IN_DB(db, 'Events', lambda r: f"{r.DateTime.strftime(DATE_FORMAT)} {r.Description[:25]}",
 						orderby = ~db.Events.DateTime,
-		      			zero='Please select event for new reservation from dropdown.'))],
+			  			zero='Please select event for new reservation from dropdown.'))],
 		formstyle=FormStyleBulma)
 	
 	if form.accepted:
@@ -437,8 +437,8 @@ def affiliations(ismember, member_id, path=None):
 	back = request.query.back if path.startswith('select') else decode_url(request.query._referrer)
 
 	header = CAT(A('back', _href=back),
-	      		H5('Member Affiliations'),
-	      		H6(member_name(member_id)))
+		  		H5('Member Affiliations'),
+		  		H6(member_name(member_id)))
 	footer = "Multiple affiliations are listed in order modified. The topmost one \
 is used on name badges etc."
 
@@ -448,7 +448,7 @@ is used on name badges etc."
 			return
 
 	grid = Grid(path, db.Affiliations.Member==member_id,
-	     	orderby=db.Affiliations.Modified,
+		 	orderby=db.Affiliations.Modified,
 			columns=[db.Affiliations.College, db.Affiliations.Matr, db.Affiliations.Notes],
 			details=not write, editable=write, create=write, deletable=write, show_id=True,
 			validation=affiliation_modified,
@@ -524,8 +524,8 @@ def emails(ismember, member_id, path=None):
 	
 
 	header = CAT(A('back', _href=back),
-	      		H5('Member Emails'),
-	      		H6(member_name(member_id)))
+		  		H5('Member Emails'),
+		  		H6(member_name(member_id)))
 	if path=='select':
 		header = CAT(header, XML("Note, the most recently edited (topmost) email is used for messages \
 directed to the individual member, and appears in the Members Directory. Notices \
@@ -550,7 +550,7 @@ To change your mailing list subscritions, use the <b>Edit</b> button."))
 						back=decode_url(request.query._referrer))))))
 
 	grid = Grid(path, db.Emails.Member==member_id,
-	     	orderby=~db.Emails.Modified,
+		 	orderby=~db.Emails.Modified,
 			columns=[db.Emails.Email, db.Emails.Mailings],
 			details=not write, editable=write, create=write,
 			deletable=lambda row: write and (ismember!='Y' or row['id']!=db(db.Emails.Member == member_id).select(orderby=~db.Emails.Modified).first().id),
@@ -605,8 +605,8 @@ def new_members(path=None):
 			columns=[Column("Name", lambda row: A(member_name(row.Member), _href=URL(f"members/{'details' if access=='read' else 'edit'}/{row.Member}",
 									vars=dict(_referrer=encode_url(request.url))),
 									_style="white-space: normal")),
-	    			Column("College", lambda row: primary_affiliation(row.Member), required_fields=[db.AccTrans.Member, db.AccTrans.Timestamp]),
-	    			Column("Matr", lambda row: primary_matriculation(row.Member)),
+					Column("College", lambda row: primary_affiliation(row.Member), required_fields=[db.AccTrans.Member, db.AccTrans.Timestamp]),
+					Column("Matr", lambda row: primary_matriculation(row.Member)),
 					Column("Status", lambda row: db.Members[row.Member].Membership),
 					Column('Date', lambda row: row.Timestamp.strftime(DATE_FORMAT)),
 					Column('Previous', lambda row: classify(db.AccTrans[row.id])),
@@ -714,8 +714,8 @@ def events(path=None):
 			return
 
 	grid = Grid(path, db.Events.id>0,
-	     	orderby=~db.Events.DateTime,
-		    headings=['Datetime', 'Event', 'Venue', 'Paid', 'TBC', 'Conf', 'Wait'],
+		 	orderby=~db.Events.DateTime,
+			headings=['Datetime', 'Event', 'Venue', 'Paid', 'TBC', 'Conf', 'Wait'],
 			columns=[db.Events.DateTime,
 					Column('event', lambda row: A(row.Description, _href=URL(f"event_reservations/{row.id}/select",
 										vars=dict(back=request.url)),
@@ -726,8 +726,8 @@ def events(path=None):
 					Column('Conf', lambda row: event_attend(row.id) or ''),
 					Column('Wait', lambda row: event_wait(row.id) or '')],
 			search_queries=[["Event", lambda value: db.Events.Description.ilike(f'%{value}%')],
-		    				["Venue", lambda value: db.Events.Venue.ilike(f'%{value}%')],
-						    ["Speaker", lambda value: db.Events.Speaker.ilike(f'%{value}%')],
+							["Venue", lambda value: db.Events.Venue.ilike(f'%{value}%')],
+							["Speaker", lambda value: db.Events.Speaker.ilike(f'%{value}%')],
 							["Details", lambda value: db.Events.Details.ilike(f'%{value}%')]],
 			details=not write, editable=write, create=write,
 			deletable=lambda r: write and db(db.Reservations.Event == r['id']).count() == 0 and db(db.AccTrans.Event == r['id']).count() == 0,
@@ -761,8 +761,8 @@ def tickets(event_id, path=None):
 	db.Event_Tickets.Event.default=event_id
 
 	header = CAT(A('back', _href=back),
-	      		H5('Event Tickets'),
-	      		H6(event.Description),
+		  		H5('Event Tickets'),
+		  		H6(event.Description),
 				"Note, be careful of modifying tickets once used in any reservations!")
 
 	def validation(form):
@@ -801,8 +801,8 @@ def selections(event_id, path=None):
 	db.Event_Selections.Event.default=event_id
 
 	header = CAT(A('back', _href=back),
-	      		H5('Event Selections'),
-	      		H6(event.Description),
+		  		H5('Event Selections'),
+		  		H6(event.Description),
 				"Note, changes made here are not reflected in any existing reservations!")
 
 	def validation(form):
@@ -843,8 +843,8 @@ def survey(event_id, path=None):
 	modifiable = write and db((db.Reservations.Event==event_id)&(db.Reservations.Survey_!=None)).count()==0
 
 	header = CAT(A('back', _href=back),
-	      		H5('Event Survey'),
-	      		H6(event.Description),
+		  		H5('Event Survey'),
+		  		H6(event.Description),
 				"Note, survey elements cannot be modified once chosen")
 
 	def validation(form):
@@ -967,7 +967,7 @@ def event_reservations(event_id, path=None):
 		redirect(URL(f"event_reservations/{event_id}/select", vars=vars))
 	
 	header = CAT(A('back', _href=request.query.back),
-	      		H5('Provisional Reservations' if request.query.get('provisional') else 'Waitlist' if request.query.get('waitlist') else 'Reservations'),
+		  		H5('Provisional Reservations' if request.query.get('provisional') else 'Waitlist' if request.query.get('waitlist') else 'Reservations'),
 				H6(f"{event.DateTime}, {event.Description}"),
 				XML("Click on the member name to drill down on a reservation and view/edit the details."), XML('<br>'))
 
@@ -1018,11 +1018,11 @@ def event_reservations(event_id, path=None):
 										   _href=URL(f"manage_reservation/{row.Reservations.Member}/{event_id}/select",
 											vars=dict(back=request.url)),
 										   _style='white-space: normal'), required_fields=[db.Reservations.Member]),
-	    				db.Members.Membership, db.Members.Paiddate, db.Reservations.Affiliation, db.Reservations.Notes,
-					    Column('cost', lambda row: cost.get(row.Reservations.Member) or ''),
-					    Column('tbc', lambda row: (cost.get(row.Reservations.Member) or 0)-paid.get(row.Reservations.Member) or ''),
-					    Column('count', lambda row: (res_wait(row.Reservations.Member, event_id) if request.query.get('waitlist')\
-				      		else res_prov(row.Reservations.Member, event_id) if request.query.get('provisional')\
+						db.Members.Membership, db.Members.Paiddate, db.Reservations.Affiliation, db.Reservations.Notes,
+						Column('cost', lambda row: cost.get(row.Reservations.Member) or ''),
+						Column('tbc', lambda row: (cost.get(row.Reservations.Member) or 0)-paid.get(row.Reservations.Member) or ''),
+						Column('count', lambda row: (res_wait(row.Reservations.Member, event_id) if request.query.get('waitlist')\
+					  		else res_prov(row.Reservations.Member, event_id) if request.query.get('provisional')\
 							else res_conf(row.Reservations.Member, event_id)) or'')],
 			headings=['Member', 'Type', 'Until', 'College', 'Notes', 'Cost', 'Tbc', '#'],
 			search_form=search_form if len(search_fields)>0 else None,
@@ -1527,22 +1527,24 @@ def pages(path=None):
 import re
 
 def replace_functions(text):
-    # Find all occurrences of [[some_function]] using a regular expression
-    pattern = re.compile(r'\[\[(.*?)\]\]')
+	# Find all occurrences of [[some_function]] using a regular expression
+	pattern = re.compile(r'\[\[(.*?)\]\]')
 
-    # Function to replace each match with the result of eval(some_function)
-    def replace_match(match):
-        function_name = match.group(1)
-        try:
-            # Evaluate the function and convert the result to a string
-            result = str(eval(function_name+'()'))
-        except Exception as e:
-            result = f"Error: {e}"
-        return result
+	# Function to replace each match with the result of eval(some_function)
+	def replace_match(match):
+		function_call = match.group(1)
+		if function_call[-1:] != ')':
+			function_call += '()'	#add parentheses if missing
+		try:
+			# Evaluate the function and convert the result to a string
+			result = str(eval(function_call))
+		except Exception as e:
+			result = f"Error: {e}"
+		return result
 
-    # Replace all matches in the text
-    replaced_text = pattern.sub(replace_match, text)
-    return replaced_text
+	# Replace all matches in the text
+	replaced_text = pattern.sub(replace_match, text)
+	return replaced_text
 
 @action('page_show/<page_id:int>', method=['GET'])
 @action.uses("gridform_public.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
@@ -1718,7 +1720,7 @@ def financial_statement(start, end):
 		totrev += rev
 		totexp += exp
 	rows.append(THEAD(TR(TH('Total'), TH(''), tdnum(totrev, th=True),
-		      tdnum(totexp, th=True), tdnum(totrev+totexp, th=True))))
+			  tdnum(totexp, th=True), tdnum(totrev+totexp, th=True))))
 	header  = CAT(header, H6('\nAdmin & Event Cash Flow'), TABLE(*rows))
 	return locals()
 	
@@ -1768,7 +1770,7 @@ def tax_statement(start, end):
 
 	events = db(eval(f"{query}&(db.AccTrans.Event!=None)")).select(db.Events.DateTime, db.Events.Description,
 					db.Events.id, left = eval(left
-			       ), orderby = db.Events.DateTime, groupby = db.Events.DateTime)
+				   ), orderby = db.Events.DateTime, groupby = db.Events.DateTime)
 	rows =[THEAD(TR(TH('Event'), TH('Ticket Sales'), TH('Sponsorships'), TH('Revenue'), TH('Expense'), TH('Notes')))]
 	for e in events:
 		trans = db(eval(f"{query}&(db.AccTrans.Event=={e.id})")).select(db.AccTrans.Account, sumamt, sumfee,
@@ -1814,9 +1816,9 @@ def accounting(path=None):
 
 	if path=='select':
 		header = CAT(header,
-	       		A('Financial Statement', _href=URL('get_date_range', vars=dict(function='financial_statement'))), XML('<br>'),
-	       		A('Tax Statement', _href=URL('get_date_range', vars=dict(function='tax_statement'))), XML('<br>'),
-	       		A('All Transactions', _href=URL('transactions/select', vars=dict(back=back,
+		   		A('Financial Statement', _href=URL('get_date_range', vars=dict(function='financial_statement'))), XML('<br>'),
+		   		A('Tax Statement', _href=URL('get_date_range', vars=dict(function='tax_statement'))), XML('<br>'),
+		   		A('All Transactions', _href=URL('transactions/select', vars=dict(back=back,
 					query="db.AccTrans.id>0"))), XML('<br>'),
 				"Use Upload to load a file you've downloaded from bank/payment processor into accounting")
 	elif path.startswith('edit') or path.startswith('details'):
@@ -1831,8 +1833,8 @@ def accounting(path=None):
 	grid = Grid(path, db.Bank_Accounts.id>0,
 				orderby=db.Bank_Accounts.Name,
 				columns=[db.Bank_Accounts.Name,
-	     			Column('Accrued', lambda row: bank_accrual(row.id)),
-	     			db.Bank_Accounts.Balance,
+		 			Column('Accrued', lambda row: bank_accrual(row.id)),
+		 			db.Bank_Accounts.Balance,
 					Column('', lambda row: A('Upload', _href=URL(f'bank_file/{row.id}'))),
 					Column('', lambda row: A('Transactions', _href=URL('transactions/select',
 								vars=dict(query=f"db.AccTrans.Bank=={row.id}",
@@ -1859,8 +1861,8 @@ def bank_rules(bank_id, path=None):
 	back = request.query.back if path=='select' else decode_url(request.query._referrer)
 
 	header = CAT(A('back', _href=back),
-	      		H5('Bank Transaction Rules'),
-	      		H6(bank.Name))
+		  		H5('Bank Transaction Rules'),
+		  		H6(bank.Name))
 
 	def rules_validated(form):
 		if len(form.errors)>0:
@@ -2291,7 +2293,7 @@ def directory(path=None):
 			
 	query = "(db.Members.Membership!=None)&(db.Members.Membership!='')"
 	header = CAT(H5('Member Directory'),
-	      XML(f"You can search by last name, town, state, or college/university using the boxes below; click on a name to view contact information"))
+		  XML(f"You can search by last name, town, state, or college/university using the boxes below; click on a name to view contact information"))
 
 	grid = Grid(path, eval(query),
 		columns=[Column('Name', lambda r: A(f"{member_name(r['id'])}", _href=URL(f"contact_details/{r['id']}",
@@ -2320,7 +2322,7 @@ def contact_details(member_id):
 	
 	header = CAT(A('back', _href=request.query.back),
 				H5("Member Directory - Contact Details"),
-	       member_name(member_id), XML('<br>'),
+		   member_name(member_id), XML('<br>'),
 		   member_affiliations(member_id), XML('<br>'))
 	email = primary_email(member_id)
 	if not member.Privacy and email:
@@ -2575,11 +2577,11 @@ def profile():
 	header = H5('Profile Information')
 	if member.Paiddate:
 		header = CAT(header,
-	       XML(f"Your membership {'expired' if member.Paiddate < datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date() else 'expires'} on {member.Paiddate.strftime(DATE_FORMAT)}"))
+		   XML(f"Your membership {'expired' if member.Paiddate < datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date() else 'expires'} on {member.Paiddate.strftime(DATE_FORMAT)}"))
 	if member.Pay_next:
 		header = CAT(header, XML(f" Renewal payment will be charged on {member.Pay_next.strftime(DATE_FORMAT)}."))
 	header = CAT(header,
-	      XML(f"{'<br><br>' if member.Paiddate else ''}The information on this form, except as noted, is included \
+		  XML(f"{'<br><br>' if member.Paiddate else ''}The information on this form, except as noted, is included \
 in our online Member Directory which is available through our home page to \
 all members in good standing. Fields marked * are required.<br><br>\
 You can use this screen at any time to update your information (it can be \
@@ -2607,7 +2609,7 @@ reached by using the join/renew link on our home page).<br>\
 			return
 
 	form = Form(db.Members, record=member, show_id=False, deletable=False,
-	     			validation=validate, formstyle=FormStyleBulma, keep_values=True)
+		 			validation=validate, formstyle=FormStyleBulma, keep_values=True)
 					
 	if form.accepted:
 		#ready to checkout

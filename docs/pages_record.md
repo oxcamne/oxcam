@@ -12,9 +12,19 @@ The **back** link will take you back to the [Pages page](pages.md).
 
 Similarly, the page's link is shown; it may be on an external site (specified in the **Link** field), or internal to the database (**Content** field of the pages record).
 
-The **Content** is written in Markdown, and typically also includes HTML elements.
+The **Content** is written in Markdown, and typically also includes HTML elements. It may embed dynamic content by including "[[function_name(parameters)]]" where the available options are:
 
-All the other fields are self explanatory or discussed on the [Pages Page](pages.md).
+- about_content('Board', 'Advisory') where the parameters are the keywords used in the *Committees* field for the Board or Officers, and additional Organizers, respectively generates the about page content
+- history_content() generates the list of recent events
+- upcoming_events() generates the calendar for the home page.
+
+Note that if an external public website is being used, the above dynamic content can be supplied through the links:
+
+- \<your_py4web_url\>/oxcam/about?board=Board&committee=Advisory
+- \<your_py4web_url\>/oxcam/history
+- \<your_py4web_url\>/oxcam/calendar.
+
+All the other fields are self explanatory or are discussed on the [Pages Page](pages.md).
 
 There are links to Markdown documentation and to HTML documentation, specifically discussing the inclusion and formatting around images.
 

@@ -1514,8 +1514,8 @@ def pages(path=None):
 	grid = Grid(path, db.Pages.id>0,
 			orderby=db.Pages.Root|db.Pages.Modified,
 			columns=[db.Pages.Page, db.Pages.Root_name, db.Pages.Parent_name, db.Pages.Hide, db.Pages.Link, db.Pages.Views],
-			search_queries=[["Page", lambda value: db.Pages.Page.contains(value)],
-				   			["Tree", lambda value: db.Pages.id.belongs(trees.get(value.lower(), []))],
+			search_queries=[["Tree", lambda value: db.Pages.id.belongs(trees.get(value.lower(), []))],
+							["Page", lambda value: db.Pages.Page.contains(value)],
 							["Content", lambda value: db.Pages.Content.contains(value)]],
 			details=not write, editable=write, create=write,
 			deletable=lambda r: write,
@@ -1547,6 +1547,7 @@ def replace_functions(text):
 	return replaced_text
 
 @action('page_show/<page_id:int>', method=['GET'])
+@action('page_show/<page_id:int>/feed', method=['GET']) #get this if someone browses, e.g. www.oxcamne.org/home
 @action.uses("gridform_public.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
 def page_show(page_id):
 	page = db.Pages[page_id]

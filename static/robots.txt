@@ -1,2 +1,5 @@
 User-agent: *
 Disallow: /
+Allow: /oxcam/page_show/1
+Allow: /oxcam/static/favicon.ico
+Allow: /oxcam/static/images/oxcamne_no_pad.png

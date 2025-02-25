@@ -30,7 +30,7 @@ from py4web.utils.form import Form, FormStyleBulma
 grid_style = GridClassStyleBulma
 form_style = FormStyleBulma
 
-from py4web import action, request, response, redirect, URL, Field
+from py4web import action, request, response, redirect, URL, Field, HTTP, abort
 from yatl.helpers import H5, H6, XML, TABLE, TH, TD, THEAD, TR, HTML, P, BUTTON
 from .common import db, session, flash
 from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
@@ -39,7 +39,7 @@ from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
 from .pay_processors import paymentprocessor
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
-	primary_matriculation, event_revenue, event_unpaid,\
+	primary_matriculation, event_revenue, event_unpaid, page_name,\
 	res_conf, event_cost, res_wait, res_prov, bank_accrual, tickets_sold,\
 	res_unitcost, res_selection, event_paid_dict, event_ticket_dict, collegelist
 from pydal.validators import IS_LIST_OF_EMAILS, IS_EMPTY_OR, IS_IN_DB, IS_IN_SET,\
@@ -1505,6 +1505,16 @@ def pages(path=None):
 			form.errors['Content']="Please provide either an external link or Content"
 		if form.vars.get('Hide') and not form.vars.get('Root'):
 			form.errors['Hide']="Root pages should not be hidden"
+
+		if form.vars.get('Parent'):
+			parent = db.Pages[form.vars.get('Parent')]
+			if parent.Parent:
+				form.errors['Parent']="Only 2 levels of nesting are allowed"
+			if form.vars.get('Parent')==form.vars.get('Root'):
+				form.errors['Parent']="Parent should not be the same as Root"
+			if parent.Root != int(form.vars.get('Root')):
+				form.errors['Parent']="Parent should be in the same tree as Root"
+		
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
@@ -1547,10 +1557,27 @@ def replace_functions(text):
 	return replaced_text
 
 @action('page_show/<page_id:int>', method=['GET'])
-@action('page_show/<page_id:int>/feed', method=['GET']) #get this if someone browses, e.g. www.oxcamne.org/home
 @action.uses("gridform_public.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
 def page_show(page_id):
-	page = db.Pages[page_id]
+	page = db(db.Pages.id==page_id).select().first()
+	if not page:
+		abort(404)
+	page.update_record(Views = page.Views+1, Modified=page.Modified)
+	menu = pages_menu(page)	#for layout_publc.html
+	content = replace_functions(page.Content)
+	header = XML(markdown.markdown(content))
+	return locals()
+
+@action('web/<root>', method=['GET'])
+@action('web/<root>/<branch>', method=['GET'])
+@action('web/<root>/<branch>/<twig>', method=['GET'])
+@action.uses("gridform_public.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
+def web(root, branch=None, twig=None):
+	page = db(db.Pages.Page.ilike((twig or branch or root).replace('_', ' '))).select().first()
+	if not page or \
+		twig and page_name(page.Parent).lower() != branch.replace('-', ' ').lower() or \
+		branch and page_name(page.Root).lower() != root.replace('-', ' ').lower():
+		abort(404)
 	page.update_record(Views = page.Views+1, Modified=page.Modified)
 	menu = pages_menu(page)	#for layout_publc.html
 	content = replace_functions(page.Content)

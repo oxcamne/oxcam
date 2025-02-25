@@ -10,9 +10,9 @@ The **+New** button is used to create a new page. Go to [Pages Record](pages_rec
 
 Multiple sites can be constructed in the database, though the example shows only one, the main public website 'home'. I will also be migrating the organizers' help site shortly. Note that these two web sites' addresses are configured in the settings_private.py file.
 
-The first page created is assumed to be the public website home page. There is a robots.txt file in the static directory which allows web crawlers to find this page.
+There is a robots.txt file in the static directory which allows web crawlers to find a 'Home' page and its subpages.
 
-When a page is viewed, the Nav Bar will show the corresponding root page followed by all other pages with the same root but no parent, in order most recently modified. Pages with a parent appear on a submenu which appears when the parent is hovered over. Submenus can be nested, and are displayed in the order the pages were most recently modified.
+When a page is viewed, the Nav Bar will show the corresponding root page followed by all other pages with the same root but no parent, in order most recently modified. Pages with a parent appear on a submenu which appears when the parent is hovered over. Submenus can be nested to 2 levels, and are displayed in the order the pages were most recently modified.
 
 If the 'Hide' column is ticked, the page will not appear on Nav Bar or submenus, presumably there is a link to it somewhere.
 

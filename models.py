@@ -228,7 +228,7 @@ db.define_table('Pages',
 	Field('Page', 'string', requires=IS_NOT_EMPTY()),
 	Field('Root', 'reference Pages',
 	   requires=IS_EMPTY_OR(IS_IN_SET(lambda: {r.id: r.Page for r in db(db.Pages.Root==None).select()})),
-	   comment="select root page, e.g. 'Home' or 'Help'"),
+	   comment="select root page if not a tree root, e.g. 'Home' or 'Help'"),
 	Field.Virtual('Root_name', lambda r: page_name(r.Root)),
 	Field('Parent', 'reference Pages',
 	   requires=IS_EMPTY_OR(IS_IN_SET(lambda: {r.id: r.Page for r in db(db.Pages.id>0).select()})),
@@ -243,6 +243,7 @@ db.define_table('Pages',
 	Field('Modified', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None),
        			update=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),
 	format='%(Page)s')
+db.Pages.Page.requires = IS_NOT_IN_DB(db, db.Pages.Page)
 
 db.define_table('Affiliations',
 	Field('Member', 'reference Members', writable=False),

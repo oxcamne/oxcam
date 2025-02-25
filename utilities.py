@@ -6,7 +6,7 @@ from .common import db
 from .settings import TIME_ZONE, SUPPORT_EMAIL, LETTERHEAD, GRACE_PERIOD, CURRENCY_SYMBOL,\
 	DB_URL, SOCIETY_SHORT_NAME, MEMBERSHIPS, DATE_FORMAT, SMTP_TRANS, PAGE_BANNER
 from .models import primary_email, event_cost, member_name, res_selection,\
-	res_unitcost, event_revenue
+	res_unitcost, event_revenue, page_name
 from yatl.helpers import A, TABLE, TH, THEAD, H6, TR, TD, CAT, HTML, XML
 import datetime, re, smtplib, markdown, base64, decimal
 from email.message import EmailMessage
@@ -263,15 +263,14 @@ def event_confirm(event_id, member_id, dues=0, event_only=False):
 		body += markdown.markdown(event.Notes)
 	return body
 
-def add_page(menu, page):
-	url = URL(f'page_show/{page.id}')
-	menu += f"<li><a href={url}>{page.Page}"
+def add_page(menu, page, url):
+	menu += f"<li><a href={URL(url)}>{page.Page}"
 	#subpages:
 	subpages = db((db.Pages.Parent==page.id)&(db.Pages.Hide!=True)).select(db.Pages.id, db.Pages.Page, db.Pages.Hide, orderby=db.Pages.Modified)
 	if subpages:
 		menu += '<ul>'
 		for subpage in subpages:
-			menu = add_page(menu, subpage)
+			menu = add_page(menu, subpage, f"{url}/{subpage.Page.replace(' ','_')}")
 		menu += '</ul>'
 	menu += '</li>'
 	return menu
@@ -283,8 +282,10 @@ def pages_menu(forpage):
 	pages = db(db.Pages.Parent==None).select(db.Pages.id, db.Pages.Page, db.Pages.Root, orderby=db.Pages.Root|db.Pages.Modified)
 	menu = ''
 	for page in pages:
-		if (page.id == root) or (page.Root == root):	
-			menu = add_page(menu, page)
+		if (page.id == root):	
+			menu = add_page(menu, page, f"web/{page.Page.replace(' ','_')}")
+		elif page.Root == root:
+			menu = add_page(menu, page, f"web/{page_name(page.Root).replace(' ','_')}/{page.Page.replace(' ','_')}")
 	return menu
 
 def society_emails(member_id):

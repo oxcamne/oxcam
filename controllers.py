@@ -1573,6 +1573,8 @@ def page_show(page_id):
 	if not page:
 		abort(404)
 	page.update_record(Views = page.Views+1, Modified=page.Modified)
+	if not page.Content:
+		redirect(page.Link)
 	menu = pages_menu(page)	#for layout_publc.html
 	content = replace_functions(page.Content)
 	header = XML(markdown.markdown(content))
@@ -1587,6 +1589,8 @@ def web(root, branch=None, twig=None):
 	if not page:
 		abort(404)
 	page.update_record(Views = page.Views+1, Modified=page.Modified)
+	if not page.Content:
+		redirect(page.Link)
 	menu = pages_menu(page)	#for layout_publc.html
 	content = replace_functions(page.Content)
 	header = XML(markdown.markdown(content))

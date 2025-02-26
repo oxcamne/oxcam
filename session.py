@@ -3,7 +3,7 @@ This file contains controllers used to manage the user's session
 """
 from py4web import URL, request, redirect, action, Field, HTTP
 from .common import db, session, flash, logger, auth
-from .settings import SUPPORT_EMAIL, TIME_ZONE, LETTERHEAD, SOCIETY_SHORT_NAME, PAGE_BANNER, HOME_URL, HELP_URL, DATE_FORMAT,\
+from .settings import SUPPORT_EMAIL, TIME_ZONE, LETTERHEAD, SOCIETY_SHORT_NAME, PAGE_BANNER, DATE_FORMAT,\
 		RECAPTCHA_KEY, RECAPTCHA_SECRET, VERIFY_TIMEOUT
 from .models import ACCESS_LEVELS, member_name, CAT
 from .utilities import email_sender
@@ -13,7 +13,7 @@ from pydal.validators import IS_IN_SET, IS_EMAIL, ANY_OF
 from py4web.utils.factories import Inject
 import datetime, random, requests
 
-preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
+preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER))
 
 """
 decorator for validating login & access permission using a one-time code
@@ -50,7 +50,7 @@ def checkaccess(requiredaccess):
 
 @action('login', method=['POST', 'GET'])
 @action.uses("recaptcha_form.html", db, session, flash,
-	Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL, RECAPTCHA_KEY=RECAPTCHA_KEY))
+	Inject(PAGE_BANNER=PAGE_BANNER, RECAPTCHA_KEY=RECAPTCHA_KEY))
 def login():
 	session['logged_in'] = False
 	challenge = RECAPTCHA_KEY and request.query.get('challenge')
@@ -186,7 +186,7 @@ def accessdenied():
 	return locals()
 
 @action('browser_back')
-@action.uses("back.html", Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
+@action.uses("back.html", Inject(PAGE_BANNER=PAGE_BANNER))
 def browser_back():
 	return locals()
 

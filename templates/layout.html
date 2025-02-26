@@ -30,14 +30,14 @@
         <!-- Left menu ul/li -->
         [[block page_left_menu]]
         <ul>
-          <li><a href="[[=HOME_URL]]" target="_blank"><b>Home</b></a></li>
+          <li><a href="[[=URL('web/home')]]" target="_blank"><b>Home</b></a></li>
           [[try:
               if access:]]
               <li><a href="[[=URL('members/select')]]"><b> members</b></a></li>
               <li><a href="[[=URL('events/select')]]"><b> events</b></a></li>
               <li><a href="[[=URL('pages/select')]]"><b> pages</b></a></li>
               <li><a href="[[=URL('accounting/select')]]"><b> accounts</b></a></li>
-              <li><a href="[[=HELP_URL]]" target="_help"><b> help</b></a></li>
+              <li><a href="[[=URL('web/help')]]" target="_blank"><b> help</b></a></li>
           [[pass
           except:
               pass]]

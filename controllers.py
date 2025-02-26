@@ -34,7 +34,7 @@ from py4web import action, request, response, redirect, URL, Field, HTTP, abort
 from yatl.helpers import H5, H6, XML, TABLE, TH, TD, THEAD, TR, HTML, P, BUTTON
 from .common import db, session, flash
 from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
-	MEMBERSHIPS, TIME_ZONE, PAGE_BANNER, HOME_URL, HELP_URL, IS_PRODUCTION,\
+	MEMBERSHIPS, TIME_ZONE, PAGE_BANNER, IS_PRODUCTION,\
 	ALLOWED_EMAILS, DATE_FORMAT, CURRENCY_SYMBOL, SMTP_TRANS
 from .pay_processors import paymentprocessor
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
@@ -49,12 +49,13 @@ from .utilities import email_sender, member_good_standing, ageband, newpaiddate,
 	society_emails, emailparse, notification, notify_support, member_profile, generate_hash,\
 	encode_url, decode_url, pages_menu
 from .session import checkaccess
-from .website import about_content, history_content, upcoming_events	#evalated by page_show
+from .website import about_content, history_content, upcoming_events	#called to construct page content
 from py4web.utils.factories import Inject
 import datetime, re, csv, decimal, pickle, markdown, dateutil
 from io import StringIO
 
-preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
+preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER))
+preferred_public = action.uses("gridform_public.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER))
 
 @action('index')
 @preferred
@@ -1495,7 +1496,16 @@ def pages(path=None):
 		else:
 			page_id = path[path.find('/')+1:]
 			page = db.Pages[page_id]
-			urlpage = URL(f"page_show/{page.id}", scheme=True) if page.Content else page.Link
+			if page.Content:
+				urlpage = "web"
+				if page.Root:
+					urlpage += f"/{page_name(page.Root).replace('_', ' ')}"
+				if page.Parent:
+					urlpage += f"/{page_name(page.Parent).replace('_', ' ')}"
+				urlpage += f"/{page.Page.replace('_', ' ')}"
+				urlpage = URL(urlpage, scheme=True)
+			else:
+				urlpage = page.Link
 			header = CAT(A('back', _href=back), H5('Page Record'),
 						"Public page is ", A(urlpage, _href=urlpage), XML('<br>')
 			)
@@ -1557,7 +1567,7 @@ def replace_functions(text):
 	return replaced_text
 
 @action('page_show/<page_id:int>', method=['GET'])
-@action.uses("gridform_public.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
+@preferred_public
 def page_show(page_id):
 	page = db(db.Pages.id==page_id).select().first()
 	if not page:
@@ -1571,12 +1581,10 @@ def page_show(page_id):
 @action('web/<root>', method=['GET'])
 @action('web/<root>/<branch>', method=['GET'])
 @action('web/<root>/<branch>/<twig>', method=['GET'])
-@action.uses("gridform_public.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
+@preferred_public
 def web(root, branch=None, twig=None):
 	page = db(db.Pages.Page.ilike((twig or branch or root).replace('_', ' '))).select().first()
-	if not page or \
-		twig and page_name(page.Parent).lower() != branch.replace('-', ' ').lower() or \
-		branch and page_name(page.Root).lower() != root.replace('-', ' ').lower():
+	if not page:
 		abort(404)
 	page.update_record(Views = page.Views+1, Modified=page.Modified)
 	menu = pages_menu(page)	#for layout_publc.html

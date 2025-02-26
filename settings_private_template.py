@@ -7,23 +7,25 @@ Customize for your organization and instance
 # organization name and domain/short_name, etc:
 SOCIETY_NAME = 'your_group_name'
 SOCIETY_SHORT_NAME = 'your_group_short_name'    #ideally, the domain name omitting the .xxx part
-                #also use as your username if using Pythonanywhere server
-SOCIETY_LOGO = 'your_logo_file' #should be placed in py4web/apps/oxcam/static/images directory
+				#also use as your username if using Pythonanywhere server
+SOCIETY_LOGO = 'your_logo_file' 		#should be placed in py4web/apps/oxcam/static/images directory
+				#Your favicon.ico should be placed in py4web/apps/oxcam/static directory
+
+DB_URL = f'your_database_server_url'   #e.g. https://{SOCIETY_SHORT_NAME}.pythonanywhere.com/oxcam
+
 # html web page banner Customize:
 PAGE_BANNER = f'<h4><span style="color: blue"><em>{SOCIETY_NAME}</em>\
 <img src="images/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" /></span></h4>'
 # NOTE the logo image is in py4web/apps/oxcam/static/images
-HOME_URL = 'your_home_page_url'
-    #this version allows authorized users to edit
-HELP_URL = 'your_help_web_site_url' #site may embed the database help site https://oxcamne.github.io/oxcam
-DB_URL = f'your_database_server_url'   #e.g. https://{SOCIETY_SHORT_NAME}.pythonanywhere.com/oxcam
+
 SUPPORT_EMAIL = 'your_support_email'
+
 # html letterhead for email/notices:
 LETTERHEAD = f'<h2><span style="color: blue"><em>{SOCIETY_NAME}</em></span> \
 <img src="{DB_URL}/static/images/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" />\
 </h2><br>'
 # html trailer for email notices:
-VISIT_WEBSITE_INSTRUCTIONS = f"<br><br>Visit us at {HOME_URL} or your_social_media"
+VISIT_WEBSITE_INSTRUCTIONS = f"<br><br>Visit us at {DB_URL}/web/home or your_social_media"
 
 #localization settings
 import locale
@@ -69,9 +71,9 @@ import decimal
 
 @dataclass
 class Membership:
-    category: str
-    description: str
-    qualification: str = None
+	category: str
+	description: str
+	qualification: str = None
 
 """
 list of Membership definitions (may be empty list)

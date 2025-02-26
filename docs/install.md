@@ -31,21 +31,23 @@ SOCIETY_NAME = 'your_group_name'
 SOCIETY_SHORT_NAME = 'your_group_short_name'    #ideally, the domain name omitting the .xxx part
                 #also use as your username if using Pythonanywhere server
 SOCIETY_LOGO = 'your_logo_file' #should be placed in py4web/apps/oxcam/static/images directory
+                #Your favicon.ico should be placed in py4web/apps/oxcam/static directory
+
+DB_URL = f'your_database_server_url'   #e.g. https://{SOCIETY_SHORT_NAME}.pythonanywhere.com/oxcam
+
 # html web page banner Customize:
 PAGE_BANNER = f'<h4><span style="color: blue"><em>{SOCIETY_NAME}</em>\
 <img src="images/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" /></span></h4>'
 # NOTE the logo image is in py4web/apps/oxcam/static/images
-HOME_URL = 'your_home_page_url'
-    #this version allows authorized users to edit
-HELP_URL = 'your_help_web_site_url' #site may embed the database help site https://oxcamne.github.io/oxcam
-DB_URL = f'your_database_server_url'   #e.g. https://{SOCIETY_SHORT_NAME}.pythonanywhere.com/oxcam
+
 SUPPORT_EMAIL = 'your_support_email'
+
 # html letterhead for email/notices:
 LETTERHEAD = f'<h2><span style="color: blue"><em>{SOCIETY_NAME}</em></span> \
 <img src="{DB_URL}/static/images/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" />\
 </h2><br>'
 # html trailer for email notices:
-VISIT_WEBSITE_INSTRUCTIONS = f"<br><br>Visit us at {HOME_URL} or your_social_media"
+VISIT_WEBSITE_INSTRUCTIONS = f"<br><br>Visit us at {DB_URL}/web/home or your_social_media"
 
 #localization settings
 import locale
@@ -83,7 +85,7 @@ THREAD_SUPPORT = False
 # these processes as scheduled tasks. Set True if your
 # environment supports threads.
 
-# access levels for group administrators do not change
+# access levels for group administrators DO NOT CHANGE, used in @checkaccess(None|any)
 ACCESS_LEVELS = ['read', 'write', 'accounting', 'admin']
 
 from dataclasses import dataclass
@@ -92,7 +94,6 @@ import decimal
 @dataclass
 class Membership:
     category: str
-    annual_dues: decimal
     description: str
     qualification: str = None
 
@@ -111,7 +112,7 @@ the last 12 months). Annual dues are <dues>, renewable annually",
 
 class PaymentProcessor:
     def __init__(self, name, public_key, secret_key, dues_products):
-        self.name = name    #should be lower case, single word (underscore allowed)
+        self.name = name  #should be lower case, single word (underscore allowed)
         self.public_key = public_key
         self.secret_key = secret_key
         self.dues_products = dues_products
@@ -142,17 +143,6 @@ and during following 3 weeks. So we set the grace period to cover 18+21 \
 days.
 """
 
-GRACE_PERIOD = 45
-"""
-Renewal within this number of days after expiration extends membership
-continuously from the expiration date.
-Also, member can renew this number of days prior to expiration. 
-Renewal notices are sent at expiration plus -9, 0, 9, 18 days.
-Auto renewal will be attempted multiple times at the anniversary of payment
-and during following 3 weeks. So we set the grace period to cover 18+21 \
-days.
-"""
-
 @dataclass
 class Email_Account:
     server: str
@@ -160,10 +150,10 @@ class Email_Account:
     username: str
     password: str
 
-#SMTP host connection for transactional messages
+#SMTP host connection for transactional messages (e.g. a gmail account)
 SMTP_TRANS = Email_Account('smtp.somewhere.com', 'port', 'username', 'password')
 
-#SMTP host connection for bulk messages
+#SMTP host connection for bulk messages (e.g. a mailing service such as mailgun)
 SMTP_BULK = Email_Account('smtp.somewhere.com', 'port', 'username', 'password')
 
 # logger settings

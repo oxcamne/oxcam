@@ -14,11 +14,11 @@ from .session import checkaccess
 from py4web.utils.form import Form, FormStyleDefault
 from py4web.utils.grid import Grid, GridClassStyle
 from yatl.helpers import XML, H5
-from .settings import SOCIETY_SHORT_NAME, PAGE_BANNER, HOME_URL, HELP_URL, GRACE_PERIOD
+from .settings import SOCIETY_SHORT_NAME, PAGE_BANNER, GRACE_PERIOD
 from py4web.utils.factories import Inject
 from io import StringIO, TextIOWrapper
 
-preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER, HOME_URL=HOME_URL, HELP_URL=HELP_URL))
+preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER))
 
 @action('db_tool', method=['POST', 'GET'])
 @action('db_tool/<path:path>', method=['POST', 'GET'])

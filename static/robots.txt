@@ -1,4 +1,3 @@
 User-agent: *
 Disallow: /
-Allow: /oxcam/web/home
-Allow: /oxcam/static
+Allow: /oxcam

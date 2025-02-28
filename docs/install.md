@@ -30,15 +30,14 @@ Customize for your organization and instance
 SOCIETY_NAME = 'your_group_name'
 SOCIETY_SHORT_NAME = 'your_group_short_name'    #ideally, the domain name omitting the .xxx part
                 #also use as your username if using Pythonanywhere server
-SOCIETY_LOGO = 'your_logo_file' #should be placed in py4web/apps/oxcam/static/images directory
-                #Your favicon.ico should be placed in py4web/apps/oxcam/static directory
+SOCIETY_LOGO = 'your_logo_file' #should be placed in py4web/apps/oxcam/static directory
+                #Your favicon.ico should also be placed in py4web/apps/oxcam/static directory
 
 DB_URL = f'your_database_server_url'   #e.g. https://{SOCIETY_SHORT_NAME}.pythonanywhere.com/oxcam
 
 # html web page banner Customize:
 PAGE_BANNER = f'<h4><span style="color: blue"><em>{SOCIETY_NAME}</em>\
-<img src="images/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" /></span></h4>'
-# NOTE the logo image is in py4web/apps/oxcam/static/images
+<img src="{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" /></span></h4>'
 
 SUPPORT_EMAIL = 'your_support_email'
 
@@ -46,6 +45,7 @@ SUPPORT_EMAIL = 'your_support_email'
 LETTERHEAD = f'<h2><span style="color: blue"><em>{SOCIETY_NAME}</em></span> \
 <img src="{DB_URL}/static/images/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" />\
 </h2><br>'
+
 # html trailer for email notices:
 VISIT_WEBSITE_INSTRUCTIONS = f"<br><br>Visit us at {DB_URL}/web/home or your_social_media"
 

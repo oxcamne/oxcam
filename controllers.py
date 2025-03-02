@@ -738,13 +738,34 @@ def events(path=None):
 			)
 	return locals()
 
+def replace_functions(text):
+	# Find all occurrences of [[some_function]] using a regular expression
+	pattern = re.compile(r'\[\[(.*?)\]\]')
+
+	# Function to replace each match with the result of eval(some_function)
+	def replace_match(match):
+		function_call = match.group(1)
+		if function_call[-1:] != ')':
+			function_call += '()'	#add parentheses if missing
+		try:
+			# Evaluate the function and convert the result to a string
+			result = str(eval(function_call))
+		except Exception as e:
+			result = f"Error: {e}"
+		return result
+
+	# Replace all matches in the text
+	replaced_text = pattern.sub(replace_match, text)
+	return replaced_text
+
 @action('event_page/<event_id:int>', method=['GET'])
 @preferred
 def event_page(event_id):
 	access = session.access	#for layout.html
 	event = db.Events[event_id]
 	event.update_record(Views=event.Views+1, Modified=event.Modified)
-	header = XML(markdown.markdown(event.Details))
+	content = replace_functions(event.Details)
+	header = XML(markdown.markdown(content))
 	return locals()
 	
 @action('tickets/<event_id:int>/<path:path>', method=['POST', 'GET'])
@@ -1545,26 +1566,6 @@ def pages(path=None):
 			)
 	return locals()
 import re
-
-def replace_functions(text):
-	# Find all occurrences of [[some_function]] using a regular expression
-	pattern = re.compile(r'\[\[(.*?)\]\]')
-
-	# Function to replace each match with the result of eval(some_function)
-	def replace_match(match):
-		function_call = match.group(1)
-		if function_call[-1:] != ')':
-			function_call += '()'	#add parentheses if missing
-		try:
-			# Evaluate the function and convert the result to a string
-			result = str(eval(function_call))
-		except Exception as e:
-			result = f"Error: {e}"
-		return result
-
-	# Replace all matches in the text
-	replaced_text = pattern.sub(replace_match, text)
-	return replaced_text
 
 @action('page_show/<page_id:int>', method=['GET'])
 @preferred_public

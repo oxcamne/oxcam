@@ -8,7 +8,7 @@ Customize for your organization and instance
 SOCIETY_NAME = 'your_group_name'
 SOCIETY_SHORT_NAME = 'your_group_short_name'    #ideally, the domain name omitting the .xxx part
 				#also use as your username if using Pythonanywhere server
-SOCIETY_LOGO = 'your_logo_file' 		#should be placed in py4web/apps/oxcam/static directory
+SOCIETY_LOGO = 'your_logo_file_name' 		#should be placed in py4web/apps/oxcam/static directory
 				#Your favicon.ico should also be placed in py4web/apps/oxcam/static directory
 
 DB_URL = f'your_database_server_url'   #e.g. https://{SOCIETY_SHORT_NAME}.pythonanywhere.com/oxcam
@@ -21,7 +21,7 @@ SUPPORT_EMAIL = 'your_support_email'
 
 # html letterhead for email/notices:
 LETTERHEAD = f'<h2><span style="color: blue"><em>{SOCIETY_NAME}</em></span> \
-<img src="{DB_URL}/static/images/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" />\
+<img src="{DB_URL}/static/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" />\
 </h2><br>'
 # html trailer for email notices:
 VISIT_WEBSITE_INSTRUCTIONS = f"<br><br>Visit us at {DB_URL}/web/home or your_social_media"
@@ -51,7 +51,7 @@ DB_URI = f"mysql://{SOCIETY_SHORT_NAME}:<--- database password here --->@{SOCIET
 DB_POOL_SIZE = 10
 """
 
-# set True only for live production instance
+# set True only for live production instance, False for development/testing
 IS_PRODUCTION = True
 #if False, email is suppressed except to the following listed emails:
 ALLOWED_EMAILS = []
@@ -60,7 +60,7 @@ ALLOWED_EMAILS = []
 THREAD_SUPPORT = False
 # Note, PythonAnywhere doesn't support threads, must run
 # these processes as scheduled tasks. Set True if your
-# environment supports threads.
+# environment supports threads, e.g. in development environment.
 
 # access levels for group administrators DO NOT CHANGE, used in @checkaccess(None|any)
 ACCESS_LEVELS = ['read', 'write', 'accounting', 'admin']

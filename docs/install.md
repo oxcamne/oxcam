@@ -43,7 +43,7 @@ SUPPORT_EMAIL = 'your_support_email'
 
 # html letterhead for email/notices:
 LETTERHEAD = f'<h2><span style="color: blue"><em>{SOCIETY_NAME}</em></span> \
-<img src="{DB_URL}/static/images/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" />\
+<img src="{DB_URL}/static/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" />\
 </h2><br>'
 
 # html trailer for email notices:

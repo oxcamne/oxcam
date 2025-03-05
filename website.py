@@ -19,7 +19,8 @@ def history_content():
 	since = datetime.datetime(2019, 3, 31)
 	events = db((db.Events.DateTime < datetime.datetime.now()) & (db.Events.DateTime >= since) & \
 			 ((db.Events.Page != None)|(db.Events.Details != None)) & \
-				(db.Events.AdCom_only==False)).select(orderby = ~db.Events.DateTime)
+				(db.Events.AdCom_only==False)).select(orderby = ~db.Events.DateTime).\
+				find(lambda r: event_attend(r.id) > 0)
 
 	table_rows = []
 	for event in events:

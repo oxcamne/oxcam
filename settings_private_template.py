@@ -13,18 +13,11 @@ SOCIETY_LOGO = 'your_logo_file_name' 		#should be placed in py4web/apps/oxcam/st
 
 DB_URL = f'your_database_server_url'   #e.g. https://{SOCIETY_SHORT_NAME}.pythonanywhere.com/oxcam
 
-# html web page banner Customize:
-PAGE_BANNER = f'<h4><span style="color: blue"><em>{SOCIETY_NAME}</em>\
-<img src="{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" /></span></h4>'
-
 SUPPORT_EMAIL = 'your_support_email'
 
-# html letterhead for email/notices:
-LETTERHEAD = f'<h2><span style="color: blue"><em>{SOCIETY_NAME}</em></span> \
-<img src="{DB_URL}/static/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" />\
-</h2><br>'
 # html trailer for email notices:
-VISIT_WEBSITE_INSTRUCTIONS = f"<br><br>Visit us at {DB_URL}/web/home or your_social_media"
+VISIT_WEBSITE_INSTRUCTIONS = f"<br><br>Visit us at 'your_web_site_url' or your_social_media"
+				#your_web_site_url might be www.{SOCIETY_SHORT_NAME}.org or similar, or {DB_URL}/web/home
 
 #localization settings
 import locale
@@ -42,28 +35,10 @@ CURRENCY_SYMBOL = locale.nl_langinfo(locale.CRNCYSTR)[1:]
 TIME_ZONE = tz.gettz('America/New_York')
 #see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 
-# database connection string:
-DB_URI = "sqlite://storage.db"
-"""
-SQLite is built into Py4web and should be adequate except for extremely large groups.
-On PythonAnywhere you can alternatively use MySQL, e.g.:
-DB_URI = f"mysql://{SOCIETY_SHORT_NAME}:<--- database password here --->@{SOCIETY_SHORT_NAME}.mysql.pythonanywhere-services.com/{SOCIETY_SHORT_NAME}$default"
-DB_POOL_SIZE = 10
-"""
-
 # set True only for live production instance, False for development/testing
 IS_PRODUCTION = True
 #if False, email is suppressed except to the following listed emails:
 ALLOWED_EMAILS = []
-
-# if True, run email daemon & daily maintenance in server threads
-THREAD_SUPPORT = False
-# Note, PythonAnywhere doesn't support threads, must run
-# these processes as scheduled tasks. Set True if your
-# environment supports threads, e.g. in development environment.
-
-# access levels for group administrators DO NOT CHANGE, used in @checkaccess(None|any)
-ACCESS_LEVELS = ['read', 'write', 'accounting', 'admin']
 
 from dataclasses import dataclass
 import decimal
@@ -87,6 +62,19 @@ the last 12 months). Annual dues are <dues>, renewable annually",
 "Please note details of your full-time course (current or graduated within last 12 months).")
 ]
 
+@dataclass
+class Email_Account:
+	server: str
+	port: int
+	username: str
+	password: str
+
+#SMTP host connection for transactional messages (e.g. a gmail account)
+SMTP_TRANS = Email_Account('smtp.somewhere.com', 'port', 'username', 'password')
+
+#SMTP host connection for bulk messages (e.g. a mailing service such as mailgun)
+SMTP_BULK = Email_Account('smtp.somewhere.com', 'port', 'username', 'password')
+
 class PaymentProcessor:
 	def __init__(self, name, public_key, secret_key, dues_products):
 		self.name = name	#should be lower case, single word (underscore allowed)
@@ -109,6 +97,43 @@ PAYMENTPROCESSORS = [
 	)
 ]
 
+#Gooogle reCAPTCHA keys (set all to None if not using Captcha)
+RECAPTCHA_KEY = "production_recaptcha_site_key" if IS_PRODUCTION else "develomemnt_recaptcha_site_key"
+RECAPTCHA_SECRET = "production_recaptcha_secret" if IS_PRODUCTION else "develomemnt_recaptcha_secret"
+
+VERIFY_TIMEOUT = 3	#minutes enforced between verification emails
+
+"""
+Review the following settings and adjust as needed, but no changes are likely to be needed
+"""
+
+# html web page banner Customize:
+PAGE_BANNER = f'<h4><span style="color: blue"><em>{SOCIETY_NAME}</em>\
+<img src="{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" /></span></h4>'
+
+# html letterhead for email/notices:
+LETTERHEAD = f'<h2><span style="color: blue"><em>{SOCIETY_NAME}</em></span> \
+<img src="{DB_URL}/static/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" />\
+</h2><br>'
+
+# database connection string:
+DB_URI = "sqlite://storage.db"
+"""
+SQLite is built into Py4web and should be adequate except for extremely large groups.
+On PythonAnywhere you can alternatively use MySQL, e.g.:
+DB_URI = f"mysql://{SOCIETY_SHORT_NAME}:<--- database password here --->@{SOCIETY_SHORT_NAME}.mysql.pythonanywhere-services.com/{SOCIETY_SHORT_NAME}$default"
+DB_POOL_SIZE = 10
+"""
+
+# if True, run email daemon & daily maintenance in server threads
+THREAD_SUPPORT = False
+# Note, PythonAnywhere doesn't support threads, must run
+# these processes as scheduled tasks. Set True if your
+# environment supports threads, e.g. in development environment.
+
+# access levels for group administrators DO NOT CHANGE, used in @checkaccess(None|any)
+ACCESS_LEVELS = ['read', 'write', 'accounting', 'admin']
+
 GRACE_PERIOD = 45
 """
 Renewal within this number of days after expiration extends membership
@@ -120,19 +145,6 @@ and during following 3 weeks. So we set the grace period to cover 18+21 \
 days.
 """
 
-@dataclass
-class Email_Account:
-	server: str
-	port: int
-	username: str
-	password: str
-
-#SMTP host connection for transactional messages (e.g. a gmail account)
-SMTP_TRANS = Email_Account('smtp.somewhere.com', 'port', 'username', 'password')
-
-#SMTP host connection for bulk messages (e.g. a mailing service such as mailgun)
-SMTP_BULK = Email_Account('smtp.somewhere.com', 'port', 'username', 'password')
-
 # logger settings
 LOGGERS = [
 	"warning:stdout",
@@ -140,9 +152,3 @@ LOGGERS = [
 ]  # syntax "severity:filename:format" filename can be stderr or stdout
 
 ALLOWED_ACTIONS = []    #disable Py4web's auth
-
-#Gooogle reCAPTCHA keys (set all to None if not using Captcha)
-RECAPTCHA_KEY = "production_recaptcha_site_key" if IS_PRODUCTION else "develomemnt_recaptcha_site_key"
-RECAPTCHA_SECRET = "production_recaptcha_secret" if IS_PRODUCTION else "develomemnt_recaptcha_secret"
-
-VERIFY_TIMEOUT = 3	#minutes enforced between verification emails

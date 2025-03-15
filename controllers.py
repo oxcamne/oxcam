@@ -746,12 +746,12 @@ def replace_functions(text):
 	def replace_match(match):
 		function_call = match.group(1)
 		if function_call[-1:] != ')':
-			function_call += '()'	#add parentheses if missing
+			function_call += '()'
 		try:
 			# Evaluate the function and convert the result to a string
 			result = str(eval(function_call))
 		except Exception as e:
-			result = f"Error: {e}"
+			result = f"Error evaluating {function_call}: {e}"
 		return result
 
 	# Replace all matches in the text

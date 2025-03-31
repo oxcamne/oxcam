@@ -46,10 +46,10 @@ from pydal.validators import IS_LIST_OF_EMAILS, IS_EMPTY_OR, IS_IN_DB, IS_IN_SET
 	IS_NOT_EMPTY, IS_DATE, IS_DECIMAL_IN_RANGE, IS_INT_IN_RANGE, IS_MATCH, CLEANUP
 from .utilities import email_sender, member_good_standing, ageband, newpaiddate,\
 	tdnum, get_banks, financial_content, event_confirm, msg_header, msg_send,\
-	society_emails, emailparse, notification, notify_support, member_profile, generate_hash,\
-	encode_url, decode_url, pages_menu
+	notification, notify_support, member_profile, generate_hash,\
+	encode_url, decode_url, pages_menu, template_expand
 from .session import checkaccess
-from .website import about_content, history_content, upcoming_events	#called to construct page content
+from .website import society_emails, about_content, history_content, upcoming_events
 from py4web.utils.factories import Inject
 import datetime, re, csv, decimal, pickle, markdown, dateutil
 from io import StringIO
@@ -738,34 +738,13 @@ def events(path=None):
 			)
 	return locals()
 
-def replace_functions(text):
-	# Find all occurrences of [[some_function]] using a regular expression
-	pattern = re.compile(r'\[\[(.*?)\]\]')
-
-	# Function to replace each match with the result of eval(some_function)
-	def replace_match(match):
-		function_call = match.group(1)
-		if function_call[-1:] != ')':
-			function_call += '()'
-		try:
-			# Evaluate the function and convert the result to a string
-			result = str(eval(function_call))
-		except Exception as e:
-			result = f"Error evaluating {function_call}: {e}"
-		return result
-
-	# Replace all matches in the text
-	replaced_text = pattern.sub(replace_match, text)
-	return replaced_text
-
 @action('event_page/<event_id:int>', method=['GET'])
 @preferred
 def event_page(event_id):
 	access = session.access	#for layout.html
 	event = db.Events[event_id]
 	event.update_record(Views=event.Views+1, Modified=event.Modified)
-	content = replace_functions(event.Details)
-	header = XML(markdown.markdown(content))
+	header = XML(markdown.markdown(event.Details))
 	return locals()
 	
 @action('tickets/<event_id:int>/<path:path>', method=['POST', 'GET'])
@@ -1083,7 +1062,7 @@ def manage_reservation(member_id, event_id, path=None):
 		header = CAT(header, A('send email', _href=(URL('composemail', vars=dict(
 			query=f"(db.Members.id=={member_id})&(db.Members.id==db.Reservations.Member)&(db.Reservations.Event=={event_id})&(db.Reservations.Host==True)",
 			qdesc=member_name(member_id), back=request.url)))),
-			XML(" (use "), "<reservation>", XML(" to include confirmation and payment link)<br>"),
+			XML(" (use "), "[[reservation]]", XML(" to include confirmation and payment link)<br>"),
 			A('view member record', _href=URL(f"members/{'details' if access=='read' else 'edit'}/{member_id}",
 									vars=dict(_referrer=encode_url(request.url)))),
 			XML("<br>Top row is the member's own reservation, additional rows are guests.<br>\
@@ -1567,20 +1546,6 @@ def pages(path=None):
 	return locals()
 import re
 
-@action('page_show/<page_id:int>', method=['GET'])
-@preferred_public
-def page_show(page_id):
-	page = db(db.Pages.id==page_id).select().first()
-	if not page:
-		abort(404)
-	page.update_record(Views = page.Views+1, Modified=page.Modified)
-	if not page.Content:
-		redirect(page.Link)
-	menu = pages_menu(page)	#for layout_publc.html
-	content = replace_functions(page.Content)
-	header = XML(markdown.markdown(content))
-	return locals()
-
 @action('web/<root>', method=['GET'])
 @action('web/<root>/<branch>', method=['GET'])
 @action('web/<root>/<branch>/<twig>', method=['GET'])
@@ -1593,7 +1558,7 @@ def web(root, branch=None, twig=None):
 	if not page.Content:
 		redirect(page.Link)
 	menu = pages_menu(page)	#for layout_publc.html
-	content = replace_functions(page.Content)
+	content = template_expand(page.Content)
 	header = XML(markdown.markdown(content))
 	return locals()
 	
@@ -2202,7 +2167,9 @@ def composemail():
 	proto = db(db.EMProtos.id == request.query.get('proto')).select().first()
 	fields =[Field('sender', 'string', requires=IS_IN_SET(source), default=source[0])]
 	if query:
-		query_count = len(db(eval(query)).select(left=eval(left) if left else None, distinct=True))
+		rows = db(eval(query)).select(left=eval(left) if left else None, distinct=True)
+		query_count = len(rows)
+		row = rows[0]
 		header = CAT(header, XML(f'To: {qdesc} ({query_count})'))
 		footer = A("Export bcc list for use in email", _href=URL('bcc_export',
 						vars=dict(query=query, left=left or '')))
@@ -2213,11 +2180,11 @@ def composemail():
 	if not query or query_count==1:
 		fields.append(Field('bcc', 'list:string', requires=IS_LIST_OF_EMAILS()))
 	subject_default = proto.Subject if proto else ''
-	body_default = replace_functions(proto.Body) if proto else "<letterhead>\n<greeting>\n\n" if query else "<letterhead>\n\n"
+	body_default = proto.Body if proto else "[[greeting]]\n\n" if query else ""
 	if request.query.get('event_details'):
 		event = db.Events[request.query.get('event_details')]
 		if event.Details:
-			body_default = f"<letterhead>\n<greeting>\n\n{replace_functions(event.Details)}"
+			body_default = f"[[greeting]]\n\n{event.Details}"
 			subject_default = event.Description
 	fields.append(Field('subject', 'string', requires=IS_NOT_EMPTY(), default=subject_default))
 	fields.append(Field('body', 'text', requires=IS_NOT_EMPTY(), default=body_default,
@@ -2227,7 +2194,7 @@ def composemail():
 				A('HTML', _href='https://oxcamne.github.io/oxcam/send_email.html#embedding-images-in-email', _target='doc'),
 				" for additional formatting.",
 				XML('<br>'),
-				"There are custom tags <letterhead>, <subject>, <greeting>, <member>, <reservation>, and <email> ",
+				"There are custom tags [[greeting]], [[member]], and [[reservation]] ",
 				"available, depending on the context.")))
 	fields.append(Field('save', 'boolean', default=proto!=None, comment='store/update template'))
 	fields.append(Field('attachment', 'upload', uploadfield=False))
@@ -2256,6 +2223,12 @@ def composemail():
 					submit_value = 'Send', formstyle=FormStyleBulma)
 			
 	if form2.accepted:
+		try:
+			body_expanded = template_expand(form2.vars['body'], locals())
+		except Exception as e:
+			flash.set(e)
+			body_expanded = None
+
 		sender = form2.vars['sender']
 		if proto:
 			if form2.vars['save']:
@@ -2269,19 +2242,13 @@ def composemail():
 
 		bcc = form2.vars.get('bcc')
 
-		try:
-			bodyparts = emailparse(form2.vars['body'], form2.vars['subject'], query)
-		except Exception as e:
-			flash.set(e)
-			bodyparts = None
-
 		if form2.vars.get('attachment'):
 			attachment = form2.vars.get('attachment').file.read()
 			attachment_filename =form2.vars.get('attachment').filename
 		else:
 			attachment = attachment_filename = None
 
-		if bodyparts:
+		if body_expanded:
 			if query:
 				db.Email_Queue.insert(Subject=form2.vars['subject'], Body=form2.vars['body'], Sender=sender,
 			 		Attachment=pickle.dumps(attachment), Attachment_Filename=attachment_filename,
@@ -2291,11 +2258,9 @@ def composemail():
 			else:
 				to = form2.vars['to']
 				body = ''
-				for part in bodyparts:
-					body += part[0]
 				flash.set(f"Email sent to: {to} ({len(to)})")
 				email_sender(subject=form2.vars['subject'], sender=sender, to=to, bcc=bcc,
-				 	body=body, attachment=attachment, attachment_filename=attachment_filename)
+				 	body=body_expanded, attachment=attachment, attachment_filename=attachment_filename)
 			redirect(request.query.back)
 	return locals()
 

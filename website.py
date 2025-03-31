@@ -8,11 +8,15 @@ The actions in this file are pages embedded in the Society's public website
 """
 from py4web import action, URL, request
 from .common import db, session
-from .settings import TIME_ZONE
+from .settings import TIME_ZONE, SOCIETY_SHORT_NAME
 from yatl.helpers import H5, A, TABLE, TR, TD, CAT, XML, EM
 import datetime, markdown
 from .models import primary_affiliation, event_attend
-from .utilities import society_emails
+
+def society_emails(member_id):
+	return [row['Email'] for row in db((db.Emails.Member == member_id) & \
+	   (db.Emails.Email.contains(SOCIETY_SHORT_NAME.lower()))).select(
+			db.Emails.Email, orderby=~db.Emails.Modified)]
 
 #embedded in Society Recent Events Page
 def history_content():

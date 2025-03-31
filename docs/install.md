@@ -136,7 +136,7 @@ PAGE_BANNER = f'<h4><span style="color: blue"><em>{SOCIETY_NAME}</em>\
 # html letterhead for email/notices:
 LETTERHEAD = f'<h2><span style="color: blue"><em>{SOCIETY_NAME}</em></span> \
 <img src="{DB_URL}/static/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" />\
-</h2><br>'
+</h2><br><br>'
 
 # database connection string:
 DB_URI = "sqlite://storage.db"

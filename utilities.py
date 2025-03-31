@@ -7,6 +7,7 @@ from .settings import TIME_ZONE, SUPPORT_EMAIL, LETTERHEAD, GRACE_PERIOD, CURREN
 	DB_URL, SOCIETY_SHORT_NAME, MEMBERSHIPS, DATE_FORMAT, SMTP_TRANS, PAGE_BANNER
 from .models import primary_email, event_cost, member_name, res_selection,\
 	res_unitcost, event_revenue, page_name
+from .website import about_content, history_content, upcoming_events	#called to construct page content
 from yatl.helpers import A, TABLE, TH, THEAD, H6, TR, TD, CAT, HTML, XML
 import datetime, re, smtplib, markdown, base64, decimal
 from email.message import EmailMessage
@@ -67,7 +68,7 @@ def email_sender(
 		message['List-Unsubscribe'] = list_unsubscribe
 	if list_unsubscribe_post:
 		message['List-Unsubscribe-Post'] = list_unsubscribe_post
-	message.set_content(HTML(XML(body)).__str__(), subtype='html')
+	message.set_content(HTML(XML(LETTERHEAD+body)).__str__(), subtype='html')
 	if attachment:
 		message.add_attachment(attachment, maintype='application', subtype='octet-stream', filename=attachment_filename)
 	server.send_message(message)
@@ -154,30 +155,34 @@ def bank_balance(bank_id, timestamp=datetime.datetime.now(TIME_ZONE).replace(tzi
 	r = db((db.AccTrans.Bank==bank_id)&(db.AccTrans.Accrual==False)&(db.AccTrans.Timestamp>=timestamp)).select(amt, fee).first()
 	return balance-(r[amt] or 0)-(r[fee] or 0)
 
-def emailparse(body, subject, query=None):
-#parse email body from composemail form into a list of tuples:
-#	(text, function)
-#	where function will build html format from the results of the query,
-#	markdown and HTML will be passed directly into the output
-#	The special tags such as <reservation> etc are parsed out separatly.
-	m = re.match(r"^(.*)<(letterhead|greeting|reservation|member|email)>(.*)$", body, flags=re.DOTALL)
-	if m:			#found something to expand
-		text = func = None
-		if m.group(2)=='greeting' or m.group(2)=='email' or m.group(2)=='member' or m.group(2)=='reservation':
-			if not query or m.group(2)=='reservation' and not ('Reservations.Event' in query):
-				raise Exception(f"<{m.group(2)}> can't be used in this context")
-			func=m.group(2) #will be generated individually for each target later
-		#should be <name> where name is defined in settings_private, for example <letterhead>
-		else:	#letterhead
-			text = eval(m.group(2).upper()).replace('&lt;subject&gt;', subject)
+def template_expand(text, context={}):
+	# Expand all occurrences of [[something]] in the text
+	pattern = re.compile(r'\[\[(.*?)\]\]')
 
-		bodyparts = [(text, func)]
-		if m.group(1)!='':
-			bodyparts = emailparse(m.group(1), subject, query)+bodyparts
-		if m.group(3)!='':
-			bodyparts = bodyparts+emailparse(m.group(3), subject, query)
-		return bodyparts
-	return [(markdown.markdown(body), None)]
+	# Function to replace each match with the result of eval(some_function)
+	def replace_match(match):
+		func = match.group(1)
+		if func=='greeting' or func=='member' or func=='reservation':
+			if not context.get('query') or func=='reservation' and not ('Reservations.Event' in context.get('query')):
+				raise Exception(f"[[{func}]] can't be used in this context")
+		if func=='greeting':
+			result = member_greeting(db.Members[context.get('row').get('Members.id') or context.get('row').get('id')])
+		elif func=='member':
+			result = member_profile(db.Members[context.get('row').get('Members.id') or context.get('row').get('id')])
+		elif func=='reservation':
+			result = event_confirm(context.get('row').get('Reservations.Event'), context.get('row').get('Members.id'))
+		elif func.startswith('upcoming_events'):
+			result = upcoming_events()
+		elif func.startswith('history_content'):
+			result = history_content()
+		elif func.startswith('about_content'):	#will be called with committee names
+			result = eval(func)
+		else:
+			raise Exception(f"unknown content [[{func}]]")
+		return str(result)
+
+	# Replace all matches in the text
+	return pattern.sub(replace_match, text)
 	
 #display member profile
 def member_profile(member):
@@ -288,15 +293,10 @@ def pages_menu(forpage):
 			menu = add_page(menu, page, f"web/{page_name(page.Root).replace(' ','_')}/{page.Page.replace(' ','_')}")
 	return menu
 
-def society_emails(member_id):
-	return [row['Email'] for row in db((db.Emails.Member == member_id) & \
-	   (db.Emails.Email.contains(SOCIETY_SHORT_NAME.lower()))).select(
-			db.Emails.Email, orderby=~db.Emails.Modified)]
-
 def member_greeting(member):
 	if member.Title:
 		title = member.Title[4:] if member.Title.startswith('The ') else member.Title
-		greeting = f"Dear {title} {member.Firstname if title.find('Sir')>=0 else member.Lastname},"
+		greeting = f"<p>Dear {title} {member.Firstname if title.find('Sir')>=0 else member.Lastname},</p>"
 	else:
 		greeting = f"<p>Dear {member.Firstname.partition(' ')[0]},</p>"
 	return greeting

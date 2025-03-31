@@ -51,4 +51,4 @@ When cancellations are received, the associated reservation records should be se
 
 When someone on the waitlist is found who can use the freed places, allocate the spaces by clearing the 'waitlist' flag. If it is a reservation that is entirely waitlisted, simply edit the host reservation (first row). In the case of a waitlisted additional guest, edit the individual waitlisted row(s). The member should then revisit the booking link and checkout; they will receive their confirmation when any necessary payment is completed.
 
-The Reservation Display includes a link to email the host member. You can include '\<reservation>' at the bottom of the text to include a confirmation of the registration. If a payment is needed, this will show the amount and also include the payment link.
+The Reservation Display includes a link to email the host member. You can include [[<reservation]] at the bottom of the text to include a confirmation of the registration. If a payment is needed, this will show the amount and also include the payment link.

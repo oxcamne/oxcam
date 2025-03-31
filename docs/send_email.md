@@ -16,7 +16,7 @@ If the message is explicitly addressed, or targetted to a single member, a 'Bcc:
 
 The Sender field allows you select which address to use if you have multiple roles. Replies will be sent to this address.
 
-The message body can use various custom tags, such as \<letterhead>,  \<greeting> which include the Society letterhead and a personalized greeting (more or less formal depending on whether the member included a title when joining).  The tag \<member> is replaced by the member's directory information or \<email> by just their email address, and in context \<reservation> will show details of a reservation.
+The message body can use custom elements [[greeting]] (a personalized greeting, more or less formal depending on whether the member included a title when joining).  The element [[member]] is replaced by the member's directory information, and in suitable contexts [[reservation]] will show details of a reservation.
 
 [Markdown](https://www.markdownguide.org/basic-syntax/) can  be used to apply some formatting and to include links and graphics. The Send Email page has a link to Markdown documentation.
 

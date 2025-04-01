@@ -3,7 +3,7 @@ This file contains controllers used to manage the user's session
 """
 from py4web import URL, request, redirect, action, Field, HTTP
 from .common import db, session, flash, logger, auth
-from .settings import SUPPORT_EMAIL, TIME_ZONE, LETTERHEAD, SOCIETY_SHORT_NAME, PAGE_BANNER, DATE_FORMAT,\
+from .settings import SUPPORT_EMAIL, TIME_ZONE, SOCIETY_SHORT_NAME, PAGE_BANNER, DATE_FORMAT,\
 		RECAPTCHA_KEY, RECAPTCHA_SECRET, VERIFY_TIMEOUT
 from .models import ACCESS_LEVELS, member_name, CAT
 from .utilities import email_sender
@@ -193,4 +193,4 @@ def browser_back():
 @action.uses(session)
 def logout():
 	session['logged_in'] = False
-	redirect(URL('index'))
+	redirect(URL('my_account'))

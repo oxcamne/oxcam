@@ -84,7 +84,7 @@ def notify_support(member_id, subject, body):
 #notifications to Member & Support_Email of member actions
 def notification(member, subject, body):
 	# build and send email update member, and to SUPPORT_EMAIL if production environment
-	message = f"{LETTERHEAD.replace('&lt;subject&gt;', subject)}{member_greeting(member)}<br><br>{body}"
+	message = f"{member_greeting(member)}<br><br>{body}"
 	msg_send(member, subject, message)
 
 def newpaiddate(paiddate, timestamp=datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), graceperiod=GRACE_PERIOD, years=1):
@@ -212,7 +212,7 @@ def msg_header(member, subject):
 	if member.Address2:
 		body += f"{member.Address2}<br>"
 	body += f"{member.City or ''} {member.State or ''} {member.Zip or ''}<br></p>"
-	return LETTERHEAD.replace('&lt;subject&gt;', subject)+body
+	return body
 	
 #send invoice or confirm
 def msg_send(member,subject, message):

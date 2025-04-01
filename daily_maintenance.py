@@ -22,7 +22,7 @@ import datetime
 import os
 from pathlib import Path
 from .common import db
-from .settings import SOCIETY_SHORT_NAME, IS_PRODUCTION, SUPPORT_EMAIL, LETTERHEAD,\
+from .settings import SOCIETY_SHORT_NAME, IS_PRODUCTION, SUPPORT_EMAIL,\
 		SOCIETY_NAME, DB_URL, DATE_FORMAT, TIME_ZONE
 from .utilities import member_greeting, email_sender
 from .pay_processors import paymentprocessor
@@ -56,7 +56,7 @@ def daily_maintenance():
 				(db.Members.Pay_subs==None)&(db.Members.Charged==None)).select()
 	for m in members:
 		if (m.Paiddate - datetime.date.today()).days % interval == 0:
-			text = f"{LETTERHEAD.replace('&lt;subject&gt;', 'Renewal Reminder')}{member_greeting(m)}"
+			text = f"{member_greeting(m)}"
 			text += f"<p>This is a friendly reminder that your {SOCIETY_NAME} membership expiration \
 date is/was {m.Paiddate.strftime(DATE_FORMAT)}. Please renew by <a href={DB_URL}> logging in</a> \
 and selecting join/renew from the menu of choices, \
@@ -71,7 +71,7 @@ If you have any questions, please contact {SUPPORT_EMAIL}"
 	for m in subs:
 		if paymentprocessor(m.Pay_source).subscription_cancelled(m):	#subscription no longer operational
 			if IS_PRODUCTION:
-				text = f"{LETTERHEAD.replace('&lt;subject&gt;', 'Membership Renewal Failure')}{member_greeting(m)}"
+				text = f"{member_greeting(m)}"
 				text += f"<p>We have been unable to process your auto-renewal and as a result your membership has been cancelled. </p><p>\
 We hope you will <a href={DB_URL}> reinstate your membership</a>, \
 but in any case we are grateful for your past support!</p>\

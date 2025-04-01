@@ -61,6 +61,14 @@ preferred_public = action.uses("gridform_public.html", db, session, flash, Injec
 @preferred
 @checkaccess(None)
 def index():
+	if db(db.Pages.Page=='Home').count() > 0:
+		redirect(URL('web/home'))
+	redirect(URL('my_account'))
+
+@action('my_account')
+@preferred
+@checkaccess(None)
+def my_account():
 	header = H6("Please select one of the following:")
 	member = db.Members[session.member_id] if session.member_id else None
 	access = session.access	#for layout.html
@@ -95,7 +103,7 @@ def index():
 @checkaccess(None)
 def view_card():
 	if not session.Pay_source:
-		redirect(URL('index'))
+		redirect(URL('my_account'))
 	paymentprocessor().view_card
 
 @action('members/<path:path>', method=['POST', 'GET'])
@@ -479,7 +487,7 @@ def unsubscribe(email_id, list_id, hash):
 	email = db.Emails[email_id]
 	list = db.Email_Lists[list_id]
 	if not email or generate_hash(email.Email)!=hash or list.id not in email.Mailings:
-		redirect(URL('index'))
+		redirect(URL('my_account'))
 	header = f"Please Confirm to unsubscribe '{email.Email}' from '{list.Listname}' mailing list."
 	form = Form([], csrf_protection=False, submit_value='Confirm', formstyle=FormStyleBulma)
 
@@ -578,7 +586,7 @@ To change your mailing list subscritions, use the <b>Edit</b> button."))
 			flash.set('Thank you for updating your mailing list subscriptions')
 			notify_support(member_id, "Mail Subscriptions Updated",
 		  		f"{email.Email} {', '.join([list.Listname for list in db(db.Email_Lists.id.belongs(mailings)).select()])}")
-			redirect(URL(f"emails/Y/{member_id}/select", vars=dict(back=URL('index'))))
+			redirect(URL(f"emails/Y/{member_id}/select", vars=dict(back=URL('my_account'))))
 	return locals()
 	
 @action('new_members/<path:path>', method=['GET'])
@@ -1161,7 +1169,7 @@ Deleting or moving member on/off waitlist will also affect all guests."))
 def reservation(path=None):
 	access = session.access	#for layout.html
 	if not session.get('member_id') or not session.get('event_id'):
-		redirect(URL('index'))
+		redirect(URL('my_account'))
 
 	event = db.Events[session.event_id]
 	clist = collegelist(sponsors = event.Sponsors or [])
@@ -2365,7 +2373,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 				(datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.Booking_Closed and not event_attend(event_id)) or \
 				event.AdCom_only and not access:
 			flash.set('Event is not open for booking.')
-			redirect(URL('index'))
+			redirect(URL('my_account'))
 		if datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.Booking_Closed:
 			flash.set('Booking is closed, but you may join the wait list.')
 		session['event_id'] = event_id
@@ -2406,7 +2414,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 				redirect(URL('reservation/new'))	#go create this member's reservation
 
 		elif request.query.get('mail_lists'):
-			redirect(URL(f"emails/Y/{member_id}/select",vars=dict(back=URL('index'))))
+			redirect(URL(f"emails/Y/{member_id}/select",vars=dict(back=URL('my_account'))))
 		else:		#dues payment or profile update
 			if not session.get('membership') and \
 					member_good_standing(member, (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)+datetime.timedelta(days=GRACE_PERIOD)).date()):
@@ -2421,7 +2429,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 				else 'Membership Application/Renewal: Your Information')
 	if event:
 		if event.AdCom_only and not (member and member.Access):
-			redirect(URL('index'))
+			redirect(URL('my_account'))
 		header = CAT(header, XML(f"Event: {event.Description}<br>When: {event.DateTime.strftime('%A %B %d, %Y %I:%M%p')}<br>Where: {event.Venue}<br><br>"),
 XML(f"This event is open to \
 {'all alumni of Oxford & Cambridge' if not event.Members_only else f'members of {SOCIETY_SHORT_NAME}'}\
@@ -2541,7 +2549,7 @@ Please login with the email you used before{f'<em>, possibly {suggest}, </em>' i
 			
 		if (request.query.get('mail_lists')):
 			flash.set("Please review your subscription settings below.")
-			redirect(URL(f"emails/Y/{member_id}/select",vars=dict(back=URL('index'))))
+			redirect(URL(f"emails/Y/{member_id}/select",vars=dict(back=URL('my_account'))))
 				
 		if request.query.get('join_or_renew') or not event:	#collecting dues with event registration, or joining/renewing
 			#membership dues payment
@@ -2575,7 +2583,7 @@ Please login with the email you used before{f'<em>, possibly {suggest}, </em>' i
 def profile():
 	access = session.access	#for layout.html
 	if not session.member_id:
-		redirect(URL('index'))
+		redirect(URL('my_account'))
 
 	
 	member = db.Members[session.member_id]
@@ -2635,7 +2643,7 @@ def cancel_subscription(member_id=None):
 	access = session.access	#for layout.html
 	
 	if not session.member_id:
-		redirect(URL('index'))
+		redirect(URL('my_account'))
 
 	if member_id!=session.member_id and (not session.access or ACCESS_LEVELS.index(session.access) < ACCESS_LEVELS.index('write')):
 		redirect(URL('accessdenied'))

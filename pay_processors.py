@@ -152,7 +152,7 @@ class StripeProcessor(PaymentProcessor):
 
 	def checkout(self, back):
 		if not (session.member_id and (session.get('membership') or session.get('event_id'))):
-			redirect(URL('index'))
+			redirect(URL('my_account'))
 			
 		member = db.Members[session.member_id]
 		
@@ -232,7 +232,7 @@ class StripeProcessor(PaymentProcessor):
 				"mode": "setup",
 				"setup_intent_data": {},
 				"success_url": URL('stripe_switched_card', vars=dict(token=token), scheme=True), 
-				"cancel_url": URL('index', scheme=True)
+				"cancel_url": URL('my_account', scheme=True)
 			}
 		) 
 		redirect(stripe_session.url)
@@ -247,7 +247,7 @@ def stripe_view_card():
 	access = session.access	#for layout.html
 
 	if not session.member_id:
-		redirect(URL('index'))
+		redirect(URL('my_account'))
 	member = db.Members[session.member_id]
 	
 	if member.Pay_subs and member.Pay_subs!='Cancelled':
@@ -256,7 +256,7 @@ def stripe_view_card():
 		except Exception as e:
 			member.update_record(Pay_subs=None, Pay_next=None)
 	if not (member.Pay_subs and member.Pay_subs!='Cancelled'):
-		redirect(URL('index'))	#Stripe subscription doesn't exist
+		redirect(URL('my_account'))	#Stripe subscription doesn't exist
 		
 	paymentmethod = stripe_client.payment_methods.retrieve(subscription.default_payment_method)
 	renewaldate = member.Pay_next.strftime('%b %d, %Y')
@@ -348,9 +348,9 @@ def stripe_checkout_success():
 	
 	if dues:
 		flash.set('Confirmation has been sent by email. Please review your mailing list subscriptions.')
-		redirect(URL(f"emails/Y/{member.id}/select", vars=dict(back=URL('index'))))
+		redirect(URL(f"emails/Y/{member.id}/select", vars=dict(back=URL('my_account'))))
 	
-	redirect(URL('index'))
+	redirect(URL('my_account'))
 
 """
 install implementation in base class

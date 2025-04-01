@@ -123,8 +123,7 @@ def send_email_confirmation():
 		user.update_record(tokens= [token]+(user.tokens or []),
 				email = email, when_issued = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))
 		link = URL('validate', user.id, token, scheme=True, vars=dict(url=request.query.url))
-		message = f"{LETTERHEAD.replace('&lt;subject&gt;', ' ')}<br><br>\
-Please click {A(link, _href=link)} to continue to {SOCIETY_SHORT_NAME} \
+		message = f"Please click {A(link, _href=link)} to continue to {SOCIETY_SHORT_NAME} \
 and complete your registration or other transaction.<br><br>\
 <em>If you did not initiate the request, please Reply to report this so that we can investigate</em>."
 		db.commit()

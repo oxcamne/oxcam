@@ -2194,7 +2194,7 @@ def composemail():
 				A('HTML', _href='https://oxcamne.github.io/oxcam/send_email.html#embedding-images-in-email', _target='doc'),
 				" for additional formatting.",
 				XML('<br>'),
-				"There are custom tags [[greeting]], [[member]], and [[reservation]] ",
+				"There are custom elements [[greeting]], [[member]], and [[reservation]] ",
 				"available, depending on the context.")))
 	fields.append(Field('save', 'boolean', default=proto!=None, comment='store/update template'))
 	fields.append(Field('attachment', 'upload', uploadfield=False))

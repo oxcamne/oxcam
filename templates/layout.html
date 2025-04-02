@@ -16,6 +16,28 @@
         list-style-type: disc;
         margin-left: 20px;
       }
+      /* Prevent horizontal scrolling issues */
+      body {
+        overflow-x: hidden;
+        max-width: 100vw;
+      }
+      /* Ensure content resizes properly */
+      html, body {
+        min-width: 100vw;
+      }
+      /* Ensure full width on mobile */
+      main {
+        max-width: 100vw;
+        overflow-x: hidden;
+      }
+      /* Adjust margins only for larger screens */
+      @media (min-width: 768px) {
+        main {
+          max-width: 900px; /* Adds reasonable margins */
+          margin-left: auto;
+          margin-right: auto;
+        }
+      }
     </style>
   </head>
   <body>
@@ -41,7 +63,7 @@
           [[pass
           except:
               pass]]
-        </ul> 
+        </ul>
         [[end]]
         <!-- Right menu ul/li -->
         <ul>

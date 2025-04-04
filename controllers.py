@@ -59,7 +59,6 @@ preferred_public = action.uses("gridform_public.html", db, session, flash, Injec
 
 @action('index')
 @preferred
-@checkaccess(None)
 def index():
 	if db(db.Pages.Page=='Home').count() > 0:
 		redirect(URL('web/home'))

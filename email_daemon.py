@@ -25,7 +25,7 @@ in a separate thread
 NOTE PythonAnywhere doesn't support threading so this runs instead
 	as a scheduled daily task, which requires a paid account
 """
-import time, os, random, pickle, datetime, re, smtplib
+import time, os, random, pickle, datetime, re, smtplib, markdown
 from pathlib import Path
 from .common import db, logger
 from .settings import VISIT_WEBSITE_INSTRUCTIONS, TIME_ZONE, THREAD_SUPPORT, IS_PRODUCTION,\
@@ -33,10 +33,11 @@ from .settings import VISIT_WEBSITE_INSTRUCTIONS, TIME_ZONE, THREAD_SUPPORT, IS_
 from .utilities import member_profile, event_confirm, member_greeting, generate_hash, email_sender, template_expand
 from .models import primary_email
 from .daily_maintenance import daily_maintenance
-from py4web import URL
 
 def send_notice(notice):
 	query = notice.Query
+	left = notice.Left
+	Scheme = notice.Scheme
 	attachment = pickle.loads(notice.Attachment) if notice.Attachment else None
 	list_unsubscribe_uri = None
 	mailing = re.search(r"Mailings\.contains\((\d+)\)", notice.Query)
@@ -65,7 +66,7 @@ def send_notice(notice):
 		while True:
 			try:
 				email_sender(host=SMTP_BULK, subject=notice.Subject, sender=notice.Sender, to=to, bcc=eval(notice.Bcc),
-					body=body_expanded, attachment=attachment, attachment_filename=notice.Attachment_Filename,
+					body=markdown.markdown(body_expanded), attachment=attachment, attachment_filename=notice.Attachment_Filename,
 					list_unsubscribe=f"<{list_unsubscribe_uri}>" if mailing else None,
 					list_unsubscribe_post="List-Unsubscribe=One-Click" if mailing else None,
 				)

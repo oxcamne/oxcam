@@ -31,7 +31,7 @@ grid_style = GridClassStyleBulma
 form_style = FormStyleBulma
 
 from py4web import action, request, response, redirect, URL, Field, HTTP, abort
-from yatl.helpers import H5, H6, XML, TABLE, TH, TD, THEAD, TR, HTML, P, BUTTON
+from yatl.helpers import H5, H6, XML, TABLE, TH, TD, THEAD, TR, HTML, P, BUTTON, INPUT
 from .common import db, session, flash
 from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
 	MEMBERSHIPS, TIME_ZONE, PAGE_BANNER, IS_PRODUCTION,\
@@ -752,7 +752,7 @@ def event_page(event_id):
 	access = session.access	#for layout.html
 	event = db.Events[event_id]
 	event.update_record(Views=event.Views+1, Modified=event.Modified)
-	header = XML(markdown.markdown(event.Details))
+	header = XML(markdown.markdown(str(template_expand(event.Details, locals()))))
 	return locals()
 	
 @action('tickets/<event_id:int>/<path:path>', method=['POST', 'GET'])
@@ -2052,11 +2052,51 @@ def transactions(path=None):
 	db.AccTrans.Membership.writable = False
 	acdues = db(db.CoA.Name.ilike("Membership Dues")).select().first().id
 	actkts = db(db.CoA.Name.ilike("Ticket sales")).select().first().id
+	query = request.query.query or '(db.AccTrans.id>0)'
+	if request.query.get('account'):
+		query += f"&(db.AccTrans.Account=={request.query.get('account')})"
+	if request.query.get('member'):
+		query += f"&(db.AccTrans.Member=={request.query.get('member')})"
+	if request.query.get('event'):
+		query += f"&(db.AccTrans.Event=={request.query.get('event')})"
+	if request.query.get('notes'):
+		query += f"&(db.AccTrans.Notes.ilike('%{request.query.get('notes')}%'))"
+	if request.query.get('reference'):
+		query += f"&(db.AccTrans.Reference.ilike('%{request.query.get('reference')}%'))"
+			
+	search_form=Form([
+		Field('account', 'reference CoA', default=request.query.get('account'),
+				requires=IS_EMPTY_OR(IS_IN_DB(db, 'CoA', '%(Name)s', zero="account?"))),
+		Field('member', 'reference Members', default=request.query.get('member'),
+				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Members', '%(Lastname)s, %(Firstname)s',
+				orderby = db.Members.Lastname|db.Members.Firstname, zero="member?"))),
+		Field('event', 'reference Events', default=request.query.get('event'),
+				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Events',
+				lambda r: f"{r.DateTime.strftime(DATE_FORMAT)} {r.Description[:25]}",
+				orderby = ~db.Events.DateTime, zero="event?"))),
+    	Field('notes', 'string',
+		   		widget=lambda field, value: INPUT(_name='notes', _type='text', _value=request.query.get('notes'), _placeholder="notes?")),
+    	Field('reference', 'string',
+		   		widget=lambda field, value: INPUT(_name='reference', _type='text', _value=request.query.get('reference'), _placeholder="ref?"))],
+		keep_values=True, formstyle=FormStyleBulma)
 
 	if path=='select':
-		bank_id_match=re.match('db.AccTrans.Bank==([0-9]+)$', request.query.get('query'))
+		bank_id_match=re.match('db.AccTrans.Bank==([0-9]+)$', query)
 		session['bank_id'] = int(bank_id_match.group(1)) if bank_id_match else None
 		back = request.query.back
+		if search_form.accepted:	#Filter button clicked
+			select_vars = {}
+			if search_form.vars.get('account'):
+				select_vars['account'] = search_form.vars.get('account')
+			if search_form.vars.get('member'):
+				select_vars['member'] = search_form.vars.get('member')
+			if search_form.vars.get('event'):
+				select_vars['event'] = search_form.vars.get('event')
+			if search_form.vars.get('notes'):
+				select_vars['notes'] = search_form.vars.get('notes')
+			if search_form.vars.get('reference'):
+				select_vars['reference'] = search_form.vars.get('reference')
+			redirect(URL('transactions/select', vars=select_vars))
 	else:
 		back=decode_url(request.query._referrer)
 		if path.startswith('edit') or path.startswith('details'):	#editing/viewing AccTrans record
@@ -2127,16 +2167,8 @@ def transactions(path=None):
 								CheckNumber=transaction.CheckNumber, Accrual=transaction.Accrual,
 								 Reference=transaction.Reference,Notes=form.vars.get('Notes'))	#the residual piece
 			db.AccTrans[form.vars.get('id')].update_record(Fee=fee)
-			
-	search_queries = [
-		["Account", lambda value: db.AccTrans.Account.belongs([r.id for r in db(db.CoA.Name.ilike(f'%{value}%')).select(db.CoA.id)])],
-		["Member", lambda value: db.AccTrans.Member.belongs([r.id for r in db(db.Members.Lastname.ilike(f'%{value}%')|db.Members.Firstname.ilike(f'%{value}%')).select(db.Members.id)])],
-		["Event", lambda value: db.AccTrans.Event.belongs([r.id for r in db(db.Events.Description.ilike(f'%{value}%')).select(db.Events.id)])],
-		["Notes", lambda value: db.AccTrans.Notes.ilike(f'%{value}%')],
-		["Reference", lambda value: db.AccTrans.Reference.ilike(f'%{value}%')],
-	]
 	
-	grid = Grid(path, eval(request.query.get('query') or 'db.AccTrans.id>0'), left=eval(request.query.get('left')) if request.query.get('left') else None,
+	grid = Grid(path, eval(query), left=eval(request.query.get('left')) if request.query.get('left') else None,
 			orderby=~db.AccTrans.Timestamp,
 			columns=[db.AccTrans.Timestamp, db.AccTrans.Account, db.AccTrans.Event,
 					Column('member', lambda row: A(member_name(row.Member), _href=URL(f"members/edit/{row.Member}",
@@ -2144,7 +2176,7 @@ def transactions(path=None):
 											 _style='white-space: normal') if row.Member else '', required_fields=[db.AccTrans.Member]),
 	 				db.AccTrans.Amount, db.AccTrans.Fee, db.AccTrans.CheckNumber, db.AccTrans.Accrual],
 			headings=['Timestamp', 'Account','Event','Member','Amt', 'Fee', 'Chk#', 'Acc'],
-			validation=validate, search_queries=search_queries, show_id=True,
+			validation=validate, show_id=True, search_form=search_form,
 			deletable=lambda r: r.Accrual, details=False, editable=True, create=session.get('bank_id'),
 			field_id=db.AccTrans.id, grid_class_style=grid_style, formstyle=form_style)
 	return locals()
@@ -2189,8 +2221,9 @@ def composemail():
 		fields.append(Field('bcc', 'list:string', requires=IS_LIST_OF_EMAILS()))
 	subject_default = proto.Subject if proto else ''
 	body_default = proto.Body if proto else "[[greeting]]\n\n" if query else ""
-	if request.query.get('event_details'):
-		event = db.Events[request.query.get('event_details')]
+	event_id = request.query.get('event_details')
+	if event_id:
+		event = db.Events[event_id]
 		if event.Details:
 			body_default = f"[[greeting]]\n\n{event.Details}"
 			subject_default = event.Description

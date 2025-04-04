@@ -177,6 +177,12 @@ def template_expand(text, context={}):
 			result = history_content()
 		elif func.startswith('about_content'):	#will be called with committee names
 			result = eval(func)
+		elif func=='registration_link':
+			event_id_match=re.search(r'db\.Reservations\.Event==(\d+)', context.get('left') or '')
+			event_id = context.get('event_id') or (event_id_match.group(1) if event_id_match else None)
+			if not event_id:
+				raise Exception(f"[[{func}]] can't be used in this context")
+			result = f"{context.get('Scheme')}registration/{event_id}" if context.get('Scheme') else URL(f'registration/{event_id}', scheme=True)
 		else:
 			raise Exception(f"unknown content [[{func}]]")
 		return str(result)

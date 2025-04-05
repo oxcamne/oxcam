@@ -2300,7 +2300,7 @@ def composemail():
 				body = ''
 				flash.set(f"Email sent to: {to} ({len(to)})")
 				email_sender(subject=form2.vars['subject'], sender=sender, to=to, bcc=bcc,
-				 	body=body_expanded, attachment=attachment, attachment_filename=attachment_filename)
+				 	body=markdown.markdown(body_expanded), attachment=attachment, attachment_filename=attachment_filename)
 			redirect(request.query.back)
 	return locals()
 

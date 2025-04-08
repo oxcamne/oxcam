@@ -166,11 +166,11 @@ def template_expand(text, context={}):
 			if not context.get('query') or func=='reservation' and not ('Reservations.Event' in context.get('query')):
 				raise Exception(f"[[{func}]] can't be used in this context")
 		if func=='greeting':
-			result = member_greeting(db.Members[context.get('row').get('Members.id') or context.get('row').get('id')])
+			result = member_greeting(db.Members[context.get('row').get('Member') or context.get('row').get('Members.id') or context.get('row').get('id')])
 		elif func=='member':
-			result = member_profile(db.Members[context.get('row').get('Members.id') or context.get('row').get('id')])
+			result = member_profile(db.Members[context.get('row').get('Member') or context.get('row').get('Members.id') or context.get('row').get('id')])
 		elif func=='reservation':
-			result = event_confirm(context.get('row').get('Reservations.Event'), context.get('row').get('Members.id'))
+			result = event_confirm(context.get('row').get('Reservations.Event'), context.get('row').get('Member') or context.get('row').get('Members.id'))
 		elif func.startswith('upcoming_events'):
 			result = upcoming_events()
 		elif func.startswith('history_content'):

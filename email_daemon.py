@@ -51,7 +51,7 @@ def send_notice(notice):
 	sent = 0
 	for i in dispatch:
 		row = rows[i]
-		member = db.Members[row.get(db.Members.id)]
+		member = db.Members[row.get('Member') or row.get('Members.id') or row.get('id')]
 		to = row.get(db.Emails.Email) or primary_email(member.id)
 		if not to or (not IS_PRODUCTION and not (to.lower() in ALLOWED_EMAILS)):
 			continue

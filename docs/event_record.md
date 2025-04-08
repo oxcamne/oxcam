@@ -28,7 +28,12 @@ Once registration is opened, **Booking Closed** indicates the date and time when
 
 Registration is opened by editing Booking Closed to reflect the end of the registration period. After that point until the event itself the registration link will allow users to place themselves on the **waitlist**.
 
-**Details** is used to implement the event page within the database, and also automatically supplies content when the event notice is sent out to the mailing list. This avoids having to provide the information in two different contexts and formats. As with emails sent using the database, a combination of Markdown formatting and html can be used. Below the field the comment includes a link to [Markdown documentation](https://www.markdownguide.org/basic-syntax/); also [see here](send_email.md#embedding-images-in-email) for a discussion of including images. Note also that if you want the registration link to work correctly in both live and test systems (e.g. if a backup database .csv is loaded into a test system) you can use "[[URL('registration/169)]]", copying just the record id rather than the whole link.
+**Details** is used to implement the event page within the database, and also automatically supplies content when the event notice is sent out to the mailing list. This avoids having to provide the information in two different contexts and formats. As with emails sent using the database, a combination of Markdown formatting and html can be used. Below the field the comment includes a link to [Markdown documentation](https://www.markdownguide.org/basic-syntax/); also [see here](send_email.md#embedding-images-in-email) for a discussion of including images.
+
+It is recommended that the registration link be represented as
+> `[please register here]([[registration_link]])`
+
+so that the link is computed dynamically. This means that if the event is cloned, e.g. for the next instance of an annual event, the registration link will be updated correctly.
 
 Below this:
 

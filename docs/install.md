@@ -220,8 +220,8 @@ link to your email. The link opens a new tab ready for you to upload a copy of d
 ![db_restore form](images/db_restore.png)
 
 The kit contains a file, db_oxcam_minimal.csv in the py4web/apps/oxcam directory. Csv files are used to backup and restore the contents of the database.
-The minimal database defines the Colleges table including all the
-Oxford and Cambridge Colleges, defines the default mailing list, a prototype chart of accounts, sample bank and payment processor records as well as some bank rules.
+
+The minimal database initializes the content copied from our OxCamNE database in the tables: Colleges, Email_Lists, Pages, CoA, Bank_Accounts, and Bank_Rules. Any and all of these tables you may wish to edit once your are up and running, for example many of the web pages may be inapplicable or need modification for your group.
 
 To use the minimal database file, copy it from the kit to your local device where you browser is running. Click Browse and find the .csv file, then click restore. You will then need to login once more, and will be taken to the index page:
 

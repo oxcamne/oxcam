@@ -1,3 +1,12 @@
+TABLE auth_user
+
+
+TABLE auth_user_tag_groups
+
+
+TABLE users
+
+
 TABLE Colleges
 Colleges.id,Colleges.Name,Colleges.Oxbridge
 1,"Blackfriars, Oxford",True
@@ -25,6 +34,7 @@ Colleges.id,Colleges.Name,Colleges.Oxbridge
 24,"Lucy Cavendish, Cambridge",True
 25,"Robinson, Cambridge",True
 26,"St Edmund's, Cambridge",True
+27,University of St Andrews,False
 28,"Greyfriars, Oxford",True
 29,"Lincoln, Oxford",True
 30,"Pembroke, Oxford",True
@@ -58,6 +68,8 @@ Colleges.id,Colleges.Name,Colleges.Oxbridge
 59,"Jesus, Cambridge",True
 60,"Pembroke, Cambridge",True
 61,"St John's, Cambridge",True
+62,University of Edinburgh,False
+63,University of Aberdeen,False
 65,"Exeter, Oxford",True
 66,"Lady Margaret Hall, Oxford",True
 67,"Ruskin, Oxford",True
@@ -66,9 +78,11 @@ Colleges.id,Colleges.Name,Colleges.Oxbridge
 70,"Wycliffe Hall, Oxford",True
 71,"Churchill, Cambridge",True
 72,"Emmanuel, Cambridge",True
-73,"King’s, Cambridge",True
-74,"Queens’, Cambridge",True
+73,"King's, Cambridge",True
+74,"Queens', Cambridge",True
 75,"Sidney Sussex, Cambridge",True
+76,University of Glasgow,False
+77,Dalhousie,False
 79,"Brasenose, Oxford",True
 80,"Hertford, Oxford",True
 81,"Mansfield, Oxford",True
@@ -79,27 +93,754 @@ Colleges.id,Colleges.Name,Colleges.Oxbridge
 86,"Wadham, Oxford",True
 87,"Homerton, Cambridge",True
 88,"Murray Edwards, Cambridge",True
+89,University College Dublin,False
+90,Trinity College Dublin,False
 91,"Saïd Business School, Oxford",True
 92,"Judge Business School, Cambridge",True
+93,"University College, Cork",False
+94,National Trust for Scotland,False
 95,"MRC-LMB, Cambridge",True
+96,English Speaking Union,False
+97,Scottish Development International,False
 98,"Weatherall Institute, Oxford",True
 99,"Reuben, Oxford",True
+100,British American Business Council,False
 
 
 TABLE Email_Lists
-Email_Lists.id,Email_Lists.Listname,Email_Lists.Member,Email_Lists.Description
-1,Group Mailings,True,"All notices."
+Email_Lists.id,Email_Lists.Listname,Email_Lists.Member,Email_Lists.Daemon,Email_Lists.Description
+1,Member Events,True,2025-04-08 11:19:29,Notices of all Society events except <b>Pub Nights</b>.
+3,Pub Nights,True,<NULL>,Notices of informal Society Pub Nights.
+4,OxCam10,False,<NULL>,Notices of informal events organized by the Society's OxCam10 Group for alumni within 10 years of graduation.
+5,BABCNE,True,<NULL>,"Notices of selected <a href=""https://www.babcne.org""; style=""white-space: normal"">British American Business Council</a> events."
+
+
+TABLE Members
+
+
+TABLE Emails
+Emails.id,Emails.Member,Emails.Email,Emails.Mailings,Emails.Modified
+2485,<NULL>,<NULL>,<NULL>,2024-01-12 11:48:08
+
+
+TABLE Events
+
+
+TABLE Event_Tickets
+
+
+TABLE Event_Selections
+
+
+TABLE Event_Survey
+
+
+TABLE Pages
+Pages.id,Pages.Page,Pages.Root,Pages.Parent,Pages.Hide,Pages.Link,Pages.Content,Pages.Views,Pages.Created,Pages.Modified
+1,Home,<NULL>,<NULL>,False,<NULL>,"#####Welcome to the Oxford and Cambridge Society of New England, a regional alumni network.
+We are a member of both University’s alumni networks and are the local leg of the stool of your connections to Oxford and Cambridge. We are an independent, volunteer-run, non-profit organization whose purpose is to promote and support the interests, welfare and influence of the Universities of Oxford and Cambridge, U.K., in the New England region.
+
+######Coming Events:
+[[upcoming_events]]
+
+All OxCam alums are invited to **[join the Society](https://oxcamne.pythonanywhere.com/oxcam/registration)**.  The annual membership subscription is $30, but this is reduced to $10 for full-time students and recent graduates (within the past year). Members have access to our online **[Member Directory](https://www.google.com/url?q=https%3A%2F%2Foxcamne.pythonanywhere.com%2Foxcam%2Fdirectory)**. Or you can **[join the email list](https://oxcamne.pythonanywhere.com/oxcam/registration?mail_lists=Y)** or follow us on **[Instagram](https://www.google.com/url?q=https%3A%2F%2Fwww.instagram.com%2Foxcamne%2F&sa=D&sntz=1&usg=AFQjCNFhsTPnK2xup0MIc7Sj_QroEOFX_A)** or **[Facebook](https://www.facebook.com/oxcamne)** to stay informed.
+
+If you are a New England based student thinking of applying to Oxford or Cambridge, **[we can help](https://oxcamne.pythonanywhere.com/oxcam/web/Oxbridge Enquiries)**. We are also a resource for New England high school college counsellors interested in advising their students on the possibilities of attending Oxford or Cambridge.
+
+If you are within ten years of your graduation, you may be interested in connecting with **[OxCam10](https://oxcamne.pythonanywhere.com/oxcam/web/OxCam10)**, our affiliated young alumni group.
+
+If you are part of the New England innovation ecosystem in some way both Oxford and Cambridge have alumni groups devoted to entrepreneurship.  Visit the **[Oxford Entrepreneurs Network](https://oxfordentrepreneurs.net/)** or **[CamEntrepreneurs](https://www.alumni.cam.ac.uk/group/camentrepreneurs)** for information.  You can join them (**[here](https://mailchi.mp/c7a4bde5fb85/oxford_entrepreneurs_network_subscribe)** Oxford or **[here](https://camentrepreneurs.mn.co/feed)** (Cambridge).
+
+All of the Society's events are run by volunteers. This dedicated and diligent group plans, coordinates and organizes each function. If you would like to help out and **[get involved](https://oxcamne.pythonanywhere.com/oxcam/web/Get Involved)** please let us know. If you know of any Oxonians or Cantabrigians in New England please do let them know about this website, the Society and its events.
+
+A sampling of events is illustrated below, or you can explore [recent events](https://oxcamne.pythonanywhere.com/oxcam/web/Recent Events).
+
+<p style=""float:left; margin:0px 15px 0px 0px""><img src=""https://drive.google.com/thumbnail?sz=w400&id=1Ct_qWsEB_0Gxw22uvnP2IYROZvNMLB7w"" alt=""bikes""></p>
+Our first-ever Oxford and Cambridge Society bike ride took place on Saturday August 20th 2022, starting out at 9:00am.  
+This was a leisurely cycle along the historic <a href=""http://minutemanbikeway.org/"">Minuteman Bikeway</a>, a paved multi-use trail that goes from Alewife to Bedford via Lexington. The trail closely approximates the route that Paul Revere took on his famous ride in 1775.
+
+<div style=""clear: both;""></div>
+
+<p style=""float:right; margin:0px 0px 0px 15px""><img src=""https://drive.google.com/thumbnail?sz=w400&id=1WwgSYtlHyglShCdfO-waMyHOIQpwqdqj"" alt=""hike""></p>
+Our first ever Society hike at the Middlesex Fells, on June 27, 2021, was a great success, as you can see ...
+
+<div style=""clear: both;""></div>
+
+<p style=""float:left; margin:0px 15px 0px 0px""><img src=""https://drive.google.com/thumbnail?sz=w400&id=1Q3h1OqAkqgt6WVQEao_CFj_EcYIKeJyx"" alt=""polo""></p>
+... as was our afternoon watching Polo at [Myopia Hunt Club]() on Sunday June 13, 2021.
+
+<div style=""clear: both;""></div>
+
+<p style=""float:right; margin:0px 0px 0px 15px""><img src=""https://drive.google.com/thumbnail?sz=w400&id=1eGtFgT8ueQ33D7MOuiI3UqGeVUg1cCbo"" alt=""christmas2019""></p>
+Annual Christmas Dinner, Sunday December 8, 2019
+
+[Watch the 2 minute video](https://drive.google.com/file/d/1TKDmXKQ-lXAq2W3JQNXv5GRoht5F8X_A/view)
+
+or [view photo album](https://drive.google.com/drive/u/1/folders/1Vvq3b63LqT7W1ccoi3ikh_AXmEsgaNcn)
+
+<div style=""clear: both;""></div>
+
+<p style=""float:left; margin:0px 15px 0px 0px""><img src=""https://drive.google.com/thumbnail?sz=w400&id=1ko_THoqmP6s6AGovLrKntcvhTAizXXzG"" alt=""freshers""></p>
+Freshers & New Members Reception
+
+Thursday September 5, 2019
+
+[View 2 minute video](https://drive.google.com/file/d/15JgL2R0MjIDhOXgseHCyPuDjaWpZ9Mk1/view) or
+
+[view photo album](https://drive.google.com/drive/u/1/folders/1tz_7nlY5zfFYseA68GjYlu1lQ9OU2koa).
+
+<div style=""clear: both;""></div>
+
+<p style=""float:right; margin:0px 0px 0px 15px""><img src=""https://drive.google.com/thumbnail?sz=w400&id=1LK5I6w_e5WITHUdXRreL0BulrZyPZPze"" alt=""christmas2019""></p>
+Annual Spring Dinner, Saturday April 6, 2019
+
+[view album](https://drive.google.com/drive/folders/1eP4oc0OLg8GFF0_bXzrWzrcR09P-e2l8)
+
+<div style=""clear: both;""></div>
+
+<p style=""float:left; margin:0px 15px 0px 0px""><img src=""https://drive.google.com/thumbnail?sz=w400&id=16JUwQzdw73dqKRxYQYgLYBdDm8y5EjwX"" alt=""burns2019""></p>
+12th Annual Ancient Universities Burns Nicht, January 26, 2019
+
+[view album](https://drive.google.com/drive/u/1/folders/1eFdyiyEhjs3X-Y2kJfyoyGM9Qm0uOi-r) of photos and videos.
+
+<div style=""clear: both;""></div>
+
+<p style=""float:right; margin:0px 0px 0px 15px""><img src=""https://drive.google.com/thumbnail?sz=w400&id=1zN1-KuAJMmkQjrp1iCi33B5AqubFS1tb"" alt=""hocr2019""></p>
+Head of the Charles Regatta, 2018
+
+<div style=""clear: both;""></div>
+
+<p style=""float:left; margin:0px 15px 0px 0px""><img src=""https://drive.google.com/thumbnail?sz=w400&id=14SWSCsgutcy6kwkyFXtFQJsYKXquEU3o"" alt=""40th2018""></p>
+[View album](https://drive.google.com/drive/folders/14bn3uvnImyZXTOQBQLTl1dhuPvlZnHhD?usp=sharing) of photos and videos, or
+
+[Watch a 2-minute video](https://drive.google.com/file/d/1DnGRKx5AHFuFDzvvETwxfpLql_RbNubJ/view?usp=sharing) of the 40th Anniversary Party, April 21st, 2018
+",6900,2025-02-06 16:34:34,2025-04-01 21:00:50
+2,About,1,<NULL>,False,<NULL>,"###About the Society
+A [short history](https://oxcamne.pythonanywhere.com/oxcam/web/History) of the society is available and provides interesting background information. The Society is a Massachusetts 501 c (7) corporation.
+
+[[about_content('Board', 'Advisory')]]
+",127,2025-02-07 09:30:21,2025-04-01 21:02:40
+3,History,1,2,False,<NULL>,"###An Informal History of the Society
+In keeping with the origins of many fine institutions of great antiquity, our early history is obscure. It appears from our meager early archives that the birth of the Society took place in the 1950's initially as a local Oxford Society known as the ""Boston Branch."" A letter from Mason Hammond to a Mr. Bereday on January 20th., 1955, reads ""I don't know when the Oxford Cambridge Boat Race occurs but it might be an occasion on which the Oxford Society could meet and invite Cambridge men to join it."" Mr. Bereday replied with a concern that it not be, the first time around ""a big do"" (which he considered numbers exceeding fifty) and this suggests a history of organizing previous occasions at which Oxonians had got together prior to 1955, probably at various venues in Boston including the Harvard Club. The dinner was duly held at the Signet Club on April 13th., 1955, the speaker being T.S.R. Boase, President of Magdalen. In 1973 the Boston Branch was renamed the Oxford Society of New England.
+
+Obviously Cantabridgians had early uses as dinner guests, but the full legitimization of the rival university in a joint society awaited the initiative of Professor Radu Florescu, the secretary of the Oxford Society since 1975. In 1976, he received rather late notice that the Vice Chancellor of Oxford University, Professor Habakkuk, would be paying a short visit to the Boston area and that, perhaps, it would be appropriate for the Society to host him at a small dinner. Such a suggestion was rather in the nature of a command but the time was short. At the time, Professor Florescu's wife was teaching at the Noble and Greenough School, so the decision was made to hold the dinner at the school since parking would be no problem and the Castle would provide a suitable atmosphere. Professor Florescu feared that his list of former members of Oxford was not completely up to date so in order to boost attendance an eventful decision was taken and invitations were therefore sent out to graduates of both Oxford and Cambridge and the first dinner was held on Saturday, April 3, 1976. 
+
+Old friendships were renewed and new ones begun so that at the end of the evening there was unanimous agreement that the experiment should be repeated the following year and that a new association, the Oxford and Cambridge Society of New England, should be the official host. On that occasion, the first of an annual series of boat races between members of the two universities took place on the river below the Castle. Oxford was the worthy(?) winner but their victory was not often repeated in the following years. Indeed there was one occasion when the Cambridge crew had finished, taken their showers, and joined their spouses and friends for drinks before Oxford appeared out of the rapidly gathering gloom. Since the course in question is not more than five hundred yards in length, it was felt that this performance should have been reported to the Guinness Book of Records. To this day, no one has clearly established what had taken place on the other side of the inlet but the fact that one member of the crew had never been in a boat in his life might have had some effect on the result. 
+
+As the Society grew larger and more functions were held, it was felt that it needed a more formal structure, so a self appointed executive committee met in November 1983 and drew up the Constitution for the Society. Professor Florescu was unanimously elected as the first President and served until December 1984 when Roland Gubisch took over for a two year term. Under his able leadership and that of his successor, Jill Strang, the Society continued to flourish and expand its activities. The three annual dinners, Christmas, Spring and Boat Race are a universally popular fixture in our program and are usually held in the fine facilities at Noble and Greenough School in Dedham or Roxbury Latin School in West Roxbury. In the last few years, we have hosted many additional events such as cocktail parties for new graduates, a social afternoon at the M.I.T. Museum, an evening get together at the Union Club and, more recently, cocktails at Simmons College with a visit to the Van Gogh Exhibition at the Museum of Fine Arts. We celebrated the arrival of the New Millenium in grand style with a May Ball at Nobles. 
+
+The number of speakers who have enlightened and entertained the Society over the years is impressive. Unfortunately the records of the Society are not as impressive. The following represents a partial list (in alphabetical order) but does include all those who have spoken in the last decade: Eric Anderson, Peter Ashton, Warren Ault, Richard Baker, Dame Gillian Beer, Sir John Boyd, Richard Bradley, David Burns, Daniel Coquillette, J. Kenneth Galbraith, Gillian Gill, Peter Gomes, Hannah Gray, Sir John Habakkuk, Sir David Hannay, Seamus Heaney, Peter Hilton, Christopher Hogwood, Anthony Howard, Sir Jeremy Isaacs, Lord Jenkins of Hillhead, Gordon Johnson, Elizabeth Keenan, Samuel Keyser, Uwe Kitzinger, Sir Hans Kornberg, Mary Lefkowitz, Sir Hugh Lloyd-Jones, Jonathan McDowell, Roderick McFarquhar, Philip McLean, Ved Mehta, Mary Moore, Baroness Perry of Southwark, Robert Reich, Andreas Riedlemayer, Christopher Ricks, Malcolm Rogers, Abram Sachar, John Sears, Hedrick Smith, Rosemary Stevens, Oliver Strimpel, Geoff Tabin, Lester Thurow, Margaret Vaillancourt, Sir John Weston, Rt. Hon Shirley Williams, Sir David Williams.
+
+The energy of the more athletic members of the Society was not satisfied with the annual ""fours"" at Nobles and in 1987 a challenge was issued to - and duly accepted by - the Washington Oxford and Cambridge Society to meet in eights on the Charles in Boston. This has not yet become an annual event but the Boston crew has chalked up three victories, two on the Charles and one down on the Potomac. It should be noted that from its inception, the Boston crew has been a co-ed one. 
+
+Other English athletic traditions have been kept alive. The Society's cricket team has played eleven matches with the British Officers' Club of Boston, gaining victory in all but one of these encounters. There was even a cricket festival in July 1987 when teams from the British Officers' Club of Philadelphia and the Commonwealth Club of Boston, along with the other two, could be seen dispatching the ball to the boundary to the admiration - and sometimes bewilderment - of the Americans in the crowd of spectators. More recently the cricket team has spread its wings with matches scheduled in Vermont and Rhode Island. 
+Today, the membership is close to 400 and new members are always welcome. Our members include graduates of Oxford and Cambridge and those associated in other ways with the Universities. The varied functions that the Society organizes provide different interests for all and members are always welcome to bring guests (space permitting).",92,2025-02-07 09:34:48,2025-04-01 11:36:14
+4,Recent Events,1,<NULL>,False,<NULL>,"###Recent Events
+
+The list excludes informal events such as Pub Nights, and does not include OxCam10 events. You can click on each event to view the full details.
+
+An incomplete list of events prior to 2019 is [here](https://sites.google.com/oxcamne.org/home/history/past-events-prior-to-april-2019).
+
+[[history_content]]",211,2025-02-07 09:45:41,2025-02-09 16:02:29
+5,Oxbridge Enquiries,1,<NULL>,True,<NULL>,"###*Thinking of Applying to Oxford or Cambridge?*
+<img src=""https://drive.google.com/thumbnail?sz=w400&id=1c7613uBty2bHA3hq-O5s703ZpYjZ8Wru"" alt=""oxford"">
+<img src=""https://drive.google.com/thumbnail?sz=w400&id=10qPEIvDGajLDMNM4swJlruH03zgjX9IU"" alt=""cambridge"">
+
+If you or a member of your family are thinking about applying to Oxford or Cambridge, the Society will be happy to introduce you to an alumnus/a and to a family that has recently gone through the admission process with whom you can discuss the many issues and questions you may have, such as:
+
+- What were their experiences of the admissions process like?
+- What is a college and how can you choose between them?
+- How can you decide what subject to study?
+- What is the tutorial/supervision system and what is it like?
+
+If you would like to be introduced to an alumnus/a, **[fill in and submit the form](https://docs.google.com/forms/d/e/1FAIpQLSesj-uFg6HC5963kYYE4wBN89mg1vBRP-mzFhaYj5zGRI7nJQ/viewform?usp=sharing)**. We’ll connect you with a recent graduate of the university you’re more interested in, and if you already have an idea about the most appropriate college, we’ll try to connect you with someone from that college. Aside from those connections, your details are held confidentially.
+
+We can also introduce you to the family of a current student who is willing to share with you some of their experiences and insights from going through the application process and give you some practical tips. 
+
+Speaking to a former or current student can be an excellent way of hearing their personal perspectives and experiences, but please note that they are unable to give concrete guidance on admissions. For information about applying to the University, please see the relevant webpages for Oxford and Cambridge, or contact admissions staff at the University in which you are interested.
+
+**College Counsellors**
+
+International admissions personnel from Oxford and Cambridge make periodic visits to the U.S.  In the form below please select whether you wish to be connected to these Counsellors, or to an alumnus/family, or both.",107,2025-02-07 13:43:55,2025-04-01 10:15:45
+6,OxCam10,1,<NULL>,False,<NULL>,"###*OxCam10 - Young Alumni Group*
+
+OxCam10 is targeted at our recent alumni who graduated from Oxford University and Cambridge University within the past ten years. It organizes events including pub nights and ice cream socials. Our goal is to provide a setting for recent alumni to connect and network with each other.
+
+To find out more about OxCam10 please visit **[Facebook](https://www.facebook.com/groups/169410007135411/about/)** or join the **[OxCam10 mailing list](https://oxcamne.pythonanywhere.com/oxcam/registration?mail_lists=Y)**
+
+<p style=""float:right; margin:0px 0px 0px 15px""><img src=""https://drive.google.com/thumbnail?sz=w600&id=1W6wru3OAFmwZzKgwgy0GCZcF9Idhjr5w"" alt=""picnic""></p>
+[An autumn picnic in Boston](https://drive.google.com/drive/folders/1Gm0Igihthe5xlV_TUnSCPtwtX4AanJEK?usp=drive_link) on Sunday October 31, 2021 was enjoyed by OxCam10 members ... and an enthusiastic recruit. 14 people  stopped by throughout the afternoon despite our having to switch to a rain date.
+
+<div style=""clear: both;""></div>
+
+<p style=""float:left; margin:0px 15px 0px 0px""><img src=""https://drive.google.com/thumbnail?sz=w600&id=12CRz9X3uF_6wZBvXGHnvI2FLNCzX9GN9"" alt=""downeast""></p>
+OxCam10 members enjoyed a [meetup at Downeast Cider](https://drive.google.com/drive/folders/1e2dQUdGfXj_AZ0FwBXKklO-D7iO_RAVT?usp=drive_link) on Sunday August 29, 2021.
+
+<div style=""clear: both;""></div>
+
+<p style=""float:right; margin:0px 0px 0px 15px""><img src=""https://drive.google.com/thumbnail?sz=w600&id=1AFrs9UzrE0frCvgGngspV4juQBaI5hLI"" alt=""jplicks""></p>
+On Wednesday July 28, 2021 11  OxCam10 members enjoyed ice cream at J P Licks!
+
+<div style=""clear: both;""></div>
+
+<p style=""float:left; margin:0px 15px 0px 0px""><img src=""https://drive.google.com/thumbnail?sz=w600&id=1LbrQDU9gd9iFBFuH0TmVOINqhKF0OCzo"" alt=""downeast""></p>
+We had a very successful [OxCam10 picnic on Saturday May 22, 2021](https://drive.google.com/drive/folders/1fuH8fdRPK2YwQaZb-1WEow7-qWFaDbTq?usp=sharing). This marks our first in-person event of the year, and since the pandemic started!
+
+We had 18 members stop by throughout the afternoon including many new members (along with a few friends)! It was a great success and we had many requests for similar events throughout the summer so we will be planning more events soon.
+
+<div style=""clear: both;""></div>
+
+<p style=""float:right; margin:0px 0px 0px 15px""><img src=""https://drive.google.com/thumbnail?sz=w600&id=12omp_1rdzRmzTaIpKYa4uAK7LTwev7G2"" alt=""jplicks""></p>
+
+<div style=""clear: both;""></div>
+
+<p style=""float:left; margin:0px 15px 0px 0px""><img src=""https://drive.google.com/thumbnail?sz=w600&id=1z8vG-pbAAAuyynrZzvF_qRGkw0bl16tq"" alt=""downeast""></p>
+",181,2025-02-07 13:56:49,2025-02-09 16:02:42
+7,Membership,1,<NULL>,False,<NULL>,"Membership of the Society is open to all graduates and current and prospective students of the Universities of Oxford and Cambridge as well as those closely associated in other ways such as visiting faculty, Rhodes and Marshall scholars etc. If in doubt about your eligibility, or with other questions, please contact the membership secretary at [secretary@oxcamne.org](mailto:secretary@oxcamne.org). 
+
+For most of us, just the opportunity to meet our fellow members is in itself a sufficient reason to join the Society. But equally the opportunities to socialize, network, be entertained and educated are part of what makes the society vibrant. And, our formal dinners also provide a little nostalgia for those years in college. Members are welcome to bring spouses and guests to the events.
+
+Membership is required to attend our formal events, and for other membership benefits, including an annually updated membership directory and partner organization discounts. The annual membership subscription is $30, but this is reduced to $10 for full-time students and recent graduates (within the past year). 
+
+Members have access to our online **[Member Directory](https://oxcamne.pythonanywhere.com/oxcam/directory)**. The directory is intended for personal use only and is available only to members in good standing. It is searchable by name, college affiliation, and location.
+
+
+Members please visit **[MyAccount](https://oxcamne.pythonanywhere.com/my_account)** to manage your contact and profile information, membership subscription and credit card information, or to adjust mailing list subscriptions. We accept credit and debit cards via the secure payments processor Stripe. You can also use Apple Pay or Google Pay.
+
+MyAccount and Directory are always available through the menu at top right of our pages.
+
+To view details of and register for upcoming events, please see the list on our [home page](https://oxcamne.pythonanywhere.com/oxcam/web/Home).
+
+All of the Society's events are run totally by member volunteers. This dedicated and diligent group plans, coordinates and organizes each function. If you would like to help out and get involved please let us know. 
+
+#####Keeping in Touch
+In addition to invitations to the formal Society events, we occasionally publish notices about other events of interest to members, including our informal monthly pub nights as well as Oxford & Cambridge related events outside the Society. We also publish a newsletter to members at intervals.
+
+You can join our [email list](https://oxcamne.pythonanywhere.com/oxcam/registration?mail_lists=Y) or follow our [Facebook Page](http://www.facebook.com/oxcamne) or [Instagram](https://www.google.com/url?q=https%3A%2F%2Fwww.instagram.com%2Foxcamne%2F&sa=D&sntz=1&usg=AFQjCNFhsTPnK2xup0MIc7Sj_QroEOFX_A) to keep up to date.
+
+The Society also maintains a group on [LinkedIn](http://www.google.com/url?q=http%3A%2F%2Fwww.linkedin.com%2Fgroups%3Fhome%3D%26gid%3D986%26trk%3Danet_ug_hm&sa=D&sntz=1&usg=AFrqEzd7Q62KttYZzdsDSh3xldD_vtkgUw) that you might like to join. 
+
+#####Questions/Problems
+Please address these to  [secretary@oxcamne.org](mailto:secretary@oxcamne.org).
+
+If you wish to make US tax deductible donations to your university or college, please contact their offices in New York, click on Universities for more information. ",128,2025-02-07 14:03:04,2025-04-01 21:06:29
+8,Get Involved,1,7,False,<NULL>,"###*Get Involved!*
+
+All of the Society's events are run by member volunteers. This dedicated and diligent group plans, coordinates and organizes each function.
+ 
+The Society is constantly on the look out for new ideas and suggestions to make the organization even more responsive to members. Over the years, the Society has always benefited from a regular flow of new volunteers, bringing new ideas and suggestions to the organization.
+
+Some of the ways to get involved and help out include:
+
+- suggestions for and coordinating with potential speakers
+- identify and arrange venues for events
+- become involved with the Event's committee (coordinating with caterers, helping with logistics on the day of the event) 
+- ideas for and setting up new events
+
+If you would like to contribute in one of the above ways please email [secretary@oxcamne.org](mailto:secretary@oxcamne.org).",141,2025-02-07 14:23:38,2025-04-01 11:35:58
+9,The Universities,1,7,False,<NULL>,"###*The Two Universities*
+
+Through the Universities' main web sites in the United Kingdom you can connect to your college and browse through an infinite variety of information about the universities:
+
+Oxford University [www.ox.ac.uk](https://www.ox.ac.uk)  
+Cambridge University [www.cam.ac.uk](https://www.cam.ac.uk)
+
+Each University also maintains a central web site for alumni. This is the place to go for alumni news, events, travel opportunities and links to alumni groups around the world and much more:
+
+[www.alumni.ox.ac.uk](https://www.alumni.ox.ac.uk)  
+[www.alumni.cam.ac.uk](https://www.alumni.cam.ac.uk)
+
+Finally, both Universities maintain offices in New York specifically to keep in contact with its many alumni in the USA. Check out their many services here. The IRS recognizes these as charitable organizations and you can make tax deductible gifts to your university or college through these sites:
+
+[www.oxfordna.org](https://www.oxfordna.org)  
+[www.cantab.org](https://www.cantab.org)",72,2025-02-07 14:35:56,2025-04-01 11:36:03
+10,Privacy,1,2,False,<NULL>,"###Privacy Statement 
+Welcome to our website (“Site”) operated by Oxford and Cambridge Society of New England, Inc. (“OxCamNE,"" ""we,"" and ""our""). This Privacy Statement (“Privacy Statement”), which is part of our [Terms](https://oxcamne.pythonanywhere.com/oxcam/web/Terms), explains how OxCamNE collects, uses, shares, and stores information we collect about you (“you” and “your”). By using our Site, you agree to this Privacy Statement. We may modify the Privacy Statement at any time by posting a revised version on our Site or, if we determine appropriate, by sending you an email or other notice. Please review this Privacy Statement from time to time because your continued use of our Site after a modified Privacy Statement has been posted indicates your consent to the Privacy Statement.
+
+###Background
+OxCamNE is an independent, volunteer-run, non-profit organization whose purpose is to promote and support the interests, welfare, and influence of the Universities of Oxford and Cambridge, U.K. (known together as “Oxbridge”), their alumni, and prospective students in the New England region. Each year the Society holds a variety of educational events with an Oxbridge connection for members and their guests.
+
+###Collection and Use of Your Personal Data
+OxCamNE collects personally-identifiable information about you (“Personal Data”) on our Site when you voluntarily provide it to us such as filling in forms on our Site and communicating with us by telephone, email, or otherwise. Personal Data may include your name, physical address(es), email address(es), telephone number(s), college affiliation(s) and matriculation year(s), and any other data that you provide. This Privacy Statement applies to all Personal Data, whether we collect it online or offline.
+
+We will use your Personal Data for the purposes for which you provide it, such as processing your membership, registering you for an event, and sending you information about events and other Society activities, surveys to improve the Society’s offerings, and, occasionally, other items of interest.
+
+If you ever wish to stop receiving communications, you may opt out by following the “unsubscribe” instructions in email communications, or sending an email to [secretary@oxcamne.org](mailto:secretary@oxcamne.org).
+
+###Sharing Your Personal Data
+We do not share your Personal Data with third parties other than those we use to support our website and operations (e.g., which provide services such as website hosting, emails, and payment card processing). We may also share your information with the volunteers who serve as our officers, directors, and on our operating committees as necessary for them to perform their roles.
+
+The names, primary College affiliation, matriculation year, state and town of residence,  and (optionally) email address and telephone number of active members are published in an on-line directory which is available to all members in good standing.
+
+###Use of Cookies and Similar Technologies
+Like many websites, our Site uses the Google Analytics tool. Google Analytics uses “cookies”, which are small text files placed on your computer, to collect anonymous, non-personal data, including browser type, domain names, referring website, landing page, web pages viewed, time spent on a web page, and links clicked. This data is used for such purposes as identifying web pages visited most often to improve our Site and providing you a better experience on our Site. Please review Google Analytics’ terms of use and privacy policy to learn more about how Google Analytics may collect and use information. If we ever combine non-personal data with personally-identifiable information, the combined information will be treated as personally-identifiable information.
+
+The transactional portions of our website (e.g. joining or renewing as a member, or registering for an event) require the use of a ‘session cookie’ which is used to authenticate who you are (by sending a one-time security code to your email address) and track context through the transaction. These cookies are discarded at the end of the browser session, or may optionally be kept in your browser for up to 3 months by ticking ‘remember me’ when you authenticate yourself.
+
+If you do not want to use cookies, you can remove them from your computer’s hard drive or set your browser to block them or to send an alert before a cookie is stored on your computer. If you block cookies, the transactional features of our website cannot be used.
+
+Our Site is not currently configured to respond to “do not track” signals or similar mechanisms.
+
+###Data Subject Rights
+Data subjects in the European Economic Area and other jurisdictions may have rights in relation to their Personal Data which include:
+
+- Right to rectification: Data subjects may request that we rectify any inaccurate or incomplete Personal Data.
+- Right to withdraw consent: Data subjects may at any time withdraw their consent to the processing of their Personal Data carried out by us on the basis of their previous consent. Such withdrawal will not affect the lawfulness of processing based on such previous consent.
+- Right to make a subject access request (SAR): Data subjects may request in writing copies of their Personal Data. However, compliance with such requests is subject to certain limitations and exemptions and the rights of other individuals. Each request should make clear that a SAR is being made. You may also be required to submit a proof of your identity and any payment permitted by law, where applicable.
+- Right to object to processing including automated processing and profiling: We do not make automated decisions about data subjects. However, we may rely on information provided by third parties such as credit reference agencies which may score data subjects on the basis of automated decisions. Profiling may be carried out for business administration purposes, such as monitoring trends in user visits of our website and in order to deliver relevant ads to users’ devices. We will comply with valid objection requests unless we have a compelling overriding legitimate ground for the continuation of our processing or we have another lawful reason to refuse such request. We will comply with each valid opt-out request in relation to marketing communications.
+- Right to erasure: Data subjects may request that we erase their Personal Data. We will comply, unless there is a lawful reason for not doing so. For example, there may be an overriding legitimate ground for keeping the Personal Data, such as our business record retention obligations with which we must comply.
+- Restriction: Data subjects may request that we restrict our processing of their Personal Data in various circumstances. We will comply, unless there is a lawful reason for not doing so, such as, a legal obligation to continue processing your Personal Data in a certain way.
+- Right to data portability: In certain circumstances, data subjects may request the controller to provide a copy of their Personal Data in a structured, commonly used, and machine-readable format and have it transferred to another provider of the same or similar services. We do not consider that this right applies to our services. However, to the extent it does, we will comply with such transfer request. Please note that a transfer to another provider does not imply erasure of the data subject’s Personal Data which may still be retained for legitimate and lawful purposes.
+- Right to lodge a complaint with the supervisory authority: We suggest that data subjects contact us about any questions or complaints in relation to how we process their Personal Data. However, each data subject has the right to contact the relevant supervisory authority directly.
+
+###Legal Basis for Processing Personal Data
+The legal basis for processing your Personal Data typically include: (i) our own or third parties’ legitimate business interests (e.g., in maintain and promoting our member services); (ii) performing a contract with you; (iii) your consent where appropriate; (iv) to protect your vital interests; or (v) to comply with our legal obligations. 
+
+Please contact us at [secretary@oxcamne.org](mailto:secretary@oxcamne.org) if you have any concerns or questions about this Privacy Statement or you wish to ask us not to process your Personal Data for particular purposes. Where you have specific requests relating to how we manage your data, we will endeavor to resolve these, but please note that there may be circumstances where we cannot comply with specific requests.
+
+If you have any concerns about your Personal Data held by the University, your College, or other alumni organizations, you will need to contact them separately.
+
+###Third-Party Sites
+Our Site may contain links to third-party sites including our Service Providers and social media sites (“Third-Party Sites”). We encourage you to review the privacy statements and terms of use of Third-Party Sites so you will understand how they collect, use, and share personally-identifiable information.
+
+###Security
+We will take reasonable measures (e.g., firewalls and authentication procedures) to protect your Personal Data from unauthorized access, loss, corruption, and alteration. Of course, even protected sites can be subject to hacking, technological glitches, user misconduct, and administrative errors, and we assume no liability for any of these actions or occurrences or their results.
+
+You provide your Personal Data at your own risk.
+
+###Location of Servers
+Our servers are located in the United States. If you are located outside the United States, be aware that the information you provide us will be transferred to the United States and that the law applicable to the protection of User Information in the United States may be different from the laws of your jurisdiction. By using our Site or providing Personal Data to us, you consent to this transfer and to the collection, storage, processing, and use of your information in the United States as described in this Privacy Statement.
+
+###Records Retention
+We will retain your data indefinitely until you request us to do otherwise.
+
+###Children under Age Thirteen
+Our site is not intended for use by children under age thirteen. We do not knowingly collect Personal Data from children under age thirteen. If we learn that we have inadvertently collected any Personal Data from a child under age thirteen, we will delete it. If you are a parent or guardian and you believe that your child under age thirteen may have provided Personal Data through our Site, please contact us at [secretary@oxcamne.org](mailto:secretary@oxcamne.org).
+
+###Questions
+If you have any questions about our Site or this Privacy Statement, please contact us by email at [secretary@oxcamne.org](mailto:secretary@oxcamne.org).
+
+Last Updated: September 8, 2021
+
+",97,2025-02-07 14:38:39,2025-04-01 21:09:37
+11,Terms,1,2,False,<NULL>,"###Terms of Use 
+Welcome to our website (“Site”) operated by Oxford and Cambridge Society of New England Inc. (“OxCamNE,” “we”, or “our”). These terms of use (“Terms”), which include our [Privacy Statement](https://oxcamne.pythonanywhere.com/oxcam/web/Privacy), governs your use of our Site. By using our Site, you agree to these Terms. We may modify these Terms at any time by posting a revised version on our Site or, if we determine appropriate, by sending you an email or other notice. Please review these Terms from time to time because your continued use of our Site after modified Terms have been posted indicates your consent to the Terms.
+
+###Background
+OxCamNE is an independent, volunteer-run, non-profit organization whose purpose is to promote and support the interests, welfare, and influence of the Universities of Oxford and Cambridge, U.K. (known together as “Oxbridge”), their alumni, and prospective students in the New England region. Each year the Society holds a variety of educational events with an Oxbridge connection for members and their guests.
+
+###Copyright
+Content on our Site (“Site Content”) is protected by copyright. Except as expressly indicated otherwise in these Terms or on our Site, you may download Site Content solely for your limited, personal, non-commercial use as long as you do not alter the Site Content or remove any trademark, copyright, or other notices displayed on the Site Content. Aside from expressly permitted uses, you may not reproduce, distribute, create derivative works of, publicly display, or perform the Site Content in any manner, including extracting information or data for use in a database or any other purpose, without OxCamNE’s prior written consent in each case. If you would like to use Site Content for any other purpose, please send your request to [secretary@oxcamne.org](mailto:secretary@oxcamne.org).
+
+###Trademarks
+Our name, logos, slogans, and other indicia of source are owned by OxCamNE (collectively, ""Our Trademarks""). You may not use Our Trademarks without OxCamNE’s prior written consent in each case, including in any manner that implies OxCamNE sponsors, endorses, or is otherwise the source of or affiliated with a product, service, entity, or activity or that would be likely to cause confusion among the public.
+
+###Use of the Site
+You may use the Site only for lawful purposes. You may not use the Site for any commercial purpose, to impersonate any other person or entity, to submit any malicious code, to submit any content that violates any party’s rights or that is objectionable, or to harvest or otherwise collect any information or data from our Site through automated or other means.
+
+###Frames and Metatags
+You may not frame the content of our Site on any other web site unless you first obtain our prior written consent in each case. You may not use metatags or any other ""hidden text"" that incorporates Our Trademarks, or words confusingly similar to Our Trademarks, without our prior written consent.
+
+###Third-Party Sites
+Our Site includes links to web sites controlled and maintained by third parties (""Third-Party Sites""). You may also link to OxCamNE’s social networking pages for additional news. Any information you share with or actions you take on Third-Party Sites are governed by the applicable Third-Party Sites’ terms of use and privacy statements, which you should review carefully.
+
+###Disclaimers
+OUR SITE, SERVICES, AND CONTENT ARE OFFERED ""AS IS"" AND ""AS AVAILABLE."" TO THE MAXIMUM EXTENT PERMITTED UNDER LAW, WE DISCLAIM ALL EXPRESS OR IMPLIED WARRANTIES OF ANY KIND WITH RESPECT TO OUR SITE, SERVICES, AND CONTENT, INCLUDING ANY WARRANTY OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE (EVEN IF THE PURPOSE HAS BEEN DISCLOSED TO US), AND NON-INFRINGEMENT. WE MAKE NO REPRESENTATIONS OR WARRANTIES ABOUT THE ACCURACY, COMPLETENESS, TIMELINESS, OR RELIABILITY OF ANY SERVICES OR CONTENT AVAILABLE THROUGH OUR SITE (OR THROUGH LINKS TO THIRD-PARTY SITES), INCLUDING THAT OUR SITE, SERVICES, OR CONTENT WILL BE UNINTERRUPTED OR ERROR-FREE. WE RESERVE THE RIGHT TO CORRECT ANY ERRORS, INACCURACIES OR OTHER ISSUES CONCERNING OUR SITE, SERVICES, AND CONTENT. IF YOU RELY ON OUR SITE, SERVICES OR CONTENT, YOU DO SO ENTIRELY AT YOUR OWN RISK.
+ALTHOUGH WE INTEND TO TAKE REASONABLE STEPS TO PREVENT THE INTRODUCTION OF VIRUSES, WORMS, OR OTHER HARMFUL ELEMENTS TO OUR SITE, WE DO NOT WARRANT THAT OUR SITE, SERVICES OR CONTENT WILL BE FREE FROM SUCH ELEMENTS AND OXCAMNE IS NOT LIABLE FOR ANY DAMAGES OR HARM ATTRIBUTABLE TO THEM.
+
+###Limitation of Liability	
+OXCAMNE AND ITS DIRECTORS, OFFICERS, VOLUNTEERS, AND AGENTS ARE NOT LIABLE FOR ANY CLAIM OF ANY NATURE WHATSOEVER BASED ON ANY LOSS, DAMAGE, LIABILITY, OR INJURY ARISING FROM YOUR USE OF OUR SITE, SERVICES, OR CONTENT OR FROM YOUR BREACH OF THESE TERMS. UNDER NO CIRCUMSTANCES WILL OXCAMNE OR ITS DIRECTORS, OFFICERS, VOLUNTEERS, OR AGENTS BE LIABLE FOR ANY INDIRECT, INCIDENTAL, CONSEQUENTIAL, SPECIAL, PUNITIVE, EXEMPLARY OR SIMILAR DAMAGES (INCLUDING LOST REVENUES OR PROFITS, LOSS OF BUSINESS, OR LOSS OF DATA) ARISING OUT OF OR RELATED TO YOUR USE OF OUR SITE, SERVICES, OR CONTENT OR THESE TERMS, REGARDLESS OF THE THEORY OF LIABILITY, WHETHER TORT (INCLUDING NEGLIGENCE), CONTRACT, OR ANY OTHER LEGAL OR EQUITABLE THEORY. OUR AGGREGATE LIABILITY TO YOU FOR ANY DIRECT OR OTHER DAMAGES OF ANY NATURE ARISING OUT OF YOUR USE OF, OR INABILITY TO USE, OUR SITE IS $US 100. SOME JURISDICTIONS DO NOT ALLOW A LIMITATION OF LIABILITY FOR THESE KINDS OF DAMAGES, SO THESE LIMITATIONS OR EXCLUSIONS MAY NOT APPLY TO YOU.
+
+###Indemnification
+You agree to indemnify and hold OxCamNE and its directors, officers, volunteers, and agents harmless against all liabilities, losses, damages, and costs (including reasonable attorneys' fees) that any of the indemnified parties may incur arising out of or related to your use of our Site, services, or content or your violation of these Terms. OxCamNE reserves the right to assume the exclusive defense and control of any matter for which we are entitled to indemnification. You agree to provide us with all cooperation we reasonably request.
+
+###Termination
+We reserve the right to terminate these Terms, our Site, and any services or Site Content at any time without notice for any reason. The ""Disclaimers,"" ""Limitation of Liability,"" ""Indemnification,"" and ""General"" sections of these Terms (along with any other provision that by its terms contemplates survival) will survive any termination.
+
+###General
+These Terms, which include the Privacy Statement, are the complete agreement between you and OxCamNE regarding your use of our Site and supersede all other oral or written agreements between you and OxCamNE. These Terms are governed by and should be construed according to the laws of the Commonwealth of Massachusetts applicable to agreements made and performed in Massachusetts, unless doing so would lead to the application of the laws of another jurisdiction. If you choose to access our Site from jurisdictions other than the United States, you do so at your own risk and you are responsible for complying with any applicable local laws. You irrevocably agree: (A) to bring any claim or dispute relating to your use of our Site and these Terms exclusively in the state and federal courts located in the Commonwealth of Massachusetts; (B) to submit to the exclusive jurisdiction of those courts; and (C) to waive any objection to those courts based on inconvenience or other reasons. You may not assign your rights under these Terms without OxCamNE’s prior written consent, and any attempted assignment will be null and void. If a court of competent jurisdiction determines that any provision of these Terms is unenforceable for any reason, then that provision will be deleted (or, if possible, modified in a manner that will reflect the original intent as closely as possible) and the remaining provisions will be enforceable to the fullest extent permitted by law. The failure of a party to assert any right under these Terms will not be considered a waiver of that party’s right unless the waiver is in writing. The term “including” in these Terms is intended to be illustrative and means “including without limitation.”
+
+###Questions
+Please contact us at [secretary@oxcamne.org](mailto:secretary@oxcamne.org) with any questions you may have about these Terms.
+ 
+Last Updated: September 8, 2021",99,2025-02-07 14:56:38,2025-04-01 21:09:03
+12,Help,<NULL>,<NULL>,False,<NULL>,"###OxCamNE Operations Guide
+The Society is run by its volunteer Officers and Committee Members using online resources and record keeping. All or our digital resources are associated with our domain, *oxcamne.org*, which is hosted at *[GoDaddy](www.godaddy.com)*.
+
+We have created an open-source software package, *OxCam*, which provides our public website *[www.oxcamne.org](www.oxcamne.org)*, this help site *help.oxcamne.org*, and comprehensive group management functionality. This was written by David Manns.
+
+This package supports the database containing our web sites, mailing lists, membership records, event specifications, registration records, and accounting information. It also provides outbound email and notice sending, and payment collection for membership dues and event registrations. It runs on [PythonAnywhere](https://pythonanywhere.com), the software itself is maintained on [Github](https://github.com). The software uses the open source web framework [Py4web](https://py4web.com).
+
+We own a *Google Workspace* account which is mapped to the domain and supports the email address *[oxcamne@oxcamne.org](mailto:oxcamne@oxcamne.org)*. The workspace also provides a shared filesystem, the OxCamNE Archive, which we use for records such as committee meeting minutes, etc. etc. 
+
+The archive, email history, and membership database together represent the Society's records.
+
+Oxcamne@oxcamne.org is our shared email address. Individual addresses such as president@oxcamne.org, secretary@oxcamne.org, etc., are alias addresses. Traffic is automatically filtered into individual folders for these users.
+
+Public web site pages are mostly static, but they can also contain dynamic content generated from the database. For example, the home page contains a list of coming events, including links to display the event details and for registration, also contain links for joining the Society or the mailing list. Regular members interact with the software through these links or links in email notices.
+
+Volunteer organizers have additional access to the various organization modules which are described in the software documentation which is included with the software on Github, and is served as web pages directly from Github. These pages are also embedded in this site.
+
+Users can switch from the transactional site to the public sites by clicking on *Home*, or from public to transactional pages by clicking on *MyAccount*.
+
+The Society uses a number of Internet services, for example *Stripe* to handle online payments, *GoDaddy* to host the domain, *Pythonanywhere* to host the software and databases, *Mailgun* for bulk email services, *Zoom* for committee meetings, and *YouTube* to host video content. All of these accounts are managed using the @oxcamne.org email account aliases. Our *Eastern Bank* account is also accessed online. Most of these accounts are administered through secretary@oxcamne.org.
+
+Our social media presence is hosted on Facebook, LinkedIn, Instagram, and YouTube.",37,2025-02-11 14:56:30,2025-02-12 09:21:56
+13,Society Email,12,<NULL>,False,<NULL>,"The SocieIy maintains a shared email account **[oxcamne@oxcamne.org](mailto:oxcamne@oxcamne.org)** for Officers and other key volunteers. It is accessed just like a regular gmail account.
+
+Officers and other volunteers with key roles are assigned alias addresses for the shared email account, e.g. president@oxcamne.org, treasurer@oxcamne.org, etc. All login to the shared email at oxcamne@oxcamne.org via mail.google.com.  Each alias has its own folder in the account where filters place incoming traffic. The generic inbox receives any traffic addressed simply to oxcamne@oxcamne.org.
+
+There are also group email addresses. The groups are **[board](mailto:board@oxcamne.org)** (of directors), and **[advisory](mailto:advisory@oxcamne.org)** (committee).  Mail sent to the group addresses is forwarded to the appropriate personal email addresses, and also recorded in board and advisory folders within the shared account.
+
+The OxCam software provides facilities for sending out emails using your Society (alias) address, including notices sent to one of our mailing lists, messages to individual members or sets of members selected from the database, and explicitly addressed external mail. By default the Society letterhead is included. Your member record contains your @oxcamne.org alias. If you have more than one role and Society address, you can select from a dropdown which one to use on any given occasion.
+
+If you are a volunteer with at least write access to the OxCam database, you can send email using the shared oxcamne@oxcamne.org address itself.
+
+Emails are formatted using a mix of Markdown and HTML.
+
+The OxCam software does not process incoming email traffic.
+
+*Using the OxCam software to initiate outgoing conversations is highly recommended*, as this will ensure the ensuing conversation is recorded in the appropriate folder within the shared account.",6,2025-02-11 16:16:18,2025-02-12 09:24:10
+14,OxCamNE Archive,12,<NULL>,False,<NULL>,"###OxCamNE Archive
+The Archive is a file system, held on the Google Drive in our Google Workspace, which  holds items of many kinds, including but not limited to:
+
+- bylaws and other important documents
+- meeting minutes with associated reports etc.
+- materials related to events (including content embedded in event pages on the website)
+- templates for name badges etc. (note, these are deprecated, the preferred way to generate name badges is described here and uses an Avery account)
+- albums of photos and videos embedded in the public web site (note that the preferred place to store videos is on our YouTube channel)
+- Google forms or spreadsheets that can be filled in by members (shared with 'anyone with the link' and linked to from email notices or web pages)
+
+The Archive is a shared folder in the 'My Drive' area owned by oxcamne@oxcamne.org and shared with members of the Advisory Committee. All users of the email account have editor access to the entire contents of the archive. Other members of the advisory committee have view-only access when logged into their personal google accounts.
+
+To access the Archive, browse to [drive.google.com](https://drive.google.com) or click on the drive app in app panel of gmail. If necessary, sign in using your @oxcamne.org address (or your personal email if you don't have access to the society address). Note, if you  use a non-google  email, you will need to sign up for a drive account using your personal email address. Once signed into Drive, you will see something like:
+
+<p style=""text-align:center""><img src=""https://drive.google.com/thumbnail?sz=w800&id=1hDzg4Du50OrGXZ7EB6p_xL_fhn0-Qldc"" alt=""archive""></p>
+
+The Suggested section will display thumbnails of files recently viewed. The OxCamNE Archive folder appears below, and can be double-clicked to open it.
+
+The vp, treasurer, secretary and president@oxcamne.org folders contain files from outside the archive saved from when these were actually separate users within the workspace. Other individual files saved by users of the account may appear over time.
+
+Files placed in the archive are viewable by all members of the advisory committee using their personal gmail accounts. (Those using non-gmail addresses can create google accounts to access the shared archive).
+
+Individual folders/files within the archive can be shared more broadly. For example a folder of photos to be embedded in the web site would be modified to make it visible to all using a link, as would a form such as that used by https://www.oxcamne.org/home/oxbridge-enquiries.
+
+Certain files may need to be accessed by someone who does not have an @oxcamne.org address, for example the spreadsheet of results from a survey; in this case the 'outside' email can be added as an editor for the individual file. However, to ensure that all files in the archive are owned by @oxcamne, ***'outside' email addresses should never be given editor access to any folder within the archive***.
+
+A ***key document in the Archive*** is the spreadsheet OxCamNE accounts.xlsx held in the root directory, which records all the URL, username and password information for the various pieces of infrastructure used by the Society. Access to this spreadsheet is limited to users of the Society email account. ",6,2025-02-11 16:39:20,2025-02-12 10:51:19
+15,OxCam software,12,<NULL>,False,<NULL>,"<iframe src=""https://oxcamne.github.io/oxcam/"" style=""border:none;"" title=""App Documentation"" width=""100%"" height=""1000"">",11,2025-02-11 17:23:18,2025-02-12 10:52:02
+16,How to:,12,<NULL>,False,<NULL>,The submenu includes help with a number of OxCamNE specific tasks.,1,2025-02-11 17:27:39,2025-02-12 11:04:18
+17,Set Up a New Event,12,16,False,<NULL>,"###Set Up a New Event
+An event is managed using the events module of the web site. The event is represented by an event record and it's various sub records.
+
+The event record records the characteristics of the event, obviously the name, date and time, and whether the event is members-only or open to all alumni, etc. In addition to the date and time of the event is a date and time when booking closes. You can also set capacity limits.
+
+The *booking closed* date/time controls the booking phase: when it is in the past the phase is *save the date* if there are no registrations recorded yet, else *booking closed*. The event is listed in the home page calendar accordingly. During the *save the date* phase neither booking nor viewing of the details is possible; during the *booking closed* phase registrations will be added to the wait list.
+
+The sub-records define the ticket categories and, as appropriate, menu choices (or other selections).
+
+The record also contains the Details, which is the full description of the event for display on the public website as well as used in the email invitation. This is created using Markdown and HTML.
+
+#####Create the event record in the database
+This is most easily done by duplicating the record of an existing, similar, event. Find the existing record in the <a href=""https://oxcamne.github.io/oxcam/events.html"" target=""_blank"">events page</a> and click Edit to display it. Click the 'Make a Copy of This Event' link near the top of the display. The new event will appear next to the event copied in the events page, but your screen will display the new event for editing.
+
+The Page, Description, Datetime, Booking Closed, and Details fields, at a minimum, will need to be adjusted for the new event.
+
+Of course you can also create a new event from scratch using the '+New' button of the events page.
+
+See the documentation of the <a href=""https://oxcamne.github.io/oxcam/event_record.html"" target=""_blank"">event record</a> for full details.
+
+#####Open the event for booking
+When the *Details* have been finalized edit the event record to set the *Booking Closed* date/time. The home page calendar will now have links for viewing the details and for registration.
+
+#####Send out the invitation
+This is done through the <a href=""https://oxcamne.github.io/oxcam/members.html"" target=""_blank"">members page</a>.
+
+First select the recipients of the invitation using the filters in the Members page. Normally you would simply select the mailing list **and the event** and click *Filter*, then use the *Send Notice* link at the top of the page.
+
+This filter includes the event *Details* page in the email body and, e.g. if this is a reminder close to the end of the booking period, excludes members who have already registered. You can make any desired adjustments to the text before clicking *Send*.
+",13,2025-02-12 09:49:22,2025-04-08 11:00:24
+18,Manage Reservations and Waitlist,12,16,False,<NULL>,"<iframe src=""https://oxcamne.github.io/oxcam/event_registration"" style=""border:none;"" title=""App Documentation"" width=""100%"" height=""1000"">",1,2025-02-12 14:37:57,2025-04-08 11:01:39
+19,Manually Register Guest/Speaker,12,16,False,<NULL>,"###Register Speaker or other Guest
+Usually, members set up their own event registration, and make payment if appropriate, through the registration link for the event.
+
+Occasionally, typically for a speaker or other comp. registration, the secretary or another officer needs to manually set up a registration.
+
+First, the person needs a *member record*. Visit the <a href=""https://oxcamne.github.io/oxcam/members.html"" target=""_blank"">Members page</a> and use the filter to find their existing record. If no record exists, create one using the *+New* button. At a minimum, fill in the first and last name.
+
+Once a member record exists, display the Member Record using the *Edit* button. Use the links at the top to add necessary subrecords such as *Email* and *OxCam Affiliation*.
+
+You now have a sufficiently complete Member Record. From it's *Edit* display, use the *Member Reservations* link to display a list all existing registrations in reverse chronological order. The event names are links, through which the corresponding Member Reservation page can be accessed, allowing the details to be examined and edited.
+
+Note there is an *Add New Reservation* link. This prompts you to select the event for which you wish to register them. Once the event is selected the Member Reservation is displayed - for a new reservation this will display an empty grid. You can then use the *+New* button to register the person. Leave the ticket field blank to comp. them, or select the appropriate ticket type. Select the meal preference if appropriate before submitting. You can use the *+New* button again to add any additional guest(s).
+
+None of the usual restrictions, such as affiliation, Society membership, discount qualification, or event capacity apply when officers are registering people in this way!
+
+You can enter paid registrations by specifying the appropriate ticket type. This might happen if a member is not able to register online and sends in a check. The payment will be recorded in the registration when the cleared check deposit transaction is uploaded from the bank and allocated to the member and event ticket sales account.",2,2025-02-12 14:55:39,2025-04-08 11:01:50
+20,Print Name Badges/Labels,12,16,False,<NULL>,"###Print Name Badges/Labels
+Name Badges (in holders) or (sticky) Labels can be generated from the doorlist exported as a CSV file from the database <a href=""https://oxcamne.github.io/oxcam/reservation_list.html"" target=""_blank"">Reservation List</a>.
+
+In the past I have used Microsoft Word/Mailings in conjunction with Excel to print badges or labels. However, not only does this require a Microsoft Office license, the process itself is rather clunky.
+
+I am now advocating the use of [Avery Design & Print Online](https://www.avery.com/software/design-and-print/), as described on this page. Avery is a primary maker of badge and label supplies. Secretary@oxcamne.org has a (free) account at Avery, which includes predefined 'projects' for printing our name badges or labels. The password for this account is stored in the Accounts file in the root of the OxCamNE Archive.
+The Archive also contains a folder 'Name Badges & Labels' which has the old Microsoft Word templates as well as downloaded master copies of the Avery badge and label projects.
+
+#####Preparing Data for Printing Badges or Labels
+I recommend creating a folder OxCamNE Archive/Events/year/event to contain these and other files relating to the event.
+
+Begin by exporting the doorlist for the event from the reservation list to your local PC. Copy the file, doorlist.csv, to the event folder within the Archive on Google Drive. Double Click on the copied file to open it. It should look something like this:
+<p style=""text-align:left""><img src=""https://drive.google.com/thumbnail?sz=w800&id=1WHkO1t8z3cdqziwTkU08scsFyz_aoI84"" alt=""doorlist""></p>
+
+Next, use the menu at top middle to open in Google Sheets. This creates a new spreadsheet file, 'doorlist'. You can now delete ('remove') doorlist.csv, it's no longer needed.
+Note that the 'Selection' column will contain the short name for the menu selection, not the long descriptive name selected when registering. This is important as the short name will appear on the badge as a guide for attaching a colored dot.
+Add table assignments, if necessary, to the Table column. Table assignments will appear at the bottom left of the badge. Often we only assign one or two tables. You can also hide all the columns not needed on the printed copy of the doorlist:
+
+<p style=""float:left; margin: 0px 15px 0px 0px""><img src=""https://drive.google.com/thumbnail?sz=w150&id=1ZAj6_TNvLALVqZf7p9JSuoDBo1OZkRwl"" alt=""menu""></p>
+
+#####Use the Avery Site to Generate the Printable Badges
+Sign in to Avery Design & Print Online using the  Secretary@oxcamne.org account (click on the person icon at top right, as shown here. Click on 'Projects' in the menu which appears. You should then see something like:
+
+<p style=""float:left; margin: 0px 15px 0px 0px""><img src=""https://drive.google.com/thumbnail?sz=w400&id=1jOgLp6p0LDKLKGwwl23-ocY3FriG5Rkb"" alt=""projects""></p>
+Note, 'Upload Avery Project' can be used to upload the master templates from the Name Badges & Labels from the Archive, should these online versions have been lost or damaged.
+
+The project on the left is for badges, the one on the right for sticky labels (2 to a sheet).
+
+Click on the appropriate project and open the project.
+
+Note that here you can apply the design to another Avery product, for example sticky labels on letter size sheets, 6 to a page.
+
+The data shown will be from an earlier event. The new doorlist will be imported at the next step.
+
+**Important**: If you follow Avery's instructions for updating the data (replacing the spreadsheet), the formatting of the data will be lost. Follow my instructions instead. DO NOT select the text box on the badge containing the spreadsheet data, rather click on 'Import Data' at the left of the screen. The screen should look like:
+
+<p style=""float:left; margin: 0px 15px 0px 0px""><img src=""https://drive.google.com/thumbnail?sz=w400&id=1Oy3Qq6LqT61knW4K5XlwBtUkWtHB_bqw"" alt=""import data""></p>
+Now click on 'Replace Spreadsheet'. In the pop-up which appears,  click on Google Drive. You may need to do some authorization with Google to allow Avery to access (but shouldn't have to if signed in as Secretary!). The Doorlist file you've just worked on should appear among other files in the pop-up, probably in first position. Select it, and it will be displayed in the pop-up. Uncheck the heading row, and click 'Next'.
+
+Here we come to a deficiency in the software. The Next button is disabled. The pop-up is asking us to arrange a list of fields. Simply double-click the first field ONLY, then click Next, and then Finish. We should now see, in the center of the dashboard, something like:
+
+<p style=""float:left; margin: 0px 15px 0px 0px""><img src=""https://drive.google.com/thumbnail?sz=w400&id=1k88M4Ca2UV0oqEXRPWfOiCNitawADlnb"" alt=""edit badge""></p>
+The field we selected in order to get by the disabled Next button appears on top of the Society Name (and in Arial font rather than Times New Roman). To get rid of this, click on the 'Object List' button on the right and then on the extraneous field; you should now see it displayed within a text box, and the corresponding object should be highlighted in the list at the right, as shown in the picture. Click the 'delete' icon in the highlighted object.
+
+Click the Save button on the top row of the dashboard, and click 'Save to Your Account' and then 'OK'. Finally click 'Preview & Print' at the bottom right of the dashboard. 
+
+This is a good time to preview all the pages for any errors, also beware of including unnecessary pages of blank badges; us the page range option to exclude them from the PDF produced by the 'Get PDF to Print' button.
+
+Note: my printer (Canon MG3620) won't print on the front of Avery name badge stock. It objects to the printed header and footer instructions. Have to print on the back!
+",11,2025-02-12 15:10:06,2025-04-08 11:01:57
+21,Record Election Changes,12,16,False,<NULL>,"###Record Election Changes
+Every two years the Society elects new Officers and Directors and may make other changes to the Advisory Committee. Changes in Directors, Officers and Committee membership require a number of different actions.
+
+There will be an officer or officers responsible for this activity for the various aspects of this, typically the Secretary and Clerk.
+
+#####Member Record Changes
+These must be changed to record the current membership of the advisory committee and occupants of officer and committee chair roles, board members, past president, etc.
+
+The current configuration is displayed in the [About page](htpps://www.oxcamne.org/about) on the Society web site, which is generated from the database.
+
+You will use the [Members Page](https://oxcamne.pythonanywhere.com/oxcam/members/select to find and edit the affected records.
+
+The relevant fields of the member record include:
+<p style=""text-align:center""><img src=""https://drive.google.com/thumbnail?sz=w400&id=1lbPd3xnSgmZ77dMmv6_S9pBGGvwDKAQf"" alt=""key fields""></p>
+
+The **Access** field should be set to 'admin' for President, VP, Secretary, and Treasurer. This allows access to support functions such as maintaining metadata or the list of colleges, as well as various technical support functions. Other users of Society emails should generally be set to 'write', with the remaining Advisory Committee members set to 'read'. It should be cleared for any member retiring from the AdCom.
+
+The text in the **Committees** field should include both 'Board' and 'Advisory' for Board members, and 'Advisory' for all other AdCom members. For members retiring from the Board and/or Adcom, the keywords should be removed from Committees; their service should be recorded in the Notes field.
+
+The **President** field should be used to record the dates of the outgoing President.
+
+#####Society Email Settings
+The current users of the Society email (oxcamne@oxcamne.org) should have their Society email alias(es) recorded in their records.
+
+The 'Emails' sub-screen of the member record should include any Society email address thus:
+<p style=""text-align:center""><img src=""https://drive.google.com/thumbnail?sz=w800&id=1Y5kyeuErXGTU_cGOXrmF0F8797Z0onDh"" alt=""email settings""></p>
+
+Note that after adding a Society email address the personal email should be restored to the top of the page by making a trivial edit to it. The Society email address should be deleted from the outgoing incumbent's record.
+
+When all the membership database changes have been made and the 'About' page is correct, there are two final checks it is good to make, first that there are no extraneous Society emails that are not associated with Adcom members. Use Member Filtering to display all members with emails matching ""oxcamne.org"":
+<p style=""text-align:center""><img src=""https://drive.google.com/thumbnail?sz=w800&id=19BdiKypBSrYkOOQ4QcLXiQZWigXD4kIK"" alt=""oxcamne email members""></p>
+
+Finally, check that only Adcom members have access rights, by scanning all members with access privileges using member filtering with a '%' wildcard:
+<p style=""text-align:center""><img src=""https://drive.google.com/thumbnail?sz=w800&id=15vnbLsJsWgujuzxIcUGn7AY2bDzMgIi-"" alt=""adcom members""></p>
+
+Only the first couple of rows of the grid shown above - be sure to check all pages of results.
+
+#####Google Workspace
+Google Workspace changes are made in its admin console.
+
+You reach this by opening 'settings' in your Society email account and clicking 'Manage this Organization' or by  browsing to admin.google.com and logging in using the Society email address. 
+
+######Update the Board and Advisory Groups
+Use the main menu Directory/Groups to display the list of groups:
+<p style=""text-align:center""><img src=""https://drive.google.com/thumbnail?sz=w800&id=1Hha36-udeM33BTx7nCNZp1_KgFWUN13g"" alt=""workspace groups""></p>
+
+Click on 'Board', then ''Members':
+
+<p style=""text-align:center""><img src=""https://drive.google.com/thumbnail?sz=w800&id=1lgtNf_DxodxYGESZtD6-QlwMOKxbQ5Sh"" alt=""board group""></p>
+
+Note that the group comprises the personal emails of the individual board members, plus the Society email address. The latter means that messages sent to the group are recorded in the 'board' folder of the Society email.
+
+You can obtain the incumbents' email addresses from the member database.
+
+The Advisory group is similar, containing members' personal email addresses and the Society email, so that traffic is also recorded in a folder.
+
+The Events and Speakers groups do not seem to be used or maintained currently.
+
+#####Society Email Account (oxcamne@oxcamne.org)
+Whenever any of the users of the shared account changes it is good practice to change the account password; also you need to remove any 2-step verification phone numbers for any members who are no longer users of the Society email. These are in the settings of the email account rather than in the Workspace admin console. Click on the settings cogwheel, click 'see all settings' then on the accounts tab, then on 'google account settings', which opens a new browser tab. Click on 'security' on the left side and scroll down to reach:
+<p style=""text-align:center""><img src=""https://drive.google.com/thumbnail?sz=w800&id=14xdaVhJwkAFKRLOWseGoZlHfuxgnTh-c"" alt=""security""></p>
+
+Expand the '2-step verification' phones section and delete any that belong to members no longer sharing the email. You may also need to switch the recovery phone and email. You can use the member filter to identify the cell phone users.
+
+Manually assign a new  password for oxcamne@oxcamne.org, and be sure to record the new password in the OxCamNE Accounts spreadsheet.
+
+For each new user of the email account you will need a backup code for their initial sign-in. You can view available backup codes, and if necessary generate a new set, by expanding the 'backup codes' section.
+
+Email a notification of the new password to the **personal** emails of the Society email users. This can be done using the Member Filter as illustrated above. For new users, send them an email giving them a backup code to use on first sign in and instructions on how to add their phone number for later logins. You can use the file ""Access-to-oxcamneoxcamne.org-Account.docx"" in the root of the OxCamNE Archive as a template.
+
+Finally, in the email settings, visit the 'filters and blocked addresses' tab and scan all of the filters. Most of them ensure that incoming messages are filed in the correct folders.
+
+#####File the Annual Report with the State
+We normally file this report shortly after the AGM. This is normally done by the Clerk, so notify them once the changes described above are all complete. Instructions for filing the report are here.
+
+#####Update Bank Account Information
+######Adjust the online accounts
+Our bank is Eastern Bank (which took over Cambridge Trust). Admin, Treasurer, President and Secretary are signatories and have online access accounts. Currently David Manns is both Admin and Secretary. Admin is the master account and cannot be deleted, but all account have similar access to the account.
+
+The OxCamne Account sheet has the URL to login, and the Customer ID. Login to the bank to make any necessary changes to the accounts. Clicking Administration, then Company Administration, show all the user accounts:
+<p style=""text-align:center""><img src=""https://drive.google.com/thumbnail?sz=w800&id=1TjMPIpsKWESl_zkr3yYCm1DECnQ1ftsW"" alt=""bank admin""></p>
+
+The 'System Access' link allows unlocking of a locked account by specifying a new temporary password.
+
+Clicking on the User ID allows the details to be changed, as for an officer change:
+<p style=""text-align:center""><img src=""https://drive.google.com/thumbnail?sz=w800&id=1kgiFU0wv8thpEoaA85PjQcVfMuq6EsOL"" alt=""bank user""></p>
+
+Edit the contact information to provide the new user's personal email as secondary address, and their mobile number. (A landline also works).
+
+Edit the User Information to update the new user's name and assign a temporary password. Invite them to sign in and give them the temporary password. They will need to assign their own password upon signing in.
+
+######Update the Signatories, and Request New Debit Cards if Necessary
+Once the State Corporate registration has been updated, print out a copy with all the details of corporate address, directors and officers. One of the officers should then visit a bank branch to initiate the necessary changes. A new signature form will be needed, and we may need to have new debit cards issued.
+
+Existing checks can still be used even though they show an obsolete address.
+
+#####Update Payment Processor Information
+Our payment processor is Stripe. We have discontinued the use of PayPal which is no longer supported by our website and database. We use Stripe for collecting online payments including membership dues and event tickets. For full memberships, Stripe manages auto-renewals. We also use Stripe to send out invoices, e.g. to the Universities for  sponsorship payments.
+
+Treasurer and Secretary each have logins, as noted in the OxCamNE Accounts spreadsheet.
+
+######Company Details
+Visit Stripe settings - business settings - public details. This page specifies the contact information for customer support for our members to use for payment related questions. This is currently secretary@oxcamne.org with my postal address. Update if necessary.
+
+Visit Stripe settings - business settings - business details. This page includes the corporate address and phone number which should be kept in line with our corporate filing, e.g. to contain the address and phone number of the President or other officer listed with the state. This page also has my details as account representative, and also lists the name of the President. Update as necessary.
+
+######Team Members with Access
+Visit Stripe settings - business settings - team
+
+Secretary is listed first as administrator. If the account rep changes, this would be done in company details.
+
+Treasurer is also listed, with a menu button that provides an option to transfer to a new incumbent.
+
+We could also add team members on this page to give them sign-on's.",8,2025-02-12 16:45:35,2025-04-08 11:02:09
+22,Add a New Shared Email User,12,16,False,<NULL>,"###Add a New Shared Email User
+#####Add new user to oxcamne@oxcamne.org Account
+This account is a Google Workspace account shared by officers and committee chairs. It is secured by requiring not only a password but also user verification by means of a one time code sent via text or delivered by phone. Each user has a specific email alias that can be used in the outside world, e.g. president@oxcamne.org, treasurer@oxcamne.org, etc. These are aliases for oxcamne@oxcamne.org.
+ 
+#####Add new user's phone as a recovery phone
+This is done by the Secretary (or other existing user) in phone coordination with the new user.
+ 
+The secretary should open settings by clicking on the cogwheel:
+<p style=""text-align:center""><img src=""https://drive.google.com/thumbnail?sz=w800&id=1c4zaZIdeH-AYBOQKwRUbHMb4tt2_JAIv"" alt=""workspace""""></p>
+Then click on “See all settings”, then on “Accounts”, then on “Google account settings”, and finally click on “Security” on the left hand side menu (which opens a new browser tab) and scroll down to the “How you sign in to Google” section:
+<p style=""text-align:center""><img src=""https://drive.google.com/thumbnail?sz=w800&id=1SM_TlrhiMyi7uSWECEUopUn29TrOk8wC"" alt=""workspace security""""></p>
+Click to expand as indicated by the red arrow, which will show the existing list of recovery phone numbers. Any that belong to people who no longer need access can be deleted.
+ 
+Scroll down to find the button “Add a backup 2-step Verification phone” and click it (you may need to re-enter the account password as an intermediate step). Enter the new user’s cell number, and click to verify the number by sending an OTP via text.
+ 
+The new user should, on receiving the verification text, relay the code back to the secretary who enters it to complete the verification.
+
+#####Initial Log-in
+Browse to mail.google.com (or use your favorite email client to connect)
+Username oxcamne@oxcamne.org
+Password <from the accounts file in the archive>
+ 
+You will be asked to complete 2-factor authentication. It may suggest you visit the YouTube app on your iPhone or some such, however, please:
+ 
+- Click “Try another way”
+- Identify your phone number by its last two digits and click on it to send OTP to your phone by text
+- Submit the received code to complete login.
+
+#####Later Login’s 
+You should be able to login to your normal device in it’s normal location using just the password. Otherwise you may be challenged to authenticate yourself, as in the initial login.
+
+#####Your Folder
+You will note that there is a label (folder) with your role, president, treasurer, … Your own traffic is filtered into that folder and not place in the inbox, which is a repository for traffic addressed generically to oxcamne@oxcamne.org or to non-existent oxcamne.org addresses. You will also find the sub-folders you created when you used separate accounts.
+
+#####The OxCamNE Archive
+If you are using the web client for your mail, you can get to the drive using the apps menu. Otherwise, browse to drive.google.com and sign in with username oxcamne@oxcamne.org:
+<p style=""text-align:center""><img src=""https://drive.google.com/thumbnail?sz=w800&id=1W8SDDaP-r1S5vogwA4mbpyt1ocQvbDMU"" alt=""workspace drive""""></p>
+",5,2025-02-13 11:59:25,2025-04-08 11:02:18
+23,File Annual Report with the State,12,16,False,<NULL>,"###File Annual Report with the State
+We are required to file an Annual Report to maintain our corporate status in Massachusetts.
+
+Our annual meeting is typically held at our Annual Christmas Dinner in December, and our fiscal year is the calendar year, so the report should be filed promptly following the annual meeting.
+
+Every two years we elect new directors and officers, and we will also need to relocate the principal office address (usually that of Clerk filling out the form). In the off years the only piece of information that will need to be changed is the date of the last annual meeting.
+
+We only need to submit an additional form if we need to change the address of the Principal Agent.
+
+To reach the online form:
+
+- Open the OxCamNE Accounts spreadsheet and locate the row for State Filings.
+- Click on the URL link in the State Filings Row. This opens up the page for the State Corporations Division. Note that you can search the Corporate Database for ""Oxford and Cambridge"" to view the current information on record.
+- Click on Filing Methods, then File Online in the next page. This brings up a login screen.
+- Sign in using the credentials in the Accounts spreadsheet.  Select 'Annual Report' on the next screen and submit.
+
+The form now displays, preloaded with the information currently in our corporate record. Notes on filling out the form:
+
+- Select the year just ended (or ending, if filing after the AGM in December). 
+- Change the Principal Office address if necessary. We have by custom used the President's address as our Principal Office.
+- Fill in the date of the recent Annual Meeting.
+- Update the list of Officers and Directors, including their term expiration (they are elected for a two year term ending 12/31 of the next election year).
+- Fill out the Filer's Contact Information.
+- Select email delivery for annual report notices. Notices should be send to clerk@oxcamne.org.
+- Sign and submit the form.
+- Pay the filing fee using the Society debit card if you have one, otherwise use your own card and submit a claim for reimbursement to the Treasurer.
+
+To check the corporate record status, go to the link in the Accounts Spreadsheet, click on ""Search the Corporate Database"" and search for ""Oxford and Cambridge"".
+",3,2025-02-13 12:19:25,2025-04-08 11:02:25
+24,Add a member with no College,12,16,False,<NULL>,"###Add a member with no College
+There are situations where a person without a College affiliation is invited to become a member.
+
+Examples include people who have had University appointments such as 'research assistant', and partners of deceased members. In the latter case, we might transfer the residual membership of the deceased member.
+
+In the first type of situation, have the approved member  go through the join process specifying a fictional affiliation. Once they have completed the process, simply delete the fictional affiliation.
+
+For a surviving spouse, manually set up a record for the survivor. Copy the Membership and Paiddate values from the deceased member. The survivor will be reminded to renew once the Paiddate is reached. On the deceased member's record, clear the Membership field. Make sure to transfer mail list subscriptions from the deceased member to the survivor.
+",1,2025-02-13 12:25:31,2025-04-08 11:02:32
+
+
+TABLE Affiliations
+
+
+TABLE Reservations
+
+
+TABLE EMProtos
+
+
+TABLE Email_Queue
 
 
 TABLE CoA
 CoA.id,CoA.Name,CoA.Notes
 1,"Tips, janitor",
-2,Web site,
+2,Web site,<NULL>
 3,Venue rental,
 4,Badges/Name tags,
 5,Ticket sales,
 6,Bar & snacks,
 7,Printing,"e.g. menus, AUABN programme"
+8,Algonquin Club,no longer have institutional membership
 9,Insurance,
 10,Tax filing,
 11,Sponsorships,e.g. AUABN sponsorship
@@ -110,6 +851,7 @@ CoA.id,CoA.Name,CoA.Notes
 16,Paper goods & decorations,
 17,Musicians,
 18,Bank fees,
+19,Athenaeum Institutional Membership,as of 2020 no longer applicable
 20,Police detail,
 21,Unallocated,"Amounts debited or credited and not recognized automatically, e.g. as dues payments or event ticket sales"
 22,Mailing,
@@ -117,27 +859,27 @@ CoA.id,CoA.Name,CoA.Notes
 24,Wine,
 25,Membership Directory,
 26,Flowers,
+27,OcsneDB,Membership and Accounting Database
+28,City of Cambridge License Fee,New in 2013. City of Cambridge requires License for CBC Event
+29,Athenaeum Membership,Members participating in Institutional Membership
 30,Parking,
 31,Transfer,between Bank and PayPal
 32,Charitable Donation,Donations from the Society to 501c-3 organizations
+35,Society Assets,"e.g. projector, banner"
+36,Transportation,<NULL>
+37,Audio Visual,<NULL>
 
 
 TABLE Bank_Accounts
 Bank_Accounts.id,Bank_Accounts.Name,Bank_Accounts.Balance,Bank_Accounts.Bankurl,Bank_Accounts.Csvheaders,Bank_Accounts.Reference,Bank_Accounts.Date,Bank_Accounts.Datefmt,Bank_Accounts.Time,Bank_Accounts.Timefmt,Bank_Accounts.CheckNumber,Bank_Accounts.Amount,Bank_Accounts.Fee,Bank_Accounts.Type,Bank_Accounts.Source,Bank_Accounts.Notes,Bank_Accounts.HowTo
-1,Cambridge Trust,19398.79,https://cambridgetrust.ebanking-services.com/,"TRC Number,Account Number,Account Type,Account Name,Post Date,Reference,Additional Reference,Amount,Description,Type,Text,","Post Date,Reference,Amount",Post Date,%m/%d/%Y,<NULL>,<NULL>,Additional Reference,Amount,<NULL>,<NULL>,<NULL>,"Description,Type,Text","- Click on 'Reports/Deposit Reports'
-- select ``**CSV (all fields)**``:red file, ``**all accounts**``:red (there is only one) and specify a ``**date range**``:red beginning no later than the date shown above, select Transaction types - ``**'All transactions'**``:red and click 'Search'
-- save the downloaded report and use the form below to select and import it. The downloaded file is 'export.csv'.
+1,Eastern Bank (was Cambridge Trust),0.00,https://easternbank.ebanking-services.com/eAM/Credential/Index?appId=beb&brand=easternbank,"TRC Number,Account Number,Account Type,Account Name,Post Date,Reference,Additional Reference,Amount,Description,Type,Text,","Post Date,Reference,Amount",Post Date,%m/%d/%Y,<NULL>,<NULL>,Additional Reference,Amount,<NULL>,<NULL>,<NULL>,"Description,Type,Text","1. Click on 'Reports/Deposit Reports'
+1. Select **CSV (all fields)** file, **all accounts** (there is only one) and specify a **date range** beginning no later than the date shown above,
+select Transaction types - **'All transactions'**`` and click 'Search'
+1. Save the downloaded report and use the form below to select and import it. The downloaded file is 'export.csv'.
 
 Note, Cambridge Trust now supports reports longer than 30 days, so the override box should only be needed to load the first batch of transactions in a new bank account."
-2,PayPal,0.00,https://www.paypal.com/signin?country.x=US&locale.x=en_US,"Date,Time,TimeZone,Name,Type,Status,Currency,Gross,Fee,Net,From Email Address,To Email Address,Transaction ID,Shipping Address,Address Status,Item Title,Item ID,Shipping and Handling Amount,Insurance Amount,Sales Tax,Option 1 Name,Option 1 Value,Option 2 Name,Option 2 Value,Reference Txn ID,Invoice Number,Custom Number,Quantity,Receipt ID,Balance,Address Line 1,Address Line 2/District/Neighborhood,Town/City,State/Province/Region/County/Territory/Prefecture/Republic,Zip/Postal Code,Country,Contact Phone Number,Subject,Note,Country Code,Balance Impact",Transaction ID,Date,%m/%d/%Y,Time,%H:%M:%S,<NULL>,Gross,Fee,<NULL>,<NULL>,"Type,From Email Address,To Email Address,Item Title,Invoice Number","-``**NOTE** We no longer use PayPal. Uploading of transactions would no longer work``:red Using PayPal would require software development to re-implement using a current PayPal api. The old implementation did not allow real-time capture of payments, unlike Stripe.
-- Note, the email address for the Society PayPal account is ocsnemembership@gmail.com
-- go to ``**Reports/Activity Download**``:red, select a ``**date range**``:red beginning no later than than the date shown above, and select ``**file type 'CSV'**``:red and click Create Report
-- the new report will show as submitted; after a few seconds click refresh to check if the report is ready for download (usually, this takes only a few seconds)
-- download the resulting file and use the form below to select and import it.
-
-PayPal's Activity Download supports long time ranges so the override checkbox should not be needed."
-3,Stripe,8526.03,https://dashboard.stripe.com/balance,"id,Type,Source,Amount,Fee,Net,Currency,Created (UTC),Available On (UTC)",id,Created (UTC),%Y-%m-%d %H:%M,<NULL>,<NULL>,<NULL>,Amount,-Fee,Type,Source,Source,"- go to the ``**Payments/All Transactions**``:red section of the dashboard, click ``**'Export'**``:red at the top right of the panel, select a ``**date range**``:red beginning no later than than the date shown above,  and click Export
-- use the form below to select and import the downloaded file, 'balance_history.csv'.
+3,Stripe,0.00,https://dashboard.stripe.com/balance,"id,Type,Source,Amount,Fee,Net,Currency,Created (UTC),Available On (UTC)",id,Created (UTC),%Y-%m-%d %H:%M,<NULL>,<NULL>,<NULL>,Amount,-Fee,Type,Source,Source,"1. Go to the **Payments/All Transactions** section of the dashboard, click **'Export'** at the top right of the panel, select a **date range** beginning no later than than the date shown above,  and click Export
+1. Use the form below to select and import the downloaded file, 'balance_history.csv'.
 
 Stripe's Export supports long time ranges so the override checkbox should not be needed."
 
@@ -145,16 +887,20 @@ Stripe's Export supports long time ranges so the override checkbox should not be
 TABLE bank_rules
 bank_rules.id,bank_rules.bank,bank_rules.csv_column,bank_rules.pattern,bank_rules.account
 1,1,Description,INTEREST CREDIT,14
-2,1,Reference,Oxford&Cambridge,31
+2,1,Text,Oxford&Cambridge,31
 3,1,Text,Utica Mutual Ins,9
-4,1,Text,GO DADDY WEB ORDER,2
+4,1,Text,GO DADDY,2
 5,1,Text,PYTHONANYWHERE,2
 6,1,Text,ZOOM.US,2
 7,1,Text,GSUITE,2
 8,1,Text,SEC OF MA,2
 9,1,Text,MAILGUN,2
-10,2,Type,General Withdrawal,31
-11,3,Type,Payout,31
+11,3,Type,payout,31
+12,1,Text,SIMPLE FILINGS LLC,10
+13,3,Type,stripe_fee,18
+
+
+TABLE AccTrans
 
 
 END

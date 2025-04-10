@@ -159,8 +159,8 @@ def event_attend(event_id):
 
 markdown_comment = CAT(" (optional) create page using ",
 			   A('Markdown', _href='https://www.markdownguide.org/basic-syntax/', _target='doc'),
-			   " and ",
-			   A('HTML', _href='https://oxcamne.github.io/oxcam/send_email.html#embedding-images-in-email', _target='doc'),
+			   " and see",
+			   A('Useful Tips', _href='https://oxcamne.github.io/oxcam/send_email.html#useful-tips', _target='doc'),
 			   " for additional formatting ")
 			
 db.define_table('Events',

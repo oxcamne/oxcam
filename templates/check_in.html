@@ -1,0 +1,42 @@
+[[extend 'layout.html']]
+
+[[=header]]
+
+<input type="text" id="search" placeholder="Search by name..." autocomplete="off">
+
+<div id="grid-container">
+[[=grid.render()]]
+</div>
+
+<script>
+document.getElementById("search").addEventListener("input", function() {
+    let searchValue = this.value.toLowerCase();
+    let rows = document.querySelectorAll("#grid-container table tbody tr");
+
+    let showGroup = false; // Tracks visibility of a member and their guests
+    let lastMemberRow = null; // Stores the last seen member row
+
+    rows.forEach((row) => {
+        let nameCell = row.querySelector("td:first-child"); 
+        if (!nameCell) return;
+
+        let nameText = nameCell.textContent.toLowerCase();
+        let isGuest = nameText.startsWith("+ ");
+
+        if (!isGuest) {
+            // Member row: reset visibility tracker and store reference
+            lastMemberRow = row;
+            showGroup = nameText.startsWith(searchValue);
+        } else {
+            // Guest row: Trim '+ ' prefix, then check match
+            let guestName = nameText.substring(2); // Remove '+ '
+            if (guestName.startsWith(searchValue)) {
+                showGroup = true;
+                if (lastMemberRow) lastMemberRow.style.display = ""; // Ensure member is visible
+            }
+        }
+
+        row.style.display = showGroup ? "" : "none";
+    });
+});
+</script>

@@ -1037,6 +1037,29 @@ def event_reservations(event_id, path=None):
 			details=False, editable = False, create = False, deletable = False,
 			rows_per_page=200, grid_class_style=grid_style, formstyle=form_style)
 	return locals()
+		
+@action('check_in/<event_id:int>', method=['POST', 'GET'])
+@action('check_in/<event_id:int>/<path:path>', method=['POST', 'GET'])
+@action.uses("check_in.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER))
+@checkaccess('write')
+def check_in(event_id, path=None):
+	event = db.Events[event_id]
+	access = session.access	#for layout.html
+	header = f"Check In for {event.Description}"
+
+	grid = Grid(path, (db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False),
+			#left = db.Emails.on(db.Emails.Member==db.Reservations.Member),
+			left = db.Members.on(db.Members.id==db.Reservations.Member),
+			orderby=db.Members.Lastname|db.Members.Firstname|~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname,
+			columns=[
+				Column('guest', lambda row: f"{('+ ' if not row.Host else '')  +row.Lastname+', '+row.Firstname}",
+					required_fields=[db.Reservations.Host, db.Reservations.Lastname, db.Reservations.Firstname]),
+			],
+			details=False, editable=False, create=False,
+			deletable=False,
+			grid_class_style=grid_style,rows_per_page=200,
+			formstyle=form_style)
+	return locals()
 
 #this controller is used by privileged users to manage event registrations.
 #most of the rules governing registration, e.g. capacity constrains, membership requirements,
@@ -2234,7 +2257,7 @@ def composemail():
 				A('Useful Tips', _href='https://oxcamne.github.io/oxcam/send_email.html#useful-tips', _target='doc'),
 				" for additional formatting.",
 				XML('<br>'),
-				"There are custom elements [[greeting]], [[member]], and [[reservation]] ",
+				"There are custom elements [[greeting]], [[member]], [[reservation]], [[registration_link]] ",
 				"available, depending on the context.")))
 	fields.append(Field('save', 'boolean', default=proto!=None, comment='store/update template'))
 	fields.append(Field('attachment', 'upload', uploadfield=False))

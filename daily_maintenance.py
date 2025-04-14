@@ -58,7 +58,7 @@ def daily_maintenance():
 		if (m.Paiddate - datetime.date.today()).days % interval == 0:
 			text = f"{member_greeting(m)}"
 			text += f"<p>This is a friendly reminder that your {SOCIETY_NAME} membership expiration \
-date is/was {m.Paiddate.strftime(DATE_FORMAT)}. Please renew by <a href={DB_URL}> logging in</a> \
+date is/was {m.Paiddate.strftime(DATE_FORMAT)}. Please renew by <a href={DB_URL}/my_account> logging in</a> \
 and selecting join/renew from the menu of choices, \
 or cancel membership to receive no futher reminders.</p><p>\
 We are very grateful for your membership support and hope that you will renew!</p>\
@@ -73,7 +73,7 @@ If you have any questions, please contact {SUPPORT_EMAIL}"
 			if IS_PRODUCTION:
 				text = f"{member_greeting(m)}"
 				text += f"<p>We have been unable to process your auto-renewal and as a result your membership has been cancelled. </p><p>\
-We hope you will <a href={DB_URL}> reinstate your membership</a>, \
+We hope you will <a href={DB_URL}/my_account> reinstate your membership</a>, \
 but in any case we are grateful for your past support!</p>\
 If you have any questions, please contact {SUPPORT_EMAIL}"
 				db.commit()

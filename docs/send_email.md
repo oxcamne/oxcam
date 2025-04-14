@@ -16,7 +16,7 @@ If the message is explicitly addressed, or targetted to a single member, a 'Bcc:
 
 The Sender field allows you select which address to use if you have multiple roles. Replies will be sent to this address.
 
-The message body can use custom elements [[greeting]] (a personalized greeting, more or less formal depending on whether the member included a title when joining).  The element [[member]] is replaced by the member's directory information, and in suitable contexts [[reservation]] will show details of a reservation.
+The message body can use custom elements [[greeting]] (a personalized greeting, more or less formal depending on whether the member included a title when joining).  The element [[member]] is replaced by the member's directory information, and in suitable contexts [[reservation]] will show details of a reservation, or [[registration_link]] the registration_link.
 
 **[Markdown](https://www.markdownguide.org/basic-syntax/)** can be used to format and include links and graphics. The Send Email page has a link to Markdown documentation.
 
@@ -26,7 +26,7 @@ Ticking the 'save/update template' box allows the content to be saved for later 
 
 ### Useful Tips
 
-If you want to include copy prepared in other file formats, e.g. Word, there is a useful site [file2md.com](https://file2md.com/) which provides useful conversion tools for free use.
+If you want to include copy prepared in other file formats, e.g. Word, there is a useful site **[file2md.com](https://file2md.com/)** which provides useful conversion tools for free use.
 
 The **[Markdown](https://www.markdownguide.org/basic-syntax/)** syntax \!\[alt_text](image_url) is a simple way to include images. They are displayed as a block, i.e. text does not wrap alongside them, and at full size or, depending on the email client, scaled to occupy the available display width. Either make sure the image is not too large, or specify the display width using HTML as discussed below! Note that Markdown does not apply any formatting within HTML tags.
 

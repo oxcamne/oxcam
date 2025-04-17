@@ -276,6 +276,11 @@ def res_selection(reservation_id):
 	r= db.Reservations[reservation_id]
 	return db.Event_Selections[r.Selection_].Selection if r.Selection_ else ''
 
+def res_hostchecked_in(reservation_id):
+	r= db.Reservations[reservation_id]
+	host = db((db.Reservations.Event==r.Event)&(db.Reservations.Member==r.Member)&(db.Reservations.Host==True)).select().first()
+	return host.Checked_in
+
 #table includes primary reservation records plus guest records for each guest.
 #Member(host) must have record in Members.
 #Primary reservation record has Host==True
@@ -297,6 +302,7 @@ db.define_table('Reservations',
 	Field('Provisional', 'boolean', default=False, writable=False),
 													#incomplete reservation: checkout not started, places not allocated
 	Field('Waitlist', 'boolean', default=False, writable=False),	#now meaningfull in each individual reservation
+	Field('Checked_in', 'boolean', default=False, writable=False),
 	
 	#following fields meaningfull only on the member's own reservation (Host==True)
 	Field('Charged', 'decimal(6,2)', writable=False),	#payment made, not yet downloaded from Stripe

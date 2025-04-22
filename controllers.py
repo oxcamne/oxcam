@@ -1490,7 +1490,7 @@ def event_copy(event_id):
 	selections = db(db.Event_Selections.Event==event_id).select()
 	survey = db(db.Event_Survey.Event==event_id).select()
 	new_event_id = db.Events.insert(Page=event.Page, Description='Copy of '+event.Description, DateTime=event.DateTime,
-				Booking_Closed=event.Booking_Closed, Details=event.Details, Members_only=event.Members_only, AdCom_only=event.AdCom_only,
+				Booking_Closed=event.Booking_Closed, Details=event.Details, Members_only=event.Members_only, Hidden=event.Hidden,
 				Allow_join=event.Allow_join, Guest=event.Guests, Sponsors=event.Sponsors, Venue=event.Venue,
 				Capacity=event.Capacity, Speaker=event.Speaker, Notes=event.Notes, Comment=event.Comment)
 	for t in tickets:
@@ -2445,8 +2445,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 		if not event or \
 				(datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.DateTime and \
 	 				not (member_id and event_unpaid(event_id, member_id) > 0)) or \
-				(datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.Booking_Closed and not event_attend(event_id)) or \
-				event.AdCom_only and not access:
+				(datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.Booking_Closed and not event_attend(event_id)):
 			flash.set('Event is not open for booking.')
 			redirect(URL('my_account'))
 		if datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.Booking_Closed:
@@ -2503,8 +2502,6 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 				else 'Mailing List Registration' if request.query.get('mail_lists')
 				else 'Membership Application/Renewal: Your Information')
 	if event:
-		if event.AdCom_only and not (member and member.Access):
-			redirect(URL('my_account'))
 		header = CAT(header, XML(f"Event: {event.Description}<br>When: {event.DateTime.strftime('%A %B %d, %Y %I:%M%p')}<br>Where: {event.Venue}<br><br>"),
 XML(f"This event is open to \
 {'all alumni of Oxford & Cambridge' if not event.Members_only else f'members of {SOCIETY_SHORT_NAME}'}\

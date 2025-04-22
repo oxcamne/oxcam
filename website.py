@@ -23,7 +23,7 @@ def history_content():
 	since = datetime.datetime(2019, 3, 31)
 	events = db((db.Events.DateTime < datetime.datetime.now()) & (db.Events.DateTime >= since) & \
 			 ((db.Events.Page != None)|(db.Events.Details != None)) & \
-				(db.Events.AdCom_only==False)).select(orderby = ~db.Events.DateTime).\
+				(db.Events.Hidden==False)).select(orderby = ~db.Events.DateTime).\
 				find(lambda r: event_attend(r.id) > 0)
 
 	table_rows = []
@@ -105,7 +105,7 @@ def upcoming_events():
 	if not events:
 		return CAT(header, XML(markdown.markdown('Please check again soon!')[3:-4]+'<br>'))
 	for event in events:
-		if event.AdCom_only and not (member and member.Access):
+		if event.Hidden:
 			continue
 		attend = event_attend(event.id)
 		line = f"{event.DateTime.strftime('%A, %B %d ')} **[{event.Description}]({URL(f'event_page/{event.id}') if event.Details else event.Page})**".strip()

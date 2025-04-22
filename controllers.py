@@ -1322,6 +1322,7 @@ def reservation(path=None):
 		db.Reservations.Survey_.readable = False
 		db.Reservations.Provisional.default = True
 		db.Reservations.Waitlist.readable = False
+		db.Reservations.Checked_in.readable = False
 
 		if host_reservation:
 			#update member's name from member record in case corrected

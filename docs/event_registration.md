@@ -8,11 +8,13 @@ This page displays the full information about a member's event registration incl
 
 The **back** link will take you back to the events page.
 
+The *Status* column is blank (or a tick, if checked-in to the event) for a confirmed registration, or shows *waitlisted* or *unconfirmed* (if the member did not checkout).
+
 Links allow you to send email to the member, or to pop out to view the member's record.
 
 This page can be used to build a reservation on a member's behalf (e.g. for a speaker), as well as to view/edit reservations made by the members themselves.
 
-The example shows the display of a member plus guest for which checkout (including payment) has been completed. The reservation cannot be deleted entirely as it would leave an unmatched accounting transaction. You can delete the guest if the member's guest has to cancel. If no ticket payment had been made, you would be able to delete the member's record (first line), which would also delete the guest record.
+The example shows the display of a member plus guest for which checkout has been clicked, whether or not payment was made - places have been allocated. The reservation cannot be deleted entirely as it might leave an unmatched accounting transaction. You can delete the guest if the member's guest has to cancel. If no ticket payment had been made, you may delete the member's record (first line), which would also delete the guest record.
 
 If the member wishes to cancel the entire reservation, edit the member record marking it 'provisional'. This moves it from the reservation list to the provisional list. The guest registration will also be automatically marked provisional. The reservation will show a negative TBC reflecting the ticket charges paid until and unless a refund is recorded in accounting.
 

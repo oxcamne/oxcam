@@ -18,17 +18,15 @@ The **Make a Copy of This Event** link creates a new event record (and it's subr
 
 Below the menu appear the fields of the main event record.
 
-**Page** as noted above, this field should contain the URL for the event page if implemented within the group's static website.
+**Page** as noted above, this field can be used to point to an event page in an older website. It would normally be left blank. OxCamNE uses it in older events from before the database included web content.
 
 **Description** contains the name of the event.
 
-**Datetime** should contain the start date and time of the event.
+**Datetime** should contain the start date and time of the event. Once an event record is created with a future date/time it will appear in the home page calendar. The **Booking Closed** date/time defaults to the initial creation time of the event record so that it will be in the past and a newly created event will appear as a 'save the date'.
 
-Once registration is opened, **Booking Closed** indicates the date and time when registration will close. When an event if first set up this is usually set to a past time, disabling the booking link and preventing the event from appearing as a registration link on the 'My Accounts' page until we are ready to open registration.
+Registration is opened, and public access to the event details, by editing Booking Closed to reflect the end of the registration period. After that point until the event itself the registration link will allow users to place themselves on the **waitlist**.
 
-Registration is opened by editing Booking Closed to reflect the end of the registration period. After that point until the event itself the registration link will allow users to place themselves on the **waitlist**.
-
-**Details** is used to implement the event page within the database, and also automatically supplies content when the event notice is sent out to the mailing list. This avoids having to provide the information in two different contexts and formats. As with emails sent using the database, a combination of Markdown formatting and html can be used. Below the field the comment includes a link to [Markdown documentation](https://www.markdownguide.org/basic-syntax/); also [see here](send_email.md#embedding-images-in-email) for a discussion of including images.
+**Details** is used to implement the event page within the database, and also automatically supplies content when the event notice is sent out to the mailing list. This avoids having to provide the information in two different contexts and formats. As with emails sent using the database, a combination of Markdown formatting and html can be used. Below the field the comment includes a link to [Markdown documentation](https://www.markdownguide.org/basic-syntax/); also [see here](send_email.md#useful-tips) for useful tips on managing graphic content, converting content from other formats, etc.
 
 It is recommended that the registration link be represented as
 > `[please register here]([[registration_link]])`

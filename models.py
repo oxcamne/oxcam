@@ -157,9 +157,13 @@ def event_attend(event_id):
 	attend = db((db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).count()
 	return attend
 
+def event_checked_in(event_id):
+	checked_in = db((db.Reservations.Event==event_id)&(db.Reservations.Checked_in==True)).count()
+	return checked_in
+
 markdown_comment = CAT(" (optional) create page using ",
 			   A('Markdown', _href='https://www.markdownguide.org/basic-syntax/', _target='doc'),
-			   " and see",
+			   " and see ",
 			   A('Useful Tips', _href='https://oxcamne.github.io/oxcam/send_email.html#useful-tips', _target='doc'),
 			   " for additional formatting ")
 			
@@ -167,7 +171,8 @@ db.define_table('Events',
 	Field('Page', 'string', comment=" (optional) Link to external event page"),
 	Field('Description', 'string', requires=IS_NOT_EMPTY(), comment=" Shown on website, confirmations, and financials"),
 	Field('DateTime', 'datetime', requires=[IS_NOT_EMPTY(), IS_DATETIME()], comment=" Event Date and Time, use 24-hour clock"),
-	Field('Booking_Closed', 'datetime'),
+	Field('Booking_Closed', 'datetime', requires=[IS_NOT_EMPTY(), IS_DATETIME()],
+	   		default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)),
 	Field('Details', 'text', comment=markdown_comment),
 	Field('Views', 'integer', default=0, writable=False),
 	Field('Members_only', 'boolean', default=True, comment=" members and their guests only"),
@@ -262,6 +267,10 @@ def res_wait(member_id, event_id):
 def res_prov(member_id, event_id):
 	prov = db((db.Reservations.Member==member_id)&(db.Reservations.Event==event_id)&(db.Reservations.Provisional==True)).count()
 	return prov
+
+def res_checked_in(member_id, event_id, checked=True):
+	ck = db((db.Reservations.Member==member_id)&(db.Reservations.Event==event_id)&(db.Reservations.Checked_in==checked)).count()
+	return ck
 
 def res_conf(member_id, event_id):
 	conf = db((db.Reservations.Member==member_id)& (db.Reservations.Waitlist==False) &\

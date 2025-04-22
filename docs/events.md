@@ -10,11 +10,13 @@ The **+New** button is used to create a new event. However, new events are usual
 
 The **Search** row allows search on (all or part of) an event name, venue, or speaker name.
 
-The grid contains one row for each event, showing summary data including guest and waitlist counts.
+The grid contains one row for each event, showing summary data. The example shows future events where numberical values have not yet accumulated.
 
 **Paid** is the total net ticket revenue for the event as recorded in accounting, or charged but not yet reconciled in accounting. It reflects any refunds that have been recorded in accounting.
 
-**TBC** reflects the shortfall of ticket revenues on confirmed tickets, i.e. cases where an attendee has hit 'checkout' but did not complete payment. It can also be negative, i.e. if an attendee cancels but a refund is not made or accounted for (the reservation will be marked 'provisional' to remove it from the door list). The individual discrepancies will be visible on individual rows in the reservations list or provisional reservations list.
+**TBC** reflects the shortfall of ticket revenues on confirmed tickets, i.e. cases where an attendee has hit 'checkout' but did not complete payment. It can also be negative, i.e. if an attendee cancels but a refund is not made or accounted for (the reservation should be marked 'provisional' to remove it from the door list). The individual discrepancies will be visible on individual rows in the reservations list or provisional reservations list.
+
+**Wait** is the total number of people (members and guests) waitlisted, **Conf** the total number confirmed (i.e. allocated places), and the final column (with a tick) the number who actually checked-in, after the event.
 
 The event name in a row is a link which opens up the [**reservation list**](reservation_list.md).
 The **Edit/Display** button on the row allows the [**event record**](event_record.md) to be viewed or edited.

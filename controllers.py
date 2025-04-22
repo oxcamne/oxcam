@@ -41,7 +41,8 @@ from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
 	primary_matriculation, event_revenue, event_unpaid, page_name, res_hostchecked_in,\
 	res_conf, event_cost, res_wait, res_prov, bank_accrual, tickets_sold,\
-	res_unitcost, res_selection, event_paid_dict, event_ticket_dict, collegelist
+	res_unitcost, res_selection, event_paid_dict, event_ticket_dict, collegelist,\
+	event_checked_in, res_checked_in
 from pydal.validators import IS_LIST_OF_EMAILS, IS_EMPTY_OR, IS_IN_DB, IS_IN_SET,\
 	IS_NOT_EMPTY, IS_DATE, IS_DECIMAL_IN_RANGE, IS_INT_IN_RANGE, IS_MATCH, CLEANUP
 from .utilities import email_sender, member_good_standing, ageband, newpaiddate,\
@@ -723,7 +724,7 @@ def events(path=None):
 
 	grid = Grid(path, db.Events.id>0,
 		 	orderby=~db.Events.DateTime,
-			headings=['Datetime', 'Event', 'Venue', 'Paid', 'TBC', 'Conf', 'Wait'],
+			headings=['Datetime', 'Event', 'Venue', 'Paid', 'TBC', 'Wait', 'Conf', '✔'],
 			columns=[db.Events.DateTime,
 					Column('event', lambda row: A(row.Description, _href=URL(f"event_reservations/{row.id}/select",
 										vars=dict(back=request.url)),
@@ -731,8 +732,9 @@ def events(path=None):
 	   				db.Events.Venue,
 					Column('Paid', lambda row: event_revenue(row.id) or ''),
 					Column('TBC', lambda row: event_unpaid(row.id) or ''),
+					Column('Wait', lambda row: event_wait(row.id) or ''),
 					Column('Conf', lambda row: event_attend(row.id) or ''),
-					Column('Wait', lambda row: event_wait(row.id) or '')],
+					Column('Checked_in', lambda row: event_checked_in(row.id) or '')],
 			search_queries=[["Event", lambda value: db.Events.Description.ilike(f'%{value}%')],
 							["Venue", lambda value: db.Events.Venue.ilike(f'%{value}%')],
 							["Speaker", lambda value: db.Events.Speaker.ilike(f'%{value}%')],
@@ -943,7 +945,7 @@ def event_reservations(event_id, path=None):
 
 	search_fields = [
 		Field('status', 'string', default = request.query.get('status') or 'confirmed',
-				requires=IS_IN_SET(['confirmed', 'tbc', 'checked_in', 'no_show', 'waitlist', 'provisional'])),
+				requires=IS_IN_SET(['confirmed', 'tbc', 'checked_in', 'no_show', 'waitlist', 'provisional'], zero='status?'),),
 	]
 	if db(db.Event_Tickets.Event==event_id).count()>1:
 		search_fields.append(
@@ -973,27 +975,30 @@ def event_reservations(event_id, path=None):
 	
 	header = CAT(A('back', _href=request.query.back),
 				H6(f"{event.DateTime}, {event.Description}"),
-				XML("Click on the member name to drill down on a reservation and view/edit the details."), XML('<br>'))
+				XML("Click on the member name to view/edit reservation details."),
+				XML('<br>'))
 
 	query = f'(db.Reservations.Event=={event_id})'
 	status = request.query.get('status') or 'confirmed'
 	if status == 'tbc':
 		query += f"&db.Reservations.Member.belongs({tbc})"
-	#for waitlist or provisional, have to include hosts with waitlisted or provisional guests
+	#for waitlist, provisional, checked_in, no_show, include hosts with any guests meeting criteria
 	elif status == 'waitlist':
 		query += f"&db.Reservations.Member.belongs([r.Member for r in db((db.Reservations.Event=={event_id})&\
 (db.Reservations.Waitlist==True)).select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 	elif status == 'provisional':
 		query += f"&db.Reservations.Member.belongs([r.Member for r in db((db.Reservations.Event=={event_id})&\
 (db.Reservations.Provisional==True)).select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
-	else:
-		query += '&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)'
-		header = CAT(header, A('Export Doorlist as CSV file',
-			 _href=(URL(f'doorlist_export/{event_id}', scheme=True))), " (ignores filters)", XML('<br>'))
-		
-	if status == 'checked_in':
+	elif status == 'checked_in':
 		query += f"&db.Reservations.Member.belongs([r.Member for r in db((db.Reservations.Event=={event_id})&\
 (db.Reservations.Checked_in==True)).select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
+	else:	#confirmed, no show
+		query += '&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)'
+		header = CAT(header, A('Export confirmed registrations as CSV file',
+			 _href=(URL(f'doorlist_export/{event_id}', scheme=True))), XML('<br>'),
+			 A('Check-in Tool', _href=URL(f'check_in/{event_id}/select', scheme=True)),
+			 XML('<br>'))
+		
 	if status == 'no_show':
 		query += f"&db.Reservations.Member.belongs([r.Member for r in db((db.Reservations.Event=={event_id})&\
 (db.Reservations.Checked_in==False)).select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
@@ -1008,7 +1013,7 @@ def event_reservations(event_id, path=None):
 (db.Reservations.Survey_=={request.query.survey})).select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 	query += '&(db.Reservations.Host==True)'
 
-	header = CAT(header, A('Send Email Notice', _href=URL('composemail', vars=dict(query=query,
+	header = CAT(header, A('Send Email to filtered registrations', _href=URL('composemail', vars=dict(query=query,
 		left  = "[db.Emails.on(db.Emails.Member==db.Reservations.Member),db.Members.on(db.Members.id==db.Reservations.Member)]",	
 		qdesc=f"{event.Description} {status}",
 		back=request.url
@@ -1025,8 +1030,10 @@ def event_reservations(event_id, path=None):
 						db.Members.Membership, db.Members.Paiddate, db.Reservations.Affiliation, db.Reservations.Notes,
 						Column('cost', lambda row: cost.get(row.Reservations.Member) or ''),
 						Column('tbc', lambda row: (cost.get(row.Reservations.Member) or 0)-paid.get(row.Reservations.Member) or ''),
-						Column('count', lambda row: (res_wait(row.Reservations.Member, event_id) if request.query.get('waitlist')\
-					  		else res_prov(row.Reservations.Member, event_id) if request.query.get('provisional')\
+						Column('count', lambda row: (res_wait(row.Reservations.Member, event_id) if status=='waitlist'\
+					  		else res_prov(row.Reservations.Member, event_id) if status=='provisional'\
+							else res_checked_in(row.Reservations.Member, event_id, True) if status=='checked_in'\
+							else res_checked_in(row.Reservations.Member, event_id, False) if status=='no_show'\
 							else res_conf(row.Reservations.Member, event_id)) or'')],
 			headings=['Member', 'Type', 'Until', 'College', 'Notes', 'Cost', 'Tbc', '#'],
 			search_form=search_form if len(search_fields)>0 else None,
@@ -1041,9 +1048,9 @@ def event_reservations(event_id, path=None):
 def check_in(event_id, path=None):
 	event = db.Events[event_id]
 	access = session.access	#for layout.html
-	header = f"Check-in for {event.Description}"
+	header = H6(f"Check-in {event.DateTime.date()}, {event.Description}")
 	if request.query.get('last'):
-		header = CAT(header, XML('<br>'), A('last_checked',
+		header = CAT(header, A('last_checked',
 					_href=URL(f"manage_reservation/{request.query.get('last')}/{event_id}/select",
 						vars=dict(back=URL(f"check_in/{event_id}/select", scheme=True))), _style='white-space: normal'))
 
@@ -1185,9 +1192,10 @@ Deleting or moving member on/off waitlist will also affect all guests."))
 			orderby=~db.Reservations.Host|db.Reservations.Created,
 			columns=[db.Reservations.Lastname, db.Reservations.Firstname, db.Reservations.Notes,
 					Column('Selection', lambda row: res_selection(row.id),
-						required_fields=[db.Reservations.Provisional, db.Reservations.Waitlist]),
+						required_fields=[db.Reservations.Provisional, db.Reservations.Waitlist, db.Reservations.Checked_in]),
 					Column('Price', lambda row: res_unitcost(row.id)),
-					Column('Status', lambda r: 'waitlisted' if r.Waitlist else 'unconfirmed' if r.Provisional else '')],
+					Column('Status', lambda r: 'waitlisted' if r.Waitlist else \
+						'unconfirmed' if r.Provisional else "✔" if r.Checked_in else '')],
 			headings=['Last', 'First', 'Notes', 'Selection', 'Price', 'Status'],
 			deletable=lambda row: write,
 			details=not write, 
@@ -1449,7 +1457,8 @@ def doorlist_export(event_id):
 	filename = 'doorlist.csv'
 	writer=csv.writer(stream)
 	writer.writerow(['HostLast','HostFirst','Notes','LastName','FirstName','CollegeName','Matr','Selection','Table','Ticket',
-						'Email','Cell','Survey','Comment'])
+						'Email','Cell','Survey','Comment','CheckedIn'])
+	event = db.Events[event_id]
 
 	rows = db((db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).select(
 			left = db.Members.on(db.Members.id==db.Reservations.Member),
@@ -1468,7 +1477,8 @@ def doorlist_export(event_id):
 							selection_name, '', ticket_name,
 							primary_email(row.Reservations.Member) if row.Reservations.Host==True else '',
 							row.Members.Cellphone if row.Reservations.Host==True else '',
-							survey_name, row.Reservations.Comment or ''])
+							survey_name, row.Reservations.Comment or '',
+							'✔' if row.Reservations.Checked_in else ''])
 	return locals()
 	
 @action('event_copy/<event_id:int>', method=['GET'])

@@ -1994,6 +1994,8 @@ def bank_file(bank_id):
 #before processing. We first read from the file, to determine that there is overlap with previously processed files
 #(at least one previously stored transaction in the file). 
 	file_transactions = []
+	print(type(form.vars.get('downloaded_file')))  # Confirm it's a string (path) and not a file object
+	print(form.vars.get('downloaded_file'))  # Verify the actual path
 	
 	try:
 		f = StringIO(form.vars.get('downloaded_file').file.read().decode(encoding='utf-8'))

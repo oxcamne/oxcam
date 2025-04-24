@@ -39,6 +39,8 @@ Below this:
 
 Ticking the **Members Only** checkbox restricts registration to members in good-standing at the time the event will take place. Full members with auto-renewing subscriptions will be assumed to be in good standing even if the event takes place after their currently paid date. Non-member alums and members whose renewal date precedes the event will need to join or renew at the time of registration.
 
+Ticking the **Hidden** checkbox excludes the event from being shown in the Home page calendar and My Account page. This might be an event for the organizers only, or for our OxCam10 group. Only members sent the notice or link explicitly will be aware of the event.
+
 Leaving Members Only unchecked allows any Oxbridge alumni to register. In this case, ticking **Allow Join** allows alumni to choose to join or renew as part of the registration process, as a convenience. For certain events, such as the Freshers' event, we do not allow join as registration includes the first year's membership.
 
 If a number is placed in the **Guests** field it limits the total party size a member can register, including themself.

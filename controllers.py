@@ -960,8 +960,8 @@ def event_reservations(event_id, path=None):
 	survey = db(db.Event_Survey.Event==event_id).select()
 	if len(survey)>0:
 		event_survey = [(s.id, s.Short_name) for s in survey[1:]]
-		search_fields.append(Field('survey', requires=IS_IN_SET(event_survey, zero="survey?",
-			error_message='Please make a selection'), default = request.query.get('survey')))
+		search_fields.append(Field('survey', requires=IS_EMPTY_OR(IS_IN_SET(event_survey, zero="survey?",
+			error_message='Please make a selection')), default = request.query.get('survey')))
 
 	search_form=Form(search_fields, keep_values=True, formstyle=FormStyleBulma)
 
@@ -1994,8 +1994,6 @@ def bank_file(bank_id):
 #before processing. We first read from the file, to determine that there is overlap with previously processed files
 #(at least one previously stored transaction in the file). 
 	file_transactions = []
-	print(type(form.vars.get('downloaded_file')))  # Confirm it's a string (path) and not a file object
-	print(form.vars.get('downloaded_file'))  # Verify the actual path
 	
 	try:
 		f = StringIO(form.vars.get('downloaded_file').file.read().decode(encoding='utf-8'))

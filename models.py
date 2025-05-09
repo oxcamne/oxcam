@@ -269,7 +269,8 @@ def res_prov(member_id, event_id):
 	return prov
 
 def res_checked_in(member_id, event_id, checked=True):
-	ck = db((db.Reservations.Member==member_id)&(db.Reservations.Event==event_id)&(db.Reservations.Checked_in==checked)).count()
+	ck = db((db.Reservations.Member==member_id)& (db.Reservations.Waitlist==False) &\
+			(db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)&(db.Reservations.Checked_in==checked)).count()
 	return ck
 
 def res_conf(member_id, event_id):
@@ -284,11 +285,6 @@ def res_unitcost(reservation_id):
 def res_selection(reservation_id):
 	r= db.Reservations[reservation_id]
 	return db.Event_Selections[r.Selection_].Selection if r.Selection_ else ''
-
-def res_hostchecked_in(reservation_id):
-	r= db.Reservations[reservation_id]
-	host = db((db.Reservations.Event==r.Event)&(db.Reservations.Member==r.Member)&(db.Reservations.Host==True)).select().first()
-	return host.Checked_in
 
 #table includes primary reservation records plus guest records for each guest.
 #Member(host) must have record in Members.

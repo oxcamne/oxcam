@@ -39,7 +39,7 @@ from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
 from .pay_processors import paymentprocessor
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
-	primary_matriculation, event_revenue, event_unpaid, page_name, res_hostchecked_in,\
+	primary_matriculation, event_revenue, event_unpaid, page_name,\
 	res_conf, event_cost, res_wait, res_prov, bank_accrual, tickets_sold,\
 	res_unitcost, res_selection, event_paid_dict, event_ticket_dict, collegelist,\
 	event_checked_in, res_checked_in
@@ -1048,21 +1048,27 @@ def event_reservations(event_id, path=None):
 def check_in(event_id, path=None):
 	event = db.Events[event_id]
 	access = session.access	#for layout.html
+	search_value = request.query.get('search_value') or ''
 	header = H6(f"Check-in {event.DateTime.date()}, {event.Description}")
 	if request.query.get('last'):
 		header = CAT(header, A('last_checked',
 					_href=URL(f"manage_reservation/{request.query.get('last')}/{event_id}/select",
 						vars=dict(back=URL(f"check_in/{event_id}/select", scheme=True))), _style='white-space: normal'))
+		
+	back = URL(f"check_in/{event_id}/select", scheme=True)
 
-	back = URL(f"check_in/{event_id}/select", scheme=True, vars=dict(last=request.query.member_id))	
-	if request.query.get('member_id'):
-		rows = db((db.Reservations.Event==event_id)&(db.Reservations.Member==request.query.member_id)).select()
-		for row in rows:
-			if (db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False):
-				row.update_record(Checked_in=True)
+	if request.query.get('rsvtn_id'):
+		rsvtn = db.Reservations[request.query.rsvtn_id]
+		back += f"?last={rsvtn.Member}"
+		rsvtn.update_record(Checked_in=not rsvtn.Checked_in)
+		if res_checked_in(rsvtn.Member, event_id) != res_conf(rsvtn.Member, event_id):
+			back += f"&search_value={rsvtn.Lastname[0:2]}"
 		redirect(back)
 
-	grid = Grid(path, (db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)&(db.Reservations.Checked_in==False),
+	unchecked = [r.Member for r in db((db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)&(db.Reservations.Checked_in==False)).select(db.Reservations.Member, distinct=True)]
+		#list of members whose parties not fully checked in
+
+	grid = Grid(path, (db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)&(db.Reservations.Member.belongs(unchecked)),
 			left = db.Members.on(db.Members.id==db.Reservations.Member),
 			orderby=db.Members.Lastname|db.Members.Firstname|~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname,
 			columns=[
@@ -1071,8 +1077,8 @@ def check_in(event_id, path=None):
 									_href=URL(f"manage_reservation/{row.Member}/{event_id}/select",
 									vars=dict(back=back)), _style='white-space: normal')),
 					required_fields=[db.Reservations.Host, db.Reservations.Lastname, db.Reservations.Firstname, db.Reservations.Member]),
-				Column('check in', lambda row: A("✔", _href=URL(f"check_in/{event_id}/select",
-									vars=dict(member_id=row.Member))) if row.Host or res_hostchecked_in(row.id) else ''),
+				Column('check in', lambda row: A("⬤" if row.Checked_in else "◯", _href=URL(f"check_in/{event_id}/select",
+									vars=dict(rsvtn_id=row.id))), required_fields=[db.Reservations.Checked_in]),
 			],
 			details=False, editable=False, create=False,
 			deletable=False,

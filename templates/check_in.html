@@ -2,41 +2,50 @@
 
 [[=header]]
 
-<input type="text" id="search" placeholder="Search by name..." autocomplete="off">
+<input type="text" id="search" placeholder="Search by name..." autocomplete="off" value="[[=search_value]]">
 
 <div id="grid-container">
 [[=grid.render()]]
 </div>
 
 <script>
-document.getElementById("search").addEventListener("input", function() {
-    let searchValue = this.value.toLowerCase();
-    let rows = document.querySelectorAll("#grid-container table tbody tr");
-
-    let showGroup = false; // Tracks visibility of a member and their guests
-    let lastMemberRow = null; // Stores the last seen member row
-
-    rows.forEach((row) => {
-        let nameCell = row.querySelector("td:first-child"); 
-        if (!nameCell) return;
-
-        let nameText = nameCell.textContent.toLowerCase();
-        let isGuest = nameText.startsWith("+ ");
-
-        if (!isGuest) {
-            // Member row: reset visibility tracker and store reference
-            lastMemberRow = row;
-            showGroup = nameText.startsWith(searchValue);
-        } else {
-            // Guest row: Trim '+ ' prefix, then check match
-            let guestName = nameText.substring(2); // Remove '+ '
-            if (guestName.startsWith(searchValue)) {
-                showGroup = true;
-                if (lastMemberRow) lastMemberRow.style.display = ""; // Ensure member is visible
+    function applyFilter() {
+        let searchValue = document.getElementById("search").value.toLowerCase();
+        let rows = document.querySelectorAll("#grid-container table tbody tr");
+    
+        let showGroup = false; // Tracks visibility of a member and their guests
+        let lastMemberRow = null; // Stores the last seen member row
+    
+        rows.forEach((row) => {
+            let nameCell = row.querySelector("td:first-child"); 
+            if (!nameCell) return;
+    
+            let nameText = nameCell.textContent.toLowerCase();
+            let isGuest = nameText.startsWith("+ ");
+    
+            if (!isGuest) {
+                // Member row: reset visibility tracker and store reference
+                lastMemberRow = row;
+                showGroup = nameText.startsWith(searchValue);
+            } else {
+                // Guest row: Trim '+ ' prefix, then check match
+                let guestName = nameText.substring(2); // Remove '+ '
+                if (guestName.startsWith(searchValue)) {
+                    showGroup = true;
+                    if (lastMemberRow) lastMemberRow.style.display = ""; // Ensure member is visible
+                }
             }
-        }
-
-        row.style.display = showGroup ? "" : "none";
-    });
-});
-</script>
+    
+            row.style.display = showGroup ? "" : "none";
+        });
+    }
+    
+    // Apply filter on input change
+    document.getElementById("search").addEventListener("input", applyFilter);
+    
+    // Apply filter on initial load if search_value is provided
+    if (document.getElementById("search").value.trim() !== "") {
+        applyFilter();
+    }
+    </script>
+    

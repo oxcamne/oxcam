@@ -15,7 +15,7 @@ The filter above the grid selects the types of reservations displayed. The first
 - confirmed (the default) selects reservations where at least the member is confirmed, i.e. has checked out and been allocated a place (guests may have been added later and be either waitlisted or provisional)
 - tbc selects any reservations where either payment is due or (negative values) a refund *may* be appropriate
 - checked-in selects all reservations where at least one person checked-in at the event
-- no-show selects all confirmed reservations where at least one person did not check-in at the event
+- no-show selects all reservations where at least one confirmed person did not check-in at the event
 - waitlist selects all reservations containing at least one waitlisted person (in this case the rows are shown in the order they were initially created)
 - provisional selects all reservations where at least one person was not checked-out to confirm their place.
 

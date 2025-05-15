@@ -1059,6 +1059,8 @@ def check_in(event_id, path=None):
 
 	if request.query.get('rsvtn_id'):
 		rsvtn = db.Reservations[request.query.rsvtn_id]
+		if rsvtn.Event != event_id:
+			raise Exception('Invalid event id')
 		back += f"?last={rsvtn.Member}"
 		rsvtn.update_record(Checked_in=not rsvtn.Checked_in)
 		if res_checked_in(rsvtn.Member, event_id) != res_conf(rsvtn.Member, event_id):

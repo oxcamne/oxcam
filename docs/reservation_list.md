@@ -23,7 +23,9 @@ Additional filter dropdown buttons are shown depending on whether the event has 
 
 Confirmed reservations can be exported using the **Export Doorlist as CSV file** link. The resulting spreadsheet can be used to print the doorlist, generate name badges, plan table assignments, etc. The door list includes all confirmed members and guests. See the 'how to' for help in preparing name badges.
 
-The **[Check-in Tool](check_in.md)** displayes the not yet checked in confirmed reservations.
+The **[Check-in Tool](check_in.md)** displayes the not yet checked in confirmed reservations, and is used to check people in at the door.
+
+The **[Table Assignment Tool](assign_tables.md)** is used record table assignments, e.g. for formal dinners.
 
 The **Send_Email_Notice** link allows sending notices to attendees, waitlisted, or provisional registrants. Note that the message can be customized using [[greeting>]], [[reservation]], and [[registration_link]] elements.
 

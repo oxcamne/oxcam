@@ -301,15 +301,16 @@ db.define_table('Reservations',
 			requires=IS_EMPTY_OR(IS_IN_DB(db, db.Colleges.id, '%(Name)s', orderby=db.Colleges.Name))),
 	Field('Ticket_', 'reference Event_Tickets'),
 	Field('Selection_', 'reference Event_Selections'),
-	Field('Survey_', 'reference Event_Survey', writable=False),
 	Field('Notes', 'string'),	#host name specified, or justifying ticket selection
-	Field('Comment', 'string', writable=False),	#answer to open ended question
 	Field('Provisional', 'boolean', default=False, writable=False),
 													#incomplete reservation: checkout not started, places not allocated
 	Field('Waitlist', 'boolean', default=False, writable=False),	#now meaningfull in each individual reservation
 	Field('Checked_in', 'boolean', default=False, writable=False),
 	
 	#following fields meaningfull only on the member's own reservation (Host==True)
+	Field('Table', 'string', default=''),	#table assignment, if any (host only)
+	Field('Survey_', 'reference Event_Survey', writable=False), #survey response (host only)
+	Field('Comment', 'string', writable=False),	#answer to open ended question (host only)
 	Field('Charged', 'decimal(6,2)', writable=False),	#payment made, not yet downloaded from Stripe
 	Field('Checkout', 'string', writable=False),	#session.vars of incomplete checkout
 

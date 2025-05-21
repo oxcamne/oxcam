@@ -996,7 +996,8 @@ def event_reservations(event_id, path=None):
 		query += '&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)'
 		header = CAT(header, A('Export confirmed registrations as CSV file',
 			 _href=(URL(f'doorlist_export/{event_id}', scheme=True))), XML('<br>'),
-			 A('Check-in Tool', _href=URL(f'check_in/{event_id}/select', scheme=True)),
+			 A('Check-in Tool', _href=URL(f'check_in/{event_id}/select', scheme=True)), XML('<br>'),
+			 A('Table Assignment Tool', _href=URL(f'assign_tables/{event_id}/select', scheme=True)),
 			 XML('<br>'))
 		
 	if status == 'no_show':
@@ -1087,6 +1088,71 @@ def check_in(event_id, path=None):
 			grid_class_style=grid_style,rows_per_page=1000,
 			formstyle=form_style)
 	return locals()
+		
+@action('assign_tables/<event_id:int>', method=['POST', 'GET'])
+@action('assign_tables/<event_id:int>/<path:path>', method=['POST', 'GET'])
+@preferred
+@checkaccess('write')
+def assign_tables(event_id, path=None):
+	event = db.Events[event_id]
+	access = session.access	#for layout.html
+	header = CAT(H6(f"Assign Tables {event.DateTime.date()}, {event.Description}"),
+				XML("Filter to show a selected table, selecting host also adds that party to the table.<br>"),
+				A(("Clear"), _href=URL(f'assign_tables/{event_id}/select', scheme=True)),
+				XML(" to show all table assignments."),
+				)
+		
+	back = request.url
+	query = f"(db.Reservations.Event=={event_id})&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)"
+
+	search_form = Form([
+		Field('host', 'reference Members', requires=IS_EMPTY_OR(IS_IN_DB(db(
+			(db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)&(db.Reservations.Host==True)),
+			db.Reservations.Member, '%(Lastname)s, %(Firstname)s',))),
+	    Field('table', 'string',
+		   		widget=lambda field, value: INPUT(_name='table', _type='text', _value=request.query.get('table'), _placeholder="table?"))],
+		formstyle=FormStyleBulma, submit_value='Submit')
+
+	if search_form.accepted:	#Filter button clicked
+		select_vars = {}
+		if search_form.vars.get('table'):
+			select_vars['table'] = search_form.vars.get('table')
+			if search_form.vars.get('host'):
+				db(eval(query+"&(db.Reservations.Member==search_form.vars.get('host'))")).update(Table=search_form.vars.get('table'))
+		redirect(URL(f"assign_tables/{event_id}", vars=select_vars))
+
+	if request.query.get('table'):
+		query += f"&db.Reservations.Table.ilike('%{request.query.get('table')}%')"
+
+	table_counts = {}
+	for r in db((db.Reservations.Event==event_id) &
+				(db.Reservations.Provisional==False) &
+				(db.Reservations.Waitlist==False) &
+				(db.Reservations.Table != None) &
+				(db.Reservations.Table != '')).select(db.Reservations.Table):
+		t = r.Table.strip()
+		if t:
+			table_counts[t] = table_counts.get(t, 0) + 1
+
+	grid = Grid(path, eval(query), left = db.Members.on(db.Members.id==db.Reservations.Member),
+			orderby=db.Reservations.Table|db.Members.Lastname|db.Members.Firstname|~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname,
+			columns=[
+				Column('Guest', lambda row: CAT(('+ ' if not row.Reservations.Host else ''),
+									A(f"{row.Reservations.Lastname+', '+row.Reservations.Firstname}",
+									_href=URL(f"manage_reservation/{row.Reservations.Member}/{event_id}/select",
+									vars=dict(back=back)), _style='white-space: normal')),
+					required_fields=[db.Reservations.Host, db.Reservations.Lastname, db.Reservations.Firstname, db.Reservations.Member]),
+				db.Members.Membership, db.Reservations.Affiliation,
+				Column('Matr', lambda row: primary_matriculation(row.Reservations.Member) if row.Reservations.Host else ''),
+				db.Reservations.Notes, db.Reservations.Table,
+            	Column('Count', lambda row: table_counts.get((row.Reservations.Table or '').strip(), '') if row.Reservations.Table else '',
+					required_fields=[db.Reservations.Table]),
+			],
+			details=False, editable=False, create=False,
+			deletable=False, search_form=search_form,
+			grid_class_style=grid_style,rows_per_page=1000,
+			formstyle=form_style)
+	return locals()
 
 #this controller is used by privileged users to manage event registrations.
 #most of the rules governing registration, e.g. capacity constrains, membership requirements,
@@ -1162,6 +1228,11 @@ Deleting or moving member on/off waitlist will also affect all guests."))
 			db.Reservations.Lastname.writable=True
 			db.Reservations.Provisional.default=not host_reservation.Waitlist
 			db.Reservations.Waitlist.default=host_reservation.Waitlist
+			db.Reservations.Table.readable=db.Reservations.Table.writable=False
+			db.Reservations.Charged.readable=False
+			db.Reservations.Survey_.readable=False
+			db.Reservations.Checkout.readable=False
+			db.Reservations.Comment.readable=False
 		else:
 			#creating or revising the host reservation
 			db.Reservations.Title.default = member.Title
@@ -1183,8 +1254,11 @@ Deleting or moving member on/off waitlist will also affect all guests."))
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
-		if (form.vars.get('id')):
-			if int(form.vars.get('id')) == host_reservation.id and (form.vars.get('Waitlist') != host_reservation.Waitlist or form.vars.get('Provisional') != host_reservation.Provisional):
+		if (form.vars.get('id') and (int(form.vars.get('id')) == host_reservation.id)):
+			if form.vars.get('Table') != host_reservation.Table:
+				for row in all_guests:
+					row.update_record(Table = form.vars.get('Table'))
+			if form.vars.get('Waitlist') != host_reservation.Waitlist or form.vars.get('Provisional') != host_reservation.Provisional:
 				for row in all_guests:
 					if row.id != host_reservation.id and (not row.Provisional or host_reservation.Provisional):
 						row.update_record(Waitlist = form.vars.get('Waitlist'), Provisional = form.vars.get('Provisional'))
@@ -1331,6 +1405,7 @@ def reservation(path=None):
 		db.Reservations.Provisional.default = True
 		db.Reservations.Waitlist.readable = False
 		db.Reservations.Checked_in.readable = False
+		db.Reservations.Table.readable = False
 
 		if host_reservation:
 			#update member's name from member record in case corrected
@@ -1483,7 +1558,7 @@ def doorlist_export(event_id):
 		writer.writerow([row.Members.Lastname, row.Members.Firstname, row.Reservations.Notes or '',
 							row.Reservations.Lastname, row.Reservations.Firstname, row.Reservations.Affiliation.Name if row.Reservations.Affiliation else '',
 							primary_matriculation(row.Reservations.Member) or '' if row.Reservations.Host==True else '',
-							selection_name, '', ticket_name,
+							selection_name, row.Reservations.Table or '', ticket_name,
 							primary_email(row.Reservations.Member) if row.Reservations.Host==True else '',
 							row.Members.Cellphone if row.Reservations.Host==True else '',
 							survey_name, row.Reservations.Comment or '',
@@ -1512,7 +1587,7 @@ def event_copy(event_id):
 
 	flash.set("Please customize the new event.")
 	redirect(URL(f'events/edit/{new_event_id}', vars=dict(_referrer=request.query._referrer)))
-
+	
 @action('events_export', method=['GET'])
 @action.uses("download.html2", db, session, flash, Inject(response=response))
 @checkaccess('write')
@@ -1552,7 +1627,7 @@ def pages(path=None):
 		back = decode_url(request.query._referrer)
 		if path=='new':
 			header = CAT(A('back', _href=back), H5('New Public Page'))
-		else:
+		elif path:
 			page_id = path[path.find('/')+1:]
 			page = db.Pages[page_id]
 			if page.Content:
@@ -1640,9 +1715,9 @@ def get_date_range():
 			form.errors.end = 'end should not be before start!'
 		
 	form=Form(
-		[Field('start', 'date', requires=[IS_NOT_EMPTY(),IS_DATE()],
+		[Field('start', 'date', requires=[IS_NOT_EMPTY(),IS_DATE()], label='Start Date',
 			default = prev_year_begin if request.query.function=='tax_statement' else year_ago.date()),
-		Field('end', 'date', requires=[IS_NOT_EMPTY(),IS_DATE()],
+		Field('end', 'date', requires=[IS_NOT_EMPTY(),IS_DATE()], label='End Date',
 			default = prev_year_end if request.query.function=='tax_statement' else today.date())]
 	)
 	
@@ -1786,7 +1861,7 @@ def financial_statement(start, end):
 		totexp += exp
 	rows.append(THEAD(TR(TH('Total'), TH(''), tdnum(totrev, th=True),
 			  tdnum(totexp, th=True), tdnum(totrev+totexp, th=True))))
-	header  = CAT(header, H6('\nAdmin & Event Cash Flow'), TABLE(*rows))
+	header = CAT(header, H6('\nAdmin & Event Cash Flow'), TABLE(*rows))
 	return locals()
 	
 @action('tax_statement/<start>/<end>', method=['GET'])
@@ -2326,7 +2401,7 @@ def composemail():
 			if form2.vars['save']:
 				proto.update_record(Subject=form2.vars['subject'],
 					Body=form2.vars['body'])
-				flash.set("Template updatelend: "+ form2.vars['subject'])
+				flash.set("Template updated: "+ form2.vars['subject'])
 		else:
 			if form2.vars['save']:
 				db.EMProtos.insert(Subject=form2.vars['subject'], Body=form2.vars['body'])
@@ -2468,10 +2543,12 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 	session['dues'] = None
 			
 	affinity = None
+	good_standing = False
 	clist = collegelist(event.Sponsors if event_id and event.Sponsors else [])
 	
 	if member_id:
 		member = db.Members[member_id]
+		good_standing = member_good_standing(member, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date())
 		affinity = db((db.Affiliations.Member==member_id)&db.Affiliations.College.belongs([c[0] for c in clist])).select(
 							orderby=db.Affiliations.Modified).first()
 		if affinity:
@@ -2483,14 +2560,13 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 			if member_reservation:
 				if member_reservation.Checkout:	#checked out but didn't complete payment
 					checkout = eval(member_reservation.Checkout)
-					if not member_good_standing(member, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()):
+					if not good_standing:
 						#still need dues, so signal
 						session['membership'] = checkout.get('membership')
 						session['dues'] = str(checkout.get('dues')) if checkout.get('dues') else None
 				redirect(URL('reservation/select'))	#go add guests and/or checkout
 			if sponsor or (affinity and affinity.Matr or member.Membership and not affinity) and \
-			   		(member_good_standing(member, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()) \
-						or not event.Members_only and not event.Allow_join):
+			   		(good_standing or not event.Members_only and not event.Allow_join):
 				#members of sponsor organizations, or membership eligible and member in good standing, or 
 				#event open to all alums and not offering join option, then no need to gather member information
 				#ALSO collect Matr if missing from affinity, and allow approved unaffiliated members
@@ -2533,11 +2609,11 @@ XML(f"This event is open to \
 	if not affinity or not affinity.Matr:
 		fields.append(Field('matr', 'integer', default = affinity.Matr if affinity else None,
 				requires=IS_EMPTY_OR(IS_INT_IN_RANGE(datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).year-100,datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).year+1)),
-				comment='Please enter your matriculation year, not graduation year'))
+				comment='If Oxford or Cambridge alum, please enter your matriculation year'))
 
 	if event:
 		mustjoin = event.Members_only and not event.Sponsors
-		if len(MEMBERSHIPS)>0 and (event.Members_only or event.Allow_join):
+		if len(MEMBERSHIPS)>0 and (event.Members_only or event.Allow_join) and not good_standing:
 			fields.append(Field('join_or_renew', 'boolean', default=mustjoin,
 				comment=' this event is restricted to OxCamNE members' if mustjoin else \
 					' tick if you are an Oxbridge alum and also wish to join OxCamNE or renew your membership'))
@@ -2568,7 +2644,7 @@ XML(f"This event is open to \
 			form.errors['affiliation']='please select your affiliation from the dropdown, or contact '+SUPPORT_EMAIL
 		if form.vars.get('affiliation') and (not affinity or not affinity.Matr) and not form.vars.get('matr'):
 			form.errors['matr'] = 'please enter your matriculation year'
-		if event and event.Members_only and not form.vars.get('join_or_renew'):
+		if event and event.Members_only and form.vars.get('join_or_renew')==False:
 			form.errors['join_or_renew'] = 'This event is for members only, please join/renew to attend'
 		if form.vars.get('membership'):
 			membership = next((m for m in MEMBERSHIPS if m.category==form.vars.get('membership')))

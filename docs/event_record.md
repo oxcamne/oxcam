@@ -12,6 +12,8 @@ The booking link is the registration link which would be linked from the event p
 
 Similarly, the event page link is shown; it may be external (on the group website, specified in the Page field of the record), or internal to the database (Details field of the event record).
 
+The **[Table Assignment Tool](assign_tables.md)** is used record table assignments, e.g. for formal dinners.
+
 The [**Ticket Types**](tickets.md), [**Selections**](selections.md), and [**Survey**](survey.md) links take you to the pages for managing ticket categories, menu selections, and multiple choice survey questions to appear on the registration and checkout pages. These data are all held in seperate records referencing the event record itself.
 
 The **Make a Copy of This Event** link creates a new event record (and it's subrecords) initially identical except of a 'copy of ...' prefix added to the Event Description. The newly copied event is displayed so that it can be customized with the new date, etc.

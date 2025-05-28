@@ -25,8 +25,6 @@ Confirmed reservations can be exported using the **Export Doorlist as CSV file**
 
 The **[Check-in Tool](check_in.md)** displayes the not yet checked in confirmed reservations, and is used to check people in at the door.
 
-The **[Table Assignment Tool](assign_tables.md)** is used record table assignments, e.g. for formal dinners.
-
 The **Send_Email_Notice** link allows sending notices to attendees, waitlisted, or provisional registrants. Note that the message can be customized using [[greeting>]], [[reservation]], and [[registration_link]] elements.
 
 **TBC** indicates any unpaid amount relating to confirmed tickets. Email confirmation is not sent until any necessary payment is completed. **Cost** is the total cost for both member and confirmed guests. Note that for a cancelled reservation appearing in the provisional reservations list, a negative TBC may appear indicating the unrefunded amount. Tickets may be unrefundable for late cancellations.

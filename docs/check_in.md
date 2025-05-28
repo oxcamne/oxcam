@@ -4,7 +4,7 @@
 
 This page is reached by clicking on an event name on the [Reservation List](reservation_list.md) and then clicking the "check-in tool" link.
 
-It is designed for use when checking in guests at the event, and so is designed to be smartphone friendly.
+It is designed for use when checking in guests at the event, and so is designed to be smartphone friendly. It can be used by anyone with read access privilege - the only case where this level of privilege can update the database.
 
 ![check_in](images/check_in.png)
 

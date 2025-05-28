@@ -206,7 +206,7 @@ def members(path=None):
 			qdesc += f" with email matching '{value}'."
 		else:
 			fieldtype = eval("db.Members."+field+'.type')
-			m = re.match(r"^([<>]?=?)\s*(.*)$", value, flags=re.DOTALL)
+			m = re.match(r"^([\!<>]?=?)\s*(.*)$", value, flags=re.DOTALL)
 			operator = m.group(1)
 			value = m.group(2)
 			if fieldtype == 'string' or fieldtype == 'text':
@@ -263,7 +263,7 @@ mailing list</a> or apply other filters.<br>Selecting an event selects attendees
 selecting an event AND a mailing list selects the mailing list less attendees \
 AND includes the event Details in email notices.<br>\
 You can filter on a member record field \
-using an optional operator (=, <, >, <=, >=) together with a value."))
+using an optional operator (=, !=, <, >, <=, >=) together with a value."))
 		footer = CAT(A("View Recent New Members", _href=URL('new_members/select')), XML('<br>'),
 			A("Export Membership Analytics", _href=URL('member_analytics')), XML('<br>'),
 			A("Export Selected Records", _href=URL('members_export',
@@ -706,6 +706,7 @@ def events(path=None):
 			header = CAT(A('back', _href=back), H5('Event Record'),
 						"Booking link is ", A(url, _href=url), XML('<br>'),
 						"Event page is ", A(urlpage, _href=urlpage), XML('<br>'),
+						A('Table Assignment Tool', _href=URL(f'assign_tables/{event_id}/select', scheme=True)), XML('<br>'),
 						A('Ticket Types', _href=URL(f'tickets/{event_id}/select',
 								vars=dict(back=request.url))), XML('<br>'),
 						A('Selections', _href=URL(f'selections/{event_id}/select',
@@ -996,9 +997,7 @@ def event_reservations(event_id, path=None):
 		query += '&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)'
 		header = CAT(header, A('Export confirmed registrations as CSV file',
 			 _href=(URL(f'doorlist_export/{event_id}', scheme=True))), XML('<br>'),
-			 A('Check-in Tool', _href=URL(f'check_in/{event_id}/select', scheme=True)), XML('<br>'),
-			 A('Table Assignment Tool', _href=URL(f'assign_tables/{event_id}/select', scheme=True)),
-			 XML('<br>'))
+			 A('Check-in Tool', _href=URL(f'check_in/{event_id}/select', scheme=True)), XML('<br>'),)
 		
 	if status == 'no_show':
 		query += f"&db.Reservations.Member.belongs([r.Member for r in db((db.Reservations.Event=={event_id})&\
@@ -1018,7 +1017,7 @@ def event_reservations(event_id, path=None):
 		left  = "[db.Emails.on(db.Emails.Member==db.Reservations.Member),db.Members.on(db.Members.id==db.Reservations.Member)]",	
 		qdesc=f"{event.Description} {status}",
 		back=request.url
-		))), XML('<br>'))
+		))))
 	header = CAT(header, XML('<br>'), "Use dropdowns to filter (includes reservation if member or any guest fits filter):")
 
 	grid = Grid(path, eval(query),
@@ -1045,7 +1044,7 @@ def event_reservations(event_id, path=None):
 @action('check_in/<event_id:int>', method=['POST', 'GET'])
 @action('check_in/<event_id:int>/<path:path>', method=['POST', 'GET'])
 @action.uses("check_in.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER))
-@checkaccess('write')
+@checkaccess('read')
 def check_in(event_id, path=None):
 	event = db.Events[event_id]
 	access = session.access	#for layout.html
@@ -1097,42 +1096,38 @@ def assign_tables(event_id, path=None):
 	event = db.Events[event_id]
 	access = session.access	#for layout.html
 	header = CAT(H6(f"Assign Tables {event.DateTime.date()}, {event.Description}"),
-				XML("Filter to show a selected table, selecting host also adds that party to the table.<br>"),
-				A(("Clear"), _href=URL(f'assign_tables/{event_id}/select', scheme=True)),
-				XML(" to show all table assignments."),
+				XML("Assigning host member to table assigns entire party."),
 				)
 		
 	back = request.url
+
 	query = f"(db.Reservations.Event=={event_id})&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)"
 
+	#display table counts before assignment form and detailed assignment grid
+	tablecount = db.Reservations.Table.count()
+	db(eval(query)).select(db.Reservations.Table, tablecount, orderby=db.Reservations.Table, groupby=db.Reservations.Table,)
+	form = Grid('select', eval(query), orderby=db.Reservations.Table, groupby=db.Reservations.Table,
+			 columns=[db.Reservations.Table,
+					Column('Count', lambda row: row[tablecount] or '', required_fields=[tablecount])],
+			details=False, editable=False, create=False, deletable=False,
+			grid_class_style=grid_style, rows_per_page=100, formstyle=form_style)
+
 	search_form = Form([
-		Field('host', 'reference Members', requires=IS_EMPTY_OR(IS_IN_DB(db(
+		Field('table', 'string',
+			widget=lambda field, value: INPUT(_name='table', _type='text', _value=request.query.get('table'), _placeholder="table?"),
+			requires=IS_NOT_EMPTY()),
+		Field('host', 'reference Members', requires=IS_IN_DB(db(
 			(db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)&(db.Reservations.Host==True)),
-			db.Reservations.Member, '%(Lastname)s, %(Firstname)s',))),
-	    Field('table', 'string',
-		   		widget=lambda field, value: INPUT(_name='table', _type='text', _value=request.query.get('table'), _placeholder="table?"))],
+			db.Reservations.Member, '%(Lastname)s, %(Firstname)s', zero='host member?')),],
 		formstyle=FormStyleBulma, submit_value='Submit')
 
-	if search_form.accepted:	#Filter button clicked
+	if search_form.accepted:	#Assign button clicked
 		select_vars = {}
 		if search_form.vars.get('table'):
 			select_vars['table'] = search_form.vars.get('table')
 			if search_form.vars.get('host'):
 				db(eval(query+"&(db.Reservations.Member==search_form.vars.get('host'))")).update(Table=search_form.vars.get('table'))
 		redirect(URL(f"assign_tables/{event_id}", vars=select_vars))
-
-	if request.query.get('table'):
-		query += f"&db.Reservations.Table.ilike('%{request.query.get('table')}%')"
-
-	table_counts = {}
-	for r in db((db.Reservations.Event==event_id) &
-				(db.Reservations.Provisional==False) &
-				(db.Reservations.Waitlist==False) &
-				(db.Reservations.Table != None) &
-				(db.Reservations.Table != '')).select(db.Reservations.Table):
-		t = r.Table.strip()
-		if t:
-			table_counts[t] = table_counts.get(t, 0) + 1
 
 	grid = Grid(path, eval(query), left = db.Members.on(db.Members.id==db.Reservations.Member),
 			orderby=db.Reservations.Table|db.Members.Lastname|db.Members.Firstname|~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname,
@@ -1145,12 +1140,10 @@ def assign_tables(event_id, path=None):
 				db.Members.Membership, db.Reservations.Affiliation,
 				Column('Matr', lambda row: primary_matriculation(row.Reservations.Member) if row.Reservations.Host else ''),
 				db.Reservations.Notes, db.Reservations.Table,
-            	Column('Count', lambda row: table_counts.get((row.Reservations.Table or '').strip(), '') if row.Reservations.Table else '',
-					required_fields=[db.Reservations.Table]),
 			],
 			details=False, editable=False, create=False,
 			deletable=False, search_form=search_form,
-			grid_class_style=grid_style,rows_per_page=1000,
+			grid_class_style=grid_style,rows_per_page=1000, search_button_text='Assign',
 			formstyle=form_style)
 	return locals()
 
@@ -2200,9 +2193,9 @@ def transactions(path=None):
 				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Events',
 				lambda r: f"{r.DateTime.strftime(DATE_FORMAT)} {r.Description[:25]}",
 				orderby = ~db.Events.DateTime, zero="event?"))),
-    	Field('notes', 'string',
+		Field('notes', 'string',
 		   		widget=lambda field, value: INPUT(_name='notes', _type='text', _value=request.query.get('notes'), _placeholder="notes?")),
-    	Field('reference', 'string',
+		Field('reference', 'string',
 		   		widget=lambda field, value: INPUT(_name='reference', _type='text', _value=request.query.get('reference'), _placeholder="ref?"))],
 		keep_values=True, formstyle=FormStyleBulma)
 

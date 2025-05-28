@@ -2,14 +2,16 @@
 
 ## Table Assignment Tool
 
-This page is reached by clicking on an event name on the [Reservation List](reservation_list.md) and then clicking the "table assignment tool" link.
+This page is reached by clicking the "table assignment tool" link on an [event record](event_record.md).
 
 It is designed for use prior to a formal event such as a dinner. The table assignments are included in the exported doorlist.csv file and can be used on name badges.
 
 ![assign_tables](images/assign_tables.png)
 
-The page includes a grid initially including all confirmed registered members and guests. Guests not yet assigned a table appear at the top, followed by those in each table in party (member) name order within tables. Guests are shown after their host member with a '+' prefix in front of their name.
+At the top of the page a summary is shown of the tables and seat counts already assigned.
 
-To show just the guests assigned to a table, type the table number in the 'table?' box and click filter. Selecting a member in the left hand box, placing a table number in the right hand box and clicking 'Filter' assigns the member and all of their guests to the specified table, and leaves the grid showing the resulting composition of that table, so that additional guests can easily be assigned.
+This is followed by a form which allows a host member and their guests (a party) to be assigned to a named table by filling in the form and clicking 'Assign'
 
-Clicking 'clear' clears the filter boxes and restores the grid to show all confirmed registered guests.
+The grid below lists all registered confirmed guests. Guests not yet assigned a table appear at the top, followed by those in each table in party (host member) name order within tables. Guests are shown after their host member with a '+' prefix in front of their name.
+
+Clicking on a guest name opens up the [event registration](event_registration.md). Editing the host member reservation Table will move the entire party, just like the tool; editing a guest reservation will move just the guest.

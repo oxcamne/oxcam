@@ -3,49 +3,84 @@
 [[=header]]
 
 <input type="text" id="search" placeholder="Search by name..." autocomplete="off" value="[[=search_value]]">
-
+<label>
+  <input type="checkbox" id="unchecked-only" checked>
+  Unchecked only
+</label>
 <div id="grid-container">
 [[=grid.render()]]
 </div>
 
 <script>
-    function applyFilter() {
-        let searchValue = document.getElementById("search").value.toLowerCase();
-        let rows = document.querySelectorAll("#grid-container table tbody tr");
-    
-        let showGroup = false; // Tracks visibility of a member and their guests
-        let lastMemberRow = null; // Stores the last seen member row
-    
-        rows.forEach((row) => {
-            let nameCell = row.querySelector("td:first-child"); 
-            if (!nameCell) return;
-    
-            let nameText = nameCell.textContent.toLowerCase();
-            let isGuest = nameText.startsWith("+ ");
-    
-            if (!isGuest) {
-                // Member row: reset visibility tracker and store reference
-                lastMemberRow = row;
-                showGroup = nameText.startsWith(searchValue);
-            } else {
-                // Guest row: Trim '+ ' prefix, then check match
-                let guestName = nameText.substring(2); // Remove '+ '
-                if (guestName.startsWith(searchValue)) {
-                    showGroup = true;
-                    if (lastMemberRow) lastMemberRow.style.display = ""; // Ensure member is visible
-                }
-            }
-    
-            row.style.display = showGroup ? "" : "none";
+function applyFilter() {
+    let searchValue = document.getElementById("search").value.toLowerCase();
+    let uncheckedOnly = document.getElementById("unchecked-only").checked;
+    let rows = Array.from(document.querySelectorAll("#grid-container table tbody tr"));
+
+    let groupRows = [];
+
+    function groupHasUnchecked(rows) {
+        // Returns true if at least one row is NOT checked in (does not contain "●")
+        return rows.some(row => {
+            let checkCell = row.querySelector("td:nth-child(2)");
+            if (!checkCell) return false;
+            let discText = checkCell.textContent.trim();
+            return !discText.includes("⬤");
         });
     }
-    
-    // Apply filter on input change
-    document.getElementById("search").addEventListener("input", applyFilter);
-    
-    // Apply filter on initial load if search_value is provided
-    if (document.getElementById("search").value.trim() !== "") {
-        applyFilter();
+
+    function groupHasNameStartingWith(rows, searchValue) {
+        // Returns true if host or any guest name (excluding '+ ') starts with searchValue
+        return rows.some(row => {
+            let n = row.querySelector("td:first-child");
+            if (!n) return false;
+            let t = n.textContent.toLowerCase();
+            if (t.startsWith("+ ")) t = t.substring(2);
+            return t.startsWith(searchValue);
+        });
     }
-    </script>
-    
+
+    for (let i = 0; i < rows.length; i++) {
+        let row = rows[i];
+        let nameCell = row.querySelector("td:first-child");
+        if (!nameCell) continue;
+
+        let nameText = nameCell.textContent.toLowerCase();
+        let isGuest = nameText.startsWith("+ ");
+
+        if (!isGuest) {
+            // Process previous group
+            if (groupRows.length > 0) {
+                let groupMatchesSearch = true;
+                if (searchValue !== "") {
+                    groupMatchesSearch = groupHasNameStartingWith(groupRows, searchValue);
+                }
+                let groupAllChecked = !groupHasUnchecked(groupRows);
+                let groupVisible = groupMatchesSearch && (!uncheckedOnly || !groupAllChecked);
+                groupRows.forEach(r => r.style.display = groupVisible ? "" : "none");
+            }
+            // Start new group
+            groupRows = [row];
+        } else {
+            groupRows.push(row);
+        }
+    }
+    // Process the last group
+    if (groupRows.length > 0) {
+        let groupMatchesSearch = true;
+        if (searchValue !== "") {
+            groupMatchesSearch = groupHasNameStartingWith(groupRows, searchValue);
+        }
+        let groupAllChecked = !groupHasUnchecked(groupRows);
+        let groupVisible = groupMatchesSearch && (!uncheckedOnly || !groupAllChecked);
+        groupRows.forEach(r => r.style.display = groupVisible ? "" : "none");
+    }
+}
+
+// Attach event listeners
+document.getElementById("search").addEventListener("input", applyFilter);
+document.getElementById("unchecked-only").addEventListener("change", applyFilter);
+
+// Initial filter
+applyFilter();
+</script>

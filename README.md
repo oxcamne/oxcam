@@ -26,7 +26,7 @@ OxCam is a [Python](https://www.python.org) App running under the open source we
 OxCam is a web app and these requirements apply to your chosen web server environment:
 
 - Python 3.8+ must be installed. The app has been developed and is currently running on Python 3.10.
-- [Py4web](https://py4web.com/_documentation) must also be installed. Please see the [Py4web documentation](https://py4web.com/_documentation) for information on it's installation. There is information on installing Py4web on a variety of environments. If you are installing Py4web on PythonAnywhere, an alternative is to follow [Tutorial: Easily install py4web on PythonAnywhere](https://nicozanf.wordpress.com/2024/03/24/how-to-easily-install-py4web-on-pythonanywhere/).
+- [Py4web](https://py4web.com/_documentation) must also be installed. Please see the [Py4web documentation](https://py4web.com/_documentation) for information on it's installation. There is information on installing Py4web on a variety of environments. If you are installing Py4web on PythonAnywhere, please see [https://oxcamne.github.io/oxcam/py4web_pythonanywhere](https://oxcamne.github.io/oxcam/py4web_pythonanywhere).
 - You will need to use the Py4web Dashboard for certain operations, so will need to use that password, which is set during Py4web installation.
 - git must be installed; you will use it in a terminal session to clone this software from the github repositary, and to pull future updates of OxCam.
 

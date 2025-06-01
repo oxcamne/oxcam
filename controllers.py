@@ -1050,10 +1050,6 @@ def check_in(event_id, path=None):
 	access = session.access	#for layout.html
 	search_value = request.query.get('search_value') or ''
 	header = H6(f"Check-in {event.DateTime.date()}, {event.Description}")
-	if request.query.get('last'):
-		header = CAT(header, A('last_checked',
-					_href=URL(f"manage_reservation/{request.query.get('last')}/{event_id}/select",
-						vars=dict(back=URL(f"check_in/{event_id}/select", scheme=True))), _style='white-space: normal'))
 		
 	back = URL(f"check_in/{event_id}/select", scheme=True)
 
@@ -1061,16 +1057,12 @@ def check_in(event_id, path=None):
 		rsvtn = db.Reservations[request.query.rsvtn_id]
 		if rsvtn.Event != event_id:
 			raise Exception('Invalid event id')
-		back += f"?last={rsvtn.Member}"
 		rsvtn.update_record(Checked_in=not rsvtn.Checked_in)
 		if res_checked_in(rsvtn.Member, event_id) != res_conf(rsvtn.Member, event_id):
-			back += f"&search_value={rsvtn.Lastname[0:2]}"
+			back += f"?search_value={rsvtn.Lastname[0:2]}"
 		redirect(back)
 
-	unchecked = [r.Member for r in db((db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)&(db.Reservations.Checked_in==False)).select(db.Reservations.Member, distinct=True)]
-		#list of members whose parties not fully checked in
-
-	grid = Grid(path, (db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)&(db.Reservations.Member.belongs(unchecked)),
+	grid = Grid(path, (db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False),
 			left = db.Members.on(db.Members.id==db.Reservations.Member),
 			orderby=db.Members.Lastname|db.Members.Firstname|~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname,
 			columns=[
@@ -1079,7 +1071,7 @@ def check_in(event_id, path=None):
 									_href=URL(f"manage_reservation/{row.Member}/{event_id}/select",
 									vars=dict(back=back)), _style='white-space: normal')),
 					required_fields=[db.Reservations.Host, db.Reservations.Lastname, db.Reservations.Firstname, db.Reservations.Member]),
-				Column('check in', lambda row: A("⬤" if row.Checked_in else "◯", _href=URL(f"check_in/{event_id}/select",
+				Column('check in', lambda row: A( "⬤"if row.Checked_in else "〇", _href=URL(f"check_in/{event_id}/select",
 									vars=dict(rsvtn_id=row.id))), required_fields=[db.Reservations.Checked_in]),
 			],
 			details=False, editable=False, create=False,

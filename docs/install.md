@@ -207,8 +207,7 @@ members, as used by OxCamNE. Adjust as needed. If you do not have paid membershi
 
 ### Start the database
 
-Once the app is installed and your settings_private.py file is configured you should restart py4web. If py4web is already running you can use the 'Reload Apps' button in the 'Installed Applications' section of the Py4web Dashboard. You should now see the oxcam app running
-as an installed application.
+Once the app is installed and your settings_private.py file is configured you should restart py4web using the big green button on the Pythonanywhere console *Web* tab.
 
 When first started the app creates an empty database in a databases/ folder in the py4web/apps/oxcam directory.
 

@@ -348,7 +348,7 @@ def stripe_checkout_success():
 	
 	if dues:
 		flash.set('Confirmation has been sent by email. Please review your mailing list subscriptions.')
-		redirect(URL(f"emails/Y/{member.id}/select", vars=dict(back=URL('my_account'))))
+		redirect(URL(f"emails/Y/{member.id}", vars=dict(back=URL('my_account'))))
 	
 	redirect(URL('my_account'))
 

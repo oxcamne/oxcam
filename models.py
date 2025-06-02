@@ -45,7 +45,7 @@ def email_lists(id):
 db.define_table('Email_Lists',
 	Field('Listname', 'string'),
 	Field('Member', 'boolean', default=False, comment=" if true joining Society joins this list"),
-	Field('Daemon', 'datetime'),	#on first list, records start time of current Email Daemon
+	Field('Daemon', 'datetime', writable=False),	#on first list, records start time of current Email Daemon
 	Field('Description', 'text'),	#HTML allowed
 	format='%(Listname)s')
 db.Email_Lists.Listname.requires=[IS_NOT_EMPTY(), IS_NOT_IN_DB(db, 'Email_Lists.Listname')]
@@ -252,9 +252,11 @@ db.Pages.Page.requires = IS_NOT_IN_DB(db, db.Pages.Page)
 
 db.define_table('Affiliations',
 	Field('Member', 'reference Members', writable=False),
-	Field('College', 'reference Colleges'),
-	Field('Matr', 'integer', requires=IS_INT_IN_RANGE(1900,datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date().year+1),
-			comment='Please enter your matriculation year, not graduation year'),
+	Field('College', 'reference Colleges',
+    	requires=[IS_IN_DB(db, db.Colleges.id, '%(Name)s', orderby=db.Colleges.Name), IS_NOT_EMPTY()]),
+	Field('Matr', 'integer',
+		requires=[IS_NOT_EMPTY(), IS_INT_IN_RANGE(1900,datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date().year+1)],
+		comment='Please enter your matriculation year, not graduation year'),
 	Field('Notes', 'string', default=''),
 	Field('Modified', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None),
        			update=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),

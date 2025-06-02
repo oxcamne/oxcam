@@ -21,11 +21,12 @@ from io import StringIO, TextIOWrapper
 preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER))
 
 @action('db_tool', method=['POST', 'GET'])
-@action('db_tool/<path:path>', method=['POST', 'GET'])
 @preferred
 @checkaccess('admin')
-def db_tool(path=None):
+def db_tool():
 	access = session.access	#for layout.html
+	mode = request.params.get('mode', 'query')
+
 	form = Form([Field('query'),
 			  	Field('orderby'),
 				Field('left'),
@@ -41,7 +42,7 @@ Something like \"db.table1.field1==db.table2.field2\" results in a SQL JOIN. Res
 \"field update\" is an optional expression like \"field1='...', field2='...', ...\".<br>\
 See the Py4web documentation (DAL) for to learn more.")
 
-	if not path:
+	if not mode:
 		session['query2'] = None
 		session['orderby2'] = None
 		session['left2'] = None
@@ -68,7 +69,7 @@ See the Py4web documentation (DAL) for to learn more.")
 		form.vars['orderby'] = session.get('orderby2')
 		form.vars['left'] = session.get('left2')
 		if form.vars.get('query'):
-			grid = Grid(path, eval(form.vars.get('query')),
+			grid = Grid(eval(form.vars.get('query')),
 			   		orderby=eval(form.vars.get('orderby')) if form.vars.get('orderby') else None,
 			   		left=eval(form.vars.get('left')) if form.vars.get('left') else None,
 					details=False, editable=True, create=True, deletable=True,

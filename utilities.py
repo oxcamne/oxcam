@@ -107,7 +107,7 @@ def get_banks(startdatetime, enddatetime):
 def tdnum(value, query=None, left=None, th=False):
 	#return number as TD or TH
 	nums = f'{CURRENCY_SYMBOL}{value:,.2f}' if value >= 0 else f'({CURRENCY_SYMBOL}{-value:,.2f})'
-	numsq = A(nums, _href=URL('transactions/select', vars=dict(query=query, left=left, back=request.url))) if query else nums
+	numsq = A(nums, _href=URL('transactions', vars=dict(query=query, left=left, back=request.url))) if query else nums
 	return TH(numsq, _style=f'text-align:right{"; color:Red" if value <0 else ""}') if th==True else TD(numsq, _style=f'text-align:right{"; color:Red" if value <0 else ""}')
 
 def financial_content(event, query, left):
@@ -128,7 +128,7 @@ def financial_content(event, query, left):
 	rows = [THEAD(TR(TH('Account'), TH('Amount')))]
 	for acct in accts:
 		if acct[sumamt] >= 0:
-			rows.append(TR(TD(A(acct.CoA.Name[0:25], _href=URL('transactions/select',
+			rows.append(TR(TD(A(acct.CoA.Name[0:25], _href=URL('transactions',
 							vars=dict(query=f"{query}&(db.AccTrans.Account=={acct.CoA.id})&(db.Events.id=={event})", left=left, back=request.url)))),
 						tdnum(acct[sumamt])))
 			totrev += acct[sumamt]
@@ -139,7 +139,7 @@ def financial_content(event, query, left):
 	rows = [THEAD(TR(TH('Account'), TH('Amount')))]
 	for acct in accts:
 		if acct[sumamt] < 0:
-			rows.append(TR(TD(A(acct.CoA.Name[0:25], _href=URL('transactions/select',
+			rows.append(TR(TD(A(acct.CoA.Name[0:25], _href=URL('transactions',
 							vars=dict(query=f"{query}&(db.AccTrans.Account=={acct.CoA.id})&(db.Events.id=={event})", left=left, back=request.url)))),
 						tdnum(-acct[sumamt])))
 			totexp -= acct[sumamt]
@@ -317,7 +317,7 @@ def get_list(list, index):
 	except IndexError:
 		return None
 	
-#encode something, usually a URL, for use in another URL, e.g. as _referrer
+#encode something, usually a URL, for use in another URL, e.g. as referrer
 def encode_url(url):
 	return base64.b16encode(url.encode("utf8")).decode("utf8")
 

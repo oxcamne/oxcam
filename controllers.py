@@ -48,7 +48,7 @@ from pydal.validators import IS_LIST_OF_EMAILS, IS_EMPTY_OR, IS_IN_DB, IS_IN_SET
 from .utilities import email_sender, member_good_standing, ageband, newpaiddate,\
 	tdnum, get_banks, financial_content, event_confirm, msg_header, msg_send,\
 	notification, notify_support, member_profile, generate_hash,\
-	encode_url, decode_url, pages_menu, template_expand
+	encode_url, pages_menu, template_expand
 from .session import checkaccess
 from .website import society_emails, about_content, history_content, upcoming_events
 from py4web.utils.factories import Inject
@@ -111,7 +111,8 @@ def view_card():
 @checkaccess('read')
 def members():
 	access = session.access	#for layout.html
-	mode = request.query.get('mode')
+	parsed = Grid.parse(request.query)
+	back = parsed['referrer'] or request.url
 	query = []
 	left = None #only used if mailing list with excluded event attendees
 	qdesc = ""
@@ -138,8 +139,7 @@ def members():
 		Field('value', 'string', default = request.query.get('value'))],
 		keep_values=True, formstyle=FormStyleBulma)
 	
-	if not mode:
-		back = request.url
+	if parsed['mode'] == 'select':
 		header = CAT(header, A("Send Email to Specific Address(es)",
 						_href=URL('composemail', vars=dict(back=back))), XML('<br>'))
 		
@@ -157,9 +157,8 @@ def members():
 				select_vars['value'] = search_form.vars.get('value')
 			redirect(URL('members', vars=select_vars))
 	else:
-		back = decode_url(request.query.referrer)
 		header = CAT(A('back', _href=back), H5('Member Record'))
-		if mode=='edit' or mode=='details':
+		if parsed['mode']=='edit' or parsed['mode']=='details':
 			acdues = db(db.CoA.Name.ilike("Membership Dues")).select().first().id
 			member_id = request.query.get('id')
 			member = db.Members[member_id]
@@ -251,7 +250,7 @@ def members():
 	if errors:
 		flash.set(errors)
 	
-	if not mode:
+	if parsed['mode'] == 'select':	
 		if qdesc:
 			header = CAT(header,
 				A(f"Send Notice to {qdesc}", _href=URL('composemail',
@@ -265,7 +264,7 @@ selecting an event AND a mailing list selects the mailing list less attendees \
 AND includes the event Details in email notices.<br>\
 You can filter on a member record field \
 using an optional operator (=, !=, <, >, <=, >=) together with a value."))
-		footer = CAT(A("View Recent New Members", _href=URL('new_members')), XML('<br>'),
+		footer = CAT(A("View Recent New Members", _href=URL('new_members', vars={'back': request.url})), XML('<br>'),
 			A("Export Membership Analytics", _href=URL('member_analytics')), XML('<br>'),
 			A("Export Selected Records", _href=URL('members_export',
 						vars=dict(query=query, left=left or '', qdesc=qdesc))))
@@ -300,7 +299,7 @@ using an optional operator (=, !=, <, >, <=, >=) together with a value."))
 			formstyle=form_style,
 			search_form=search_form,
 			validation=validate,
-			deletable=lambda r: member_deletable(r['id'])
+			deletable=lambda r: write and member_deletable(r['id'])
 			)
 	return locals()
 
@@ -430,7 +429,8 @@ def add_member_reservation(member_id):
 @checkaccess(None)
 def affiliations(ismember, member_id):
 	access = session.access	#for layout.html
-	mode = request.query.get('mode')
+	parsed = Grid.parse(request.query)
+	back = parsed['referrer'] or request.query.back
 	
 	if ismember=='Y':
 		if member_id!=session.member_id:
@@ -442,7 +442,6 @@ def affiliations(ismember, member_id):
 		write = ACCESS_LEVELS.index(session.access) >= ACCESS_LEVELS.index('write')
 	db.Affiliations.Member.default=member_id
 
-	back = request.query.back if not mode else decode_url(request.query.referrer)
 
 	header = CAT(A('back', _href=back),
 		  		H5('Member Affiliations'),
@@ -505,7 +504,8 @@ def unsubscribe(email_id, list_id, hash):
 @checkaccess(None)
 def emails(ismember, member_id):
 	access = session.access	#for layout.html
-	mode = request.query.get('mode')
+	parsed = Grid.parse(request.query)
+	back = parsed['referrer'] or request.query.back
 
 	if ismember=='Y':
 		if member_id!=session.member_id:
@@ -518,13 +518,11 @@ def emails(ismember, member_id):
 		write = ACCESS_LEVELS.index(session.access) >= ACCESS_LEVELS.index('write')
 	db.Emails.Member.default=member_id
 
-	if not mode:
+	if parsed['mode'] == 'select':
 		member = db.Members[member_id]
 		paymentprocessor(member.Pay_source).update_email(member)
-		back = request.query.back
 	else:
-		back = decode_url(request.query.referrer)
-		if mode=='new':
+		if parsed['mode']=='new':
 			db.Emails.Email.writable = True
 			old_primary_email = db(db.Emails.Member == member_id).select(orderby=~db.Emails.Modified).first()
 			db.Emails.Mailings.default = old_primary_email.Mailings if old_primary_email else None
@@ -535,14 +533,15 @@ def emails(ismember, member_id):
 	header = CAT(A('back', _href=back),
 		  		H5('Member Emails'),
 		  		H6(member_name(member_id)))
-	if not mode:
+	if parsed['mode']=='select':	
 		header = CAT(header, XML("Note, the most recently edited (topmost) email is used for messages \
 directed to the individual member, and appears in the Members Directory. Notices \
 are sent as specified in the Mailings Column.<br>To switch to a new email address, use <b>+New</b> button.<br>\
 To change your mailing list subscritions, use the <b>Edit</b> button."))
-	if mode=="new":
-		footer = "You will be able to adjust mailing list prefences after verifying your new email."
-	elif not mode or ismember!='Y':
+	if parsed['mode']=="new":
+		if ismember=='Y':
+			flash.set("When you submit your new email address, you will be sent an email at the new address containing a confirmation link.")
+	elif parsed['mode']=='select' or ismember!='Y':
 		table_rows=[]
 		for l in db(db.Email_Lists.id>0).select():
 			table_rows.append(TR(TH(l.Listname, _style="text-align:left"), TD(XML(l.Description), _style="white-space: normal")))
@@ -556,7 +555,7 @@ To change your mailing list subscritions, use the <b>Edit</b> button."))
 		if ismember=='Y' and not form.vars.get('id'): #member adding new address
 			redirect(URL('send_email_confirmation', vars=dict(email=form.vars['Email'],
 				url = URL('switch_email', vars=dict(mailings=db.Emails.Mailings.default, member_id=member_id,
-						back=decode_url(request.query.referrer))))))
+						back=parsed['referrer'])))))
 
 	grid = Grid(db.Emails.Member==member_id,
 		 	orderby=~db.Emails.Modified,
@@ -568,7 +567,7 @@ To change your mailing list subscritions, use the <b>Edit</b> button."))
 			formstyle=form_style,
 			)
 
-	if ismember=='Y' and (mode=='edit' or mode=='details'):	#substitute user friendly form for grid form
+	if ismember=='Y' and (parsed['mode']=='edit' or parsed['mode']=='details'):	#substitute user friendly form for grid form
 		grid = None
 		email = db.Emails[request.query.get('id')]
 		header = CAT(header, email.Email)
@@ -608,12 +607,15 @@ def new_members():
 	rows = rows.find(lambda r: classify(r) != 'Renewal')
 	ids = [r.id for r in rows]
 	
-	header =H5('Recent New/Reinstated Members')
+	header = CAT(A('back', _href= request.query.back),
+		  		H5('Recent New/Reinstated Members'))
 
 	grid = Grid(db.AccTrans.id.belongs(ids), orderby=~db.AccTrans.Timestamp,
-			columns=[Column("Name", lambda row: A(member_name(row.Member), _href=URL(f"members/{'details' if access=='read' else 'edit'}/{row.Member}",
-									vars=dict(referrer=encode_url(request.url))),
-									_style="white-space: normal")),
+			columns=[Column("Name", lambda row: A(member_name(row.Member), _href=URL('members',
+													vars=dict(referrer=encode_url(request.url),
+													mode = 'details' if access=='read' else 'edit',
+													id=row.Member)),
+													_style="white-space: normal")),
 					Column("College", lambda row: primary_affiliation(row.Member), required_fields=[db.AccTrans.Member, db.AccTrans.Timestamp]),
 					Column("Matr", lambda row: primary_matriculation(row.Member)),
 					Column("Status", lambda row: db.Members[row.Member].Membership),
@@ -623,7 +625,7 @@ def new_members():
 			deletable=False, details=False, editable=False, create=False,
 			grid_class_style=grid_style, search_queries=[],
 			formstyle=form_style,
-			)
+	)
 	return locals()
 	
 @action('email_lists', method=['POST', 'GET'])
@@ -632,22 +634,20 @@ def new_members():
 def email_lists():
 	access = session.access	#for layout.html
 	write = ACCESS_LEVELS.index(session.access) >= ACCESS_LEVELS.index('write')
-	mode = request.query.get('mode')
+	parsed = Grid.parse(request.query)
+	back = parsed['referrer'] or request.query.back
 
 	header = H5('Email Lists')
 
-	if not mode:
-		back = request.url
-	else:
-		back = decode_url(request.query.referrer)
-		if mode=='new':
+	if parsed['mode'] != 'select':
+		if parsed['mode']=='new':
 			header = CAT(A('back', _href=back), H5('New Email List'))
 		else:
 			list_id = request.query.get('id')
 			header = CAT(A('back', _href=back), H5('Email List Record'),
 						A('Make a Copy of This Email List', _href=URL(f'email_list_copy/{list_id}',
 								vars=dict(referrer=request.query.referrer))))
-			if (mode=='delete' or (mode=='edit' and request.POST._delete)):
+			if (parsed['mode']=='delete' or (parsed['mode']=='edit' and request.POST._delete)):
 				#deleting list, delete all references
 				for e in db(db.Emails.Mailings.contains(list_id)).select():
 					e.Mailings.remove(int(list_id))
@@ -688,20 +688,19 @@ def email_list_copy(list_id):
 def events():
 	access = session.access	#for layout.html
 	write = ACCESS_LEVELS.index(session.access) >= ACCESS_LEVELS.index('write')
-	mode = request.query.get('mode')
+	parsed = Grid.parse(request.query)
+	back = parsed['referrer'] or request.url
 
 	header = H5('Events')
 
-	if not mode:
-		back = request.url
+	if parsed['mode'] == 'select':
 		footer = CAT(A("Export all Events as CSV file", _href=URL('events_export')), XML('<br>'),
 			A("Export event analytics as CSV file", _href=URL('event_analytics')))
 	else:
-		back = decode_url(request.query.referrer)
-		if mode=='new':
+		if parsed['mode']=='new':
 			header = CAT(A('back', _href=back), H5('New Event'))
 		else:
-			event_id = request.query.get('id')
+			event_id = parsed['record_id']
 			event = db.Events[event_id]
 			url = URL('registration', event_id, scheme=True)
 			urlpage = URL(f"event_page/{event.id}", scheme=True) if event.Details else event.Page
@@ -767,9 +766,8 @@ def tickets(event_id):
 	access = session.access	#for layout.html
 
 	write = ACCESS_LEVELS.index(session.access) >= ACCESS_LEVELS.index('write')
-	mode = request.query.get('mode')
-
-	back = request.query.back if not mode else decode_url(request.query.referrer)
+	parsed = Grid.parse(request.query)
+	back = parsed['referrer'] or request.query.back
 
 	event=db.Events[event_id]
 	db.Event_Tickets.Event.default=event_id
@@ -808,9 +806,8 @@ def selections(event_id):
 # .../selections/event_id/...
 	access = session.access	#for layout.html
 	write = ACCESS_LEVELS.index(session.access) >= ACCESS_LEVELS.index('write')
-	mode = request.query.get('mode')
-
-	back = request.query.back if not mode else decode_url(request.query.referrer)
+	parsed = Grid.parse(request.query)
+	back = parsed['referrer'] or request.query.back
 
 	event=db.Events[event_id]
 	db.Event_Selections.Event.default=event_id
@@ -850,9 +847,8 @@ def survey(event_id):
 # .../survey/event_id/...
 	access = session.access	#for layout.html
 	write = ACCESS_LEVELS.index(session.access) >= ACCESS_LEVELS.index('write')
-	mode = request.query.get('mode')
-
-	back = request.query.back if not mode else decode_url(request.query.referrer)
+	parsed = Grid.parse(request.query)
+	back = parsed['referrer'] or request.query.back
 
 	event=db.Events[event_id]
 	db.Event_Survey.Event.default=event_id
@@ -1054,7 +1050,7 @@ def check_in(event_id):
 	search_value = request.query.get('search_value') or ''
 	header = H6(f"Check-in {event.DateTime.date()}, {event.Description}")
 		
-	back = URL(f"check_in/{event_id}", scheme=True)
+	back = URL(f"check_in/{event_id}")
 
 	if request.query.get('rsvtn_id'):
 		rsvtn = db.Reservations[request.query.rsvtn_id]
@@ -1103,7 +1099,7 @@ def assign_tables(event_id):
 	form = Grid(eval(query), orderby=db.Reservations.Table, groupby=db.Reservations.Table,
 			 columns=[db.Reservations.Table,
 					Column('Count', lambda row: row[tablecount] or '', required_fields=[tablecount])],
-			details=False, editable=False, create=False, deletable=False,
+			details=False, editable=False, create=False, deletable=False, search_queries=[],
 			grid_class_style=grid_style, rows_per_page=100, formstyle=form_style)
 
 	search_form = Form([
@@ -1150,8 +1146,9 @@ def assign_tables(event_id):
 def manage_reservation(member_id, event_id):
 	access = session.access	#for layout.html
 	write = ACCESS_LEVELS.index(session.access) >= ACCESS_LEVELS.index('write')
-	mode = request.query.get('mode')
-	id = int(request.query.get('id', '0'))
+	parsed = Grid.parse(request.query)
+	back = parsed['referrer'] or request.query.back
+	id = int(parsed['record_id'] or 0)
 
 	event = db.Events[event_id]
 	clist = collegelist(sponsors = event.Sponsors or [])
@@ -1167,15 +1164,14 @@ def manage_reservation(member_id, event_id):
 	header = CAT(H5('Event Registration'), H6(member_name(member_id)),
 			XML(event_confirm(event.id, member.id, event_only=True)))
 
-	back = request.query.back if not mode else decode_url(request.query.referrer)
 	header = CAT(A('back', _href=back), header)
-	if not mode:
+	if parsed['mode']=='select':
 		header = CAT(header, A('send email', _href=(URL('composemail', vars=dict(
 			query=f"(db.Members.id=={member_id})&(db.Members.id==db.Reservations.Member)&(db.Reservations.Event=={event_id})&(db.Reservations.Host==True)",
 			qdesc=member_name(member_id), back=request.url)))),
 			XML(" (use "), "[[reservation]]", XML(" to include confirmation and payment link)<br>"),
-			A('view member record', _href=URL(f"members/{'details' if access=='read' else 'edit'}/{member_id}",
-									vars=dict(referrer=encode_url(request.url)))),
+			A('view member record', _href=URL('members',
+				vars=dict(referrer=encode_url(request.url), mode='edit' if write else 'details', id=member_id))),
 			XML("<br>Top row is the member's own reservation, additional rows are guests.<br>\
 Use Add Record to add the member, initially, then to add additional guests.<br>\
 Edit rows to move on/off waitlist or first row to record a check payment.<br>\
@@ -1208,8 +1204,8 @@ Deleting or moving member on/off waitlist will also affect all guests."))
 		db.Reservations.Ticket_.writable = db.Reservations.Ticket_.readable = False
 	
 
-	if  mode and not mode=='delete':	#editing or creating reservation
-		if host_reservation and (mode=='new' or host_reservation.id!=id):
+	if  parsed['mode']=='edit' or parsed['mode']=='new':	#editing or creating reservation
+		if host_reservation and (parsed['mode']=='new' or host_reservation.id!=id):
 			#this is a new guest reservation, or we are revising a guest reservation
 			db.Reservations.Host.default=False
 			db.Reservations.Firstname.writable=True
@@ -1251,7 +1247,7 @@ Deleting or moving member on/off waitlist will also affect all guests."))
 					if row.id != host_reservation.id and (not row.Provisional or host_reservation.Provisional):
 						row.update_record(Waitlist = form.vars.get('Waitlist'), Provisional = form.vars.get('Provisional'))
 
-	if mode=='delete' or (mode=='edit' and request.POST._delete):
+	if parsed['mode']=='delete' or (parsed['mode']=='edit' and request.POST._delete):
 		#deleting a reservation - if it's the host, also delete all guests
 		if host_reservation.id==id:
 			for row in all_guests:
@@ -1267,9 +1263,9 @@ Deleting or moving member on/off waitlist will also affect all guests."))
 					Column('Status', lambda r: 'waitlisted' if r.Waitlist else \
 						'unconfirmed' if r.Provisional else "✔" if r.Checked_in else '')],
 			headings=['Last', 'First', 'Notes', 'Selection', 'Price', 'Status'],
-			deletable=lambda row: write,
+			deletable=write,
 			details=not write, 
-			editable=lambda row: write, 
+			editable=write, 
 			create=write, search_queries=[],
 			grid_class_style=grid_style, formstyle=form_style, validation=validate, show_id=True)
 	return locals()
@@ -1283,8 +1279,8 @@ def reservation():
 	if not session.get('member_id') or not session.get('event_id'):
 		redirect(URL('my_account'))
 
-	mode = request.query.get('mode')
-	id = int(request.query.get('id', '0'))
+	parsed = Grid.parse(request.query)
+	id = int(parsed['record_id'] or 0)
 	
 	event = db.Events[session.event_id]
 	clist = collegelist(sponsors = event.Sponsors or [])
@@ -1306,7 +1302,7 @@ def reservation():
 	header = CAT(H5('Event Registration'), H6(member_name(session.member_id)),
 			XML(event_confirm(event.id, member.id, event_only=True)))
 
-	if not mode:
+	if parsed['mode']=='select':
 		if not host_reservation:	#provisional reservation delete, start over
 			redirect(URL(f'registration/{session.event_id}'))
 		
@@ -1370,10 +1366,10 @@ def reservation():
 									default = host_reservation.Comment))
 		form2 = Form(fields, formstyle=FormStyleBulma, keep_values=True, submit_value='Checkout')
 
-	elif mode!='delete':
+	elif parsed['mode']!='delete':
 		#new or edit - creating or editing an individual reservation
-		is_guest_reservation = host_reservation and (mode=='new' or host_reservation.id!=id)
-		if mode=='new':
+		is_guest_reservation = host_reservation and (parsed['mode']=='new' or host_reservation.id!=id)
+		if parsed['mode']=='new':
 			header = CAT(header,
 				f"Please enter your own details{' (you will be able to enter guests on next screen)' if (event.Guests or 2)>1 else ''}:"\
 					if not host_reservation else "Please enter your guest's details:")
@@ -1450,7 +1446,7 @@ def reservation():
 				db.Reservations.Affiliation.default = affinity.College
 				db.Reservations.Affiliation.writable = False
 
-			if mode=='new' and not selections and len(event_tickets)<=1:
+			if parsed['mode']=='new' and not selections and len(event_tickets)<=1:
 				#no choices needed, create the Host reservation and display checkout screen
 				db.Reservations.insert(Member=session.member_id, Event=session.event_id, Host=True,
 			   		Firstname=member.Firstname, Lastname=member.Lastname, Affiliation=affinity.College if affinity else None,
@@ -1461,14 +1457,14 @@ def reservation():
 		if form.vars.get('Waitlist') and form.vars.get('Provisional'):
 			form.errors['Waitlist'] = "Waitlist and Provisional should not both be set"
 		if int(form.vars.get('Ticket_')) != db.Reservations.Ticket_.default:
-			ticket = tickets.find(lambda t: t.id == int(form.vars.get('Ticket_'))).first()
+			ticket = tickets.find(lambda t: t.id == int(form.vars.get('Ticket_', '0'))).first()
 			if ticket.Qualify and (not form.vars.get('Notes') or form.vars.get('Notes').strip()==''):
 				form.errors['Notes']=ticket.Qualify	#documentation required
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
 
-	if (mode=='delete' or (mode=='edit' and request.POST._delete)):
+	if (parsed['mode']=='delete' or (parsed['mode']=='edit' and request.POST._delete)):
 		#deleting a reservation - if it's the host, also delete all guests
 		if host_reservation.id==id:
 			for row in all_guests:
@@ -1486,10 +1482,10 @@ def reservation():
 			deletable=lambda row: row.Provisional or row.Waitlist,
 			details=False, 
 			editable=lambda row: row.Provisional or row.Waitlist, 
-			create=not event.Guests or (len(all_guests)<event.Guests),
+			create=not event.Guests or (len(all_guests)<event.Guests), search_queries=[],
 			grid_class_style=grid_style, formstyle=form_style, validation=validate)
 	
-	if not mode:
+	if parsed['mode']=='select':
 		if len(form2.errors)>0:
 			flash.set("Error(s) in form, please check")
 		elif adding==0 and payment<=0:
@@ -1576,7 +1572,7 @@ def event_copy(event_id):
 		db.Event_Survey.insert(Event=new_event_id, Item=s.Item)
 
 	flash.set("Please customize the new event.")
-	redirect(URL(f'events/edit/{new_event_id}', vars=dict(referrer=request.query.referrer)))
+	redirect(URL('events', vars=dict(referrer=request.query.referrer, mode='edit', id=new_event_id)))
 	
 @action('events_export', method=['GET'])
 @action.uses("download.html", db, session, flash, Inject(response=response))
@@ -1605,19 +1601,18 @@ def events_export():
 def pages():
 	access = session.access	#for layout.html
 	write = ACCESS_LEVELS.index(session.access) >= ACCESS_LEVELS.index('write')
-	mode = request.query.get('mode')
-	page_id = int(request.query.get('id', '0'))
+
+	parsed = Grid.parse(request.query)
+	back = parsed['referrer'] or request.url
+	page_id = int(parsed['record_id'] or 0)
 
 	header = CAT(H5('Pages'), "Public Website Pages.", XML('<br>'),
 			  "There may be multiple page trees, the root pages are shown first.", XML('<br>'),
 			  "Order of modification controls the ordering of both grid and menus.", XML('<br>'),
 			  "Tree roots appear on the Nav Bar, with their children in a dropdown menu.")
 
-	if not mode:
-		back = request.url
-	else:
-		back = decode_url(request.query.referrer)
-		if mode=='new':
+	if parsed['mode']!='select':
+		if parsed['mode']=='new':
 			header = CAT(A('back', _href=back), H5('New Public Page'))
 		else:
 			page = db.Pages[page_id]
@@ -1669,7 +1664,6 @@ def pages():
 			formstyle=form_style,
 			)
 	return locals()
-import re
 
 @action('web/<root>', method=['GET'])
 @action('web/<root>/<branch>', method=['GET'])
@@ -1703,7 +1697,7 @@ def get_date_range():
 
 	def checkform(form):
 		if form.vars.start > form.vars.end:
-			form.errors.end = 'end should not be before start!'
+			form.errors['end']= 'end should not be before start!'
 		
 	form=Form(
 		[Field('start', 'date', requires=[IS_NOT_EMPTY(),IS_DATE()], label='Start Date',
@@ -1942,13 +1936,14 @@ def tax_statement(start, end):
 @checkaccess('accounting')
 def accounting():
 	access = session.access	#for layout.html
-	mode = request.query.get('mode')
-	bank_id = request.query.get('id', '0')
+
+	parsed = Grid.parse(request.query)
+	back = parsed['referrer'] or request.url
+	bank_id = int(parsed['record_id'] or 0)
 
 	header = H5('Banks')
-	back=request.url if not mode else decode_url(request.query.referrer)
 
-	if not mode:
+	if parsed['mode']=='select':
 		header = CAT(header,
 		   		A('Financial Statement', _href=URL('get_date_range', vars=dict(function='financial_statement'))), XML('<br>'),
 		   		A('Tax Statement', _href=URL('get_date_range', vars=dict(function='tax_statement'))), XML('<br>'),
@@ -1956,10 +1951,11 @@ def accounting():
 					query="db.AccTrans.id>0"))), XML('<br>'),
 				"Use Upload to load a file you've downloaded from bank/payment processor into accounting")
 	else:
-		header = CAT(A('back', _href=back), XML('<br>'),
-			   		A('transaction rules', _href=URL(f"bank_rules/{bank_id}",
-										vars=dict(back=back))),
-			   		header)
+		header = A('back', _href=back)
+		if parsed['mode']!='new':
+			header = CAT(header, XML('<br>'), A('transaction rules',
+								 	_href=URL(f"bank_rules/{bank_id}", vars=dict(back=back))))
+		header = CAT(header, H5('Bank Account'))		
 
 	grid = Grid(db.Bank_Accounts.id>0,
 				orderby=db.Bank_Accounts.Name,
@@ -1984,13 +1980,13 @@ def bank_rules(bank_id):
 # .../bank_rules/bank_id/...
 	access = session.access	#for layout.html
 	write = ACCESS_LEVELS.index(session.access) >= ACCESS_LEVELS.index('write')
-	mode = request.query.get('mode')
+
+	parsed = Grid.parse(request.query)
+	back = parsed['referrer'] or request.query.back
 
 	bank=db.Bank_Accounts[bank_id]
 	db.bank_rules.bank.default=bank.id
 	db.bank_rules.csv_column.requires = [IS_NOT_EMPTY(), IS_IN_SET(bank.Csvheaders.split(','))]
-
-	back = request.query.back if not mode else decode_url(request.query.referrer)
 
 	header = CAT(A('back', _href=back),
 		  		H5('Bank Transaction Rules'),
@@ -2166,8 +2162,9 @@ def bank_file(bank_id):
 def transactions():
 	access = session.access	#for layout.html
 
-	mode= request.query.get('mode')
-	id = int(request.query.get('id', '0'))
+	parsed = Grid.parse(request.query)
+	back = parsed['referrer'] or request.query.back
+	id = int(parsed['record_id'] or 0)
 
 	db.AccTrans.Fee.writable = False
 	db.AccTrans.Paiddate.writable = False
@@ -2202,10 +2199,9 @@ def transactions():
 		   		widget=lambda field, value: INPUT(_name='reference', _type='text', _value=request.query.get('reference'), _placeholder="ref?"))],
 		keep_values=True, formstyle=FormStyleBulma)
 
-	if not mode:	#viewing transactions
+	if parsed['mode']:	#viewing transactions
 		bank_id_match=re.match('db.AccTrans.Bank==([0-9]+)$', query)
 		session['bank_id'] = int(bank_id_match.group(1)) if bank_id_match else None
-		back = request.query.back
 		if search_form.accepted:	#Filter button clicked
 			select_vars = {}
 			if search_form.vars.get('account'):
@@ -2220,8 +2216,7 @@ def transactions():
 				select_vars['reference'] = search_form.vars.get('reference')
 			redirect(URL('transactions', vars=select_vars))
 	else:
-		back=decode_url(request.query.referrer)
-		if mode=='edit' or mode=='details':	#editing/viewing AccTrans record
+		if parsed['mode']=='edit' or parsed['mode']=='details':	#editing/viewing AccTrans record
 			db.AccTrans.Amount.comment = 'to split transaction, enter amount of a split piece'
 			db.AccTrans.CheckNumber.writable = False
 			db.AccTrans.CheckNumber.requires = None
@@ -2233,7 +2228,7 @@ def transactions():
 				db.AccTrans.Amount.requires=IS_DECIMAL_IN_RANGE(0, transaction.Amount)
 			else:
 				db.AccTrans.Amount.requires=IS_DECIMAL_IN_RANGE(transaction.Amount, 0)
-		elif mode=='new':	#adding AccTrans accrual
+		elif parsed['mode']=='new':	#adding AccTrans accrual
 			db.AccTrans.Amount.comment='enter full amount of check as a negative number; split using Edit if multiple accounts',
 			db.AccTrans.Timestamp.writable=True
 			db.AccTrans.Amount.requires=IS_DECIMAL_IN_RANGE(-100000, 0)
@@ -2293,9 +2288,9 @@ def transactions():
 	grid = Grid(eval(query), left=eval(request.query.get('left')) if request.query.get('left') else None,
 			orderby=~db.AccTrans.Timestamp,
 			columns=[db.AccTrans.Timestamp, db.AccTrans.Account, db.AccTrans.Event,
-					Column('member', lambda row: A(member_name(row.Member), _href=URL(f"members/edit/{row.Member}",
-											vars=dict(referrer=encode_url(request.url))),
-											 _style='white-space: normal') if row.Member else '', required_fields=[db.AccTrans.Member]),
+					Column('member', lambda row: A(member_name(row.Member), _href=URL('members',
+											vars=dict(referrer=encode_url(request.url), mode='details'if access=='read' else 'edit', id=row.Member)),
+											_style='white-space: normal') if row.Member else '', required_fields=[db.AccTrans.Member]),
 	 				db.AccTrans.Amount, db.AccTrans.Fee, db.AccTrans.CheckNumber, db.AccTrans.Accrual],
 			headings=['Timestamp', 'Account','Event','Member','Amt', 'Fee', 'Chk#', 'Acc'],
 			validation=validate, show_id=True, search_form=search_form,
@@ -2565,7 +2560,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 				#members of sponsor organizations, or membership eligible and member in good standing, or 
 				#event open to all alums and not offering join option, then no need to gather member information
 				#ALSO collect Matr if missing from affinity, and allow approved unaffiliated members
-				redirect(URL('reservation/new'))	#go create this member's reservation
+				redirect(URL('reservation', vars=dict(mode='new')))	#go create this member's reservation
 
 		elif request.query.get('mail_lists'):
 			redirect(URL(f"emails/Y/{member_id}",vars=dict(back=URL('my_account'))))
@@ -2717,14 +2712,14 @@ Please login with the email you used before{f'<em>, possibly {suggest}, </em>' i
 			email.update_record(Mailings=mailings)
 		
 		if event:
-			redirect(URL('reservation/new'))	#go create this member's reservation
+			redirect(URL('reservation', vars=dict(mode='new')))	#go create this member's reservation
 		else:	#joining or renewing
 			if not member.Paiddate or member.Paiddate < (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)-datetime.timedelta(GRACE_PERIOD)).date():
 				#new/reinstated member, gather additional profile information
 				flash.set("Next, please review/complete your directory profile")
 				redirect(URL('profile')) #gather profile info
 			if session.get('event_id'):
-				redirect(URL('reservation/new'))	#go create this member's reservation
+				redirect(URL('reservation', vars=dict(mode='new')))	#go create this member's reservation
 			paymentprocessor().checkout(request.url)
 	return locals()
 	
@@ -2781,7 +2776,7 @@ reached by using the join/renew link on our home page).<br>\
 		#ready to checkout
 		if session.get('dues'):
 			if session.get('event_id'):
-				redirect(URL('reservation/new'))	#go create this member's reservation
+				redirect(URL('reservation', vars=dict(mode='new')))	#go create this member's reservation
 			paymentprocessor().checkout(request.url)
 		flash.set('Thank you for updating your profile information.')
 		notify_support(member.id, 'Member Profile Updated', member_profile(member))

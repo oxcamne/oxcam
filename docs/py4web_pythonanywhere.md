@@ -28,7 +28,7 @@ This installs the latest released version of py4web and all its dependencies.
 
 Next create a py4web directory using the command `mkdir py4web` and switch to it using the command `cd py4web`.
 
-Complete the installation by running the command `py4web setup apps`. You can answer 'N' to most of them, but be sure to answer 'Y' to **_dashboard**.
+Complete the installation by running the command `py4web setup apps`. You can answer 'N' to most of them, but be sure to answer 'Y' to **_dashboard, _documentationc, _minimal, and _scaffold**.
 
 Next use the command `py4web set_password` to create a password for the **Py4web Dashboard**. Choose a secure password and make sure to keep it safely somewhere, you will need it later.
 
@@ -40,7 +40,7 @@ Click next, and at the following screens select **Bottle** and then Python 3.10.
 
 You will then reach the **Quickstart New Bottle Project** dialog. You need to edit the displayed path to be `/home/your_username/py4web/bottle_app.py` (you will need to change 'mysite' to 'py4web').
 
-Clicking next returns you to the *Web* tab. Scroll down to the 'Code' section. You may need to edit the source code and working directories (by clicking on them) so that they are both '/home/your_username/py4web'.
+Clicking next returns you to the *Web* tab. Scroll down to the 'Code' section. You may need to edit the source code and working directories (by clicking on them) so that they are **both '/home/your_username/py4web'**.
 
 ### Edit the WSGI configuration file
 

@@ -321,6 +321,6 @@ def get_list(list, index):
 def encode_url(url):
 	return base64.b16encode(url.encode("utf8")).decode("utf8")
 
-#decode encoded something, usually URL, from a URL parameter
+#decode encoded something, usually URL, from a referrer parameter
 def decode_url(code):
 	return base64.b16decode(code.encode("utf8")).decode("utf8")

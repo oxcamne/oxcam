@@ -11,13 +11,14 @@ from py4web import action, response, redirect, Field, request, URL
 from py4web.utils.factories import Inject
 from .common import db, session, flash
 from .session import checkaccess
-from py4web.utils.form import Form, FormStyleDefault
-from py4web.utils.grid import Grid, GridClassStyle
+from py4web.utils.form import Form, FormStyleBulma
+from py4web.utils.grid import Grid, GridClassStyleBulma
 from yatl.helpers import XML, H5
 from .settings import SOCIETY_SHORT_NAME, PAGE_BANNER, GRACE_PERIOD
 from py4web.utils.factories import Inject
 from io import StringIO, TextIOWrapper
 from pydal.validators import IS_NOT_EMPTY
+from urllib.parse import urlparse, parse_qs
 
 preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER))
 
@@ -28,58 +29,67 @@ def db_tool():
 	access = session.access	#for layout.html
 	parsed = Grid.parse(request.query)
 
-	def validate_query(form):
-		"""
-		Validate the query field to ensure it is not empty and is a valid expression.
-		This is a simple validation; you may want to enhance it based on your requirements.
-		"""
-		query = form.vars.get('query', '')
-		if query:
-			try:
-				db(eval(query)).select(orderby=eval(form.vars.get('orderby', '')) if form.vars.get('orderby') else None,
-					left=eval(form.vars.get('left', '')) if form.vars.get('left') else None)
-						# This will raise an error if the query, orderby, left are invalid
-			except Exception as e:
-				form.errors['query'] = f'Invalid query: {str(e)}'
-		if form.vars.get('do_update') and not form.vars.get('field_update'):
-			form.errors['field_update'] = 'You must specify fields to update.'
-		return form.errors
-	
-	form = Form([
-		Field('query', 'string', default=request.query.get('query', ''), requires=IS_NOT_EMPTY()),
-		Field('orderby', 'string', default=request.query.get('orderby', '')),
-		Field('left', 'string', default=request.query.get('left', '')),
-		Field('delete_all', 'boolean', default=(request.query.get('delete_all') == 'On'),
-			comment='Beware, are you really sure you want to do this!'),
-		Field('do_update', 'boolean', default=(request.query.get('do_update') == 'On')),
-		Field('field_update', 'string', default=request.query.get('field_update', '')),
-	], keep_values=True, formstyle=FormStyleDefault, validation=validate_query)
+	if not parsed.get('referrer'):
+		form = Form([
+			Field('query', 'string', default=request.query.get('query', ''), requires=IS_NOT_EMPTY()),
+			Field('orderby', 'string', default=request.query.get('orderby', '')),
+			Field('left', 'string', default=request.query.get('left', '')),
+			Field('delete_all', 'boolean', default=(request.query.get('delete_all') == 'On'),
+				comment='Beware, are you really sure you want to do this!'),
+			Field('do_update', 'boolean', default=(request.query.get('do_update') == 'On')),
+			Field('field_update', 'string', default=request.query.get('field_update', '')),
+		], keep_values=True, formstyle=FormStyleBulma)
 
-	if form.accepted:
-		url = URL('db_tool', vars=dict(
-			query=form.vars.get('query', ''),
-			orderby=form.vars.get('orderby', ''),
-			left=form.vars.get('left', ''),
-			delete_all='On' if form.vars.get('delete_all') else '',
-			do_update='On' if form.vars.get('do_update') else '',
-			field_update=form.vars.get('field_update', '')
-		))
-		redirect(url)
-	
+		if form.accepted:
+			url = URL('db_tool', vars=dict(
+				query=form.vars.get('query', ''),
+				orderby=form.vars.get('orderby', ''),
+				left=form.vars.get('left', ''),
+				delete_all='On' if form.vars.get('delete_all') else '',
+				do_update='On' if form.vars.get('do_update') else '',
+				field_update=form.vars.get('field_update', '')
+			))
+			redirect(url)
+
+	qs = parse_qs(urlparse(parsed.get('referrer') or request.url).query)
+	params = {k: v[0] if v else '' for k, v in qs.items()}	
+
 	header = XML("The \"query\" is a condition like \"db.table1.field1=='value'\" \
 or \"db.table.field2.like('%value%')\"<br>\
 Use (...)&(...) for AND, (...)|(...) for OR, and ~(...) for NOT to build more complex queries.<br>\
 Something like \"db.table1.field1==db.table2.field2\" results in a SQL JOIN. Results cannot be edited.<br>\
 \"field update\" is an optional expression like \"field1='...', field2='...', ...\".<br>\
-See the Py4web documentation (DAL) for to learn more.")
+See the Py4web documentation (DAL) to learn more.")
 
-	if request.query.get('query'):
-		grid = Grid(eval(request.query.get('query')),
-				orderby=eval(request.query.get('orderby')) if request.query.get('orderby') else None,
-				left=eval(request.query.get('left')) if request.query.get('left') else None,
+	try:
+		if params.get('do_update') or params.get('delete_all'):
+			rows = db(eval(params.get('query'))).select()
+			if params.get('do_update'):
+				for row in rows:
+					update_string = f"row.update_record({params.get('field_update')})"
+					eval(update_string)
+				del params['do_update']
+				flash.set(f"{len(rows)} records updated")
+			elif params.get('delete_all'):
+				db(eval(params.get('query'))).delete()
+				del params['delete_all']
+				flash.set(f"{len(rows)} records deleted")
+			redirect(URL('db_tool', vars=params))
+		
+		grid = Grid(eval(params.get('query')),
+				orderby=eval(params.get('orderby')) if params.get('orderby') else None,
+				left=eval(params.get('left')) if params.get('left') else None,
 				details=False, editable=True, create=True, deletable=True,
-				show_id=True, search_queries=[],
+				show_id=True, formstyle=FormStyleBulma,
+				grid_class_style=GridClassStyleBulma, search_queries=[]
 				)
+	except Exception as e:
+		flash.set(e)
+	"""
+	rows = db(eval(params.get('query'))).select(
+				orderby=eval(params.get('orderby')) if params.get('orderby') else None,
+				left=eval(params.get('left')) if params.get('left') else None)
+	"""
 	return locals()
 
 @action("db_restore", method=['POST', 'GET'])

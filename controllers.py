@@ -639,7 +639,21 @@ def email_lists():
 
 	header = H5('Email Lists')
 
-	if parsed['mode'] != 'select':
+	if parsed['mode']=='select':
+		# Remove references in Emails.Mailings to Email_Lists records that no longer exist
+
+		# Get all valid Email_Lists IDs
+		valid_list_ids = set(r.id for r in db(db.Email_Lists).select(db.Email_Lists.id))
+
+		# Iterate over all Emails records
+		for email in db(db.Emails).select():
+			if not email.Mailings:
+				continue
+			# Remove invalid IDs
+			cleaned = [lid for lid in email.Mailings if lid in valid_list_ids]
+			if cleaned != email.Mailings:
+				email.update_record(Mailings=cleaned)
+	else:
 		if parsed['mode']=='new':
 			header = CAT(A('back', _href=back), H5('New Email List'))
 		else:
@@ -647,11 +661,6 @@ def email_lists():
 			header = CAT(A('back', _href=back), H5('Email List Record'),
 						A('Make a Copy of This Email List', _href=URL(f'email_list_copy/{list_id}',
 								vars=dict(referrer=request.query.referrer))))
-			if (parsed['mode']=='delete' or (parsed['mode']=='edit' and request.POST._delete)):
-				#deleting list, delete all references
-				for e in db(db.Emails.Mailings.contains(list_id)).select():
-					e.Mailings.remove(int(list_id))
-					e.update_record()
 
 	def validation(form):
 		if len(form.errors)>0:
@@ -1156,6 +1165,13 @@ def manage_reservation(member_id, event_id):
 
 	all_guests = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)).select(orderby=~db.Reservations.Host)
 	host_reservation = all_guests.first()
+
+	if parsed['mode']=='select':
+		if host_reservation and not host_reservation.Host:	#provisional reservation delete, start over
+			for row in all_guests:	#delete all guests after host reservation deleted
+				db(db.Reservations.id==row.id).delete()
+			redirect(request.url)
+
 	tickets = db(db.Event_Tickets.Event==event_id).select()
 	event_tickets = [(t.id, f"{t.Ticket}{' (waitlisting)' if t.Waiting else ''}") for t in tickets]
 	selections = db(db.Event_Selections.Event==event_id).select()
@@ -1247,13 +1263,6 @@ Deleting or moving member on/off waitlist will also affect all guests."))
 					if row.id != host_reservation.id and (not row.Provisional or host_reservation.Provisional):
 						row.update_record(Waitlist = form.vars.get('Waitlist'), Provisional = form.vars.get('Provisional'))
 
-	if parsed['mode']=='delete' or (parsed['mode']=='edit' and request.POST._delete):
-		#deleting a reservation - if it's the host, also delete all guests
-		if host_reservation.id==id:
-			for row in all_guests:
-				if row.id != host_reservation.id:
-					db(db.Reservations.id==row.id).delete()
-
 	grid = Grid((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id),
 			orderby=~db.Reservations.Host|db.Reservations.Created,
 			columns=[db.Reservations.Lastname, db.Reservations.Firstname, db.Reservations.Notes,
@@ -1303,7 +1312,9 @@ def reservation():
 			XML(event_confirm(event.id, member.id, event_only=True)))
 
 	if parsed['mode']=='select':
-		if not host_reservation:	#provisional reservation delete, start over
+		if host_reservation and not host_reservation.Host:	#provisional reservation delete, start over
+			for row in all_guests:	#delete all guests after host reservation deleted
+				db(db.Reservations.id==row.id).delete()
 			redirect(URL(f'registration/{session.event_id}'))
 		
 		#pre-checkout checks on capacity, payment status, etc.
@@ -1463,13 +1474,6 @@ def reservation():
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
-
-	if (parsed['mode']=='delete' or (parsed['mode']=='edit' and request.POST._delete)):
-		#deleting a reservation - if it's the host, also delete all guests
-		if host_reservation.id==id:
-			for row in all_guests:
-				if row.id != host_reservation.id:
-					db(db.Reservations.id==row.id).delete()
 
 	grid = Grid((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id),
 			orderby=~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname,

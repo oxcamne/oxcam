@@ -2203,7 +2203,7 @@ def transactions():
 		   		widget=lambda field, value: INPUT(_name='reference', _type='text', _value=request.query.get('reference'), _placeholder="ref?"))],
 		keep_values=True, formstyle=FormStyleBulma)
 
-	if parsed['mode']:	#viewing transactions
+	if parsed['mode'] == 'select':	#viewing transactions
 		bank_id_match=re.match('db.AccTrans.Bank==([0-9]+)$', query)
 		session['bank_id'] = int(bank_id_match.group(1)) if bank_id_match else None
 		if search_form.accepted:	#Filter button clicked
@@ -2220,7 +2220,7 @@ def transactions():
 				select_vars['reference'] = search_form.vars.get('reference')
 			redirect(URL('transactions', vars=select_vars))
 	else:
-		if parsed['mode']=='edit' or parsed['mode']=='details':	#editing/viewing AccTrans record
+		if parsed['mode']=='edit':	#editing AccTrans record
 			db.AccTrans.Amount.comment = 'to split transaction, enter amount of a split piece'
 			db.AccTrans.CheckNumber.writable = False
 			db.AccTrans.CheckNumber.requires = None
@@ -2243,7 +2243,6 @@ def transactions():
 	def validate(form):
 		if not form.vars.get('id'): #must be creating an accrual
 			return
-		transaction = db.AccTrans[form.vars.get('id')]
 		new_amount = decimal.Decimal(form.vars.get('Amount'))
 		fee = transaction.Fee
 		if form.vars.get('Account')==acdues:

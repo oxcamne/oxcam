@@ -2243,6 +2243,7 @@ def transactions():
 	def validate(form):
 		if not form.vars.get('id'): #must be creating an accrual
 			return
+		transaction = db.AccTrans[form.vars.get('id')]
 		new_amount = decimal.Decimal(form.vars.get('Amount'))
 		fee = transaction.Fee
 		if form.vars.get('Account')==acdues:

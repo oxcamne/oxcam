@@ -76,7 +76,8 @@ See the Py4web documentation (DAL) to learn more.")
 				flash.set(f"{len(rows)} records deleted")
 			redirect(URL('db_tool', vars=params))
 		
-		grid = Grid(eval(params.get('query')),
+		if params.get('query'):
+			grid = Grid(eval(params.get('query')),
 				orderby=eval(params.get('orderby')) if params.get('orderby') else None,
 				left=eval(params.get('left')) if params.get('left') else None,
 				details=False, editable=True, create=True, deletable=True,

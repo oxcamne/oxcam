@@ -1066,8 +1066,9 @@ def check_in(event_id):
 		if rsvtn.Event != event_id:
 			raise Exception('Invalid event id')
 		rsvtn.update_record(Checked_in=not rsvtn.Checked_in)
-		if res_checked_in(rsvtn.Member, event_id) != res_conf(rsvtn.Member, event_id):
-			back += f"?search_value={rsvtn.Lastname[0:2]}"
+		groupcheckedin = res_checked_in(rsvtn.Member, event_id)
+		if groupcheckedin & (groupcheckedin != res_conf(rsvtn.Member, event_id)):
+			back += f"?search_value={rsvtn.Lastname}"
 		redirect(back)
 
 	grid = Grid((db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False),

@@ -764,7 +764,10 @@ def event_page(event_id):
 	access = session.access	#for layout.html
 	event = db.Events[event_id]
 	event.update_record(Views=event.Views+1, Modified=event.Modified)
-	header = XML(markdown.markdown(str(template_expand(event.Details, locals()))))
+	header = CAT(
+				H5(event.Description, _style="text-align:center"),
+				XML(markdown.markdown(str(template_expand(event.Details, locals()))))
+		)
 	return locals()
 	
 @action('tickets/<event_id:int>', method=['POST', 'GET'])

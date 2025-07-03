@@ -1250,7 +1250,6 @@ Deleting or moving member on/off waitlist will also affect all guests."))
 			affinity = db(db.Affiliations.Member==member_id).select(orderby=db.Affiliations.Modified).first()
 			if affinity:
 				db.Reservations.Affiliation.default = affinity.College
-				db.Reservations.Affiliation.writable = False
 	
 	def validate(form):
 		if form.vars.get('Waitlist') and form.vars.get('Provisional'):

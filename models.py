@@ -23,7 +23,8 @@ db.define_table('users',
 	Field('tokens', 'list:integer'),
 	Field('remote_addr', 'string'),
 	Field('when_issued', 'datetime'),
-	Field('trusted', 'boolean', default=False))
+	Field('trusted', 'boolean', default=False),
+	Field('email_sent', 'boolean', default=False),)
 db.users.email.requires = IS_NOT_IN_DB(db, db.users.email)
 
 #include OxBridge colleges, explicit sponsors; excludes Cambridge/Oxford University

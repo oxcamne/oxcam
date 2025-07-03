@@ -92,11 +92,17 @@ you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _h
 		last = db((db.users.remote_addr==request.remote_addr)|(db.users.email==form.vars.get('email').lower())).select(orderby=~db.users.when_issued).first()
  		#rate limit the IP and email, impose VERIFY_TIMEOUT minute delay between login attempts
 		now = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
+		user = db(db.users.email==form.vars.get('email').lower()).select().first()
 		if not (VERIFY_TIMEOUT and last and now < last.when_issued + datetime.timedelta(minutes=VERIFY_TIMEOUT)):
 			session['email'] = form.vars['email'].lower()
-			if RECAPTCHA_KEY and not challenge and not db((db.users.remote_addr==request.remote_addr) &\
-								(db.users.email==form.vars['email']) & (db.users.trusted==True)).select().first():
+			if RECAPTCHA_KEY and not challenge and not (user and user.trusted and user.remote_addr == request.remote_addr):
 				redirect(URL('login', vars=dict(challenge=True, url=request.query.url)))	#not trusted email/IP, challenge with recaptcha
+			if user:
+				user.update_record(remote_addr = request.remote_addr, trusted = False, email_sent = False)
+				if datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > user.when_issued + datetime.timedelta(minutes = 15):
+					user.update_record(tokens=None)	#clear old expired tokens
+			else:
+				user = db.users[db.users.insert(email=form.vars.get('email'), remote_addr = request.remote_addr)]
 			redirect(URL('send_email_confirmation', vars=dict(email=form.vars['email'], url=request.query.url)))
 		flash.set(f"<em>Please wait a bit, there is a {VERIFY_TIMEOUT} minute time-out between sending verification messages</em>", sanitize=False)
 
@@ -110,18 +116,12 @@ def send_email_confirmation():
 	if not email:	#shouldn't happen, but can be generated perhaps by safelink mechanisms?
 		redirect(URL('login'))
 	now = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
-	last = db((db.users.remote_addr==request.remote_addr)|(db.users.email==email)).select(orderby=~db.users.when_issued).first()
-	if not (last and now < last.when_issued + datetime.timedelta(seconds=5)):	#ignore double clicks
-		user = db(db.users.email==email).select().first()
-		if user:
-			user.update_record(remote_addr = request.remote_addr, trusted = False)
-			if datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > user.when_issued + datetime.timedelta(minutes = 15):
-				user.update_record(tokens=None)	#clear old expired tokens
-		else:
-			user = db.users[db.users.insert(email=email, remote_addr = request.remote_addr)]
+	user = db(db.users.email==email).select().first()
+	if not user:	#user provided a new email address, create a new user
+		user = db.users[db.users.insert(email=email, remote_addr = request.remote_addr)]
+	if not user.email_sent:
 		token = str(random.randint(10000,999999))
-		user.update_record(tokens= [token]+(user.tokens or []),
-				email = email, when_issued = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None))
+		user.update_record(tokens= [token]+(user.tokens or []), email_sent=True, when_issued = now)
 		link = URL('validate', user.id, token, scheme=True, vars=dict(url=request.query.url))
 		message = f"Please click {A(link, _href=link)} to continue to {SOCIETY_SHORT_NAME} \
 and complete your registration or other transaction.<br><br>\

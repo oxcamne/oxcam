@@ -1315,7 +1315,7 @@ def reservation():
 			XML(event_confirm(event.id, member.id, event_only=True)))
 
 	if parsed['mode']=='select':
-		if host_reservation and not host_reservation.Host:	#provisional reservation delete, start over
+		if not host_reservation or not host_reservation.Host:	#host reservation deleted, start over
 			for row in all_guests:	#delete all guests after host reservation deleted
 				db(db.Reservations.id==row.id).delete()
 			redirect(URL(f'registration/{session.event_id}'))
@@ -1466,11 +1466,14 @@ def reservation():
 			   		Firstname=member.Firstname, Lastname=member.Lastname, Affiliation=affinity.College if affinity else None,
 					Title=member.Title, Suffix=member.Suffix, Ticket_=db.Reservations.Ticket_.default)
 				redirect(URL('reservation'))
-	
+	else:	#deleting guest or host reservatlon - bypassing the confirmation form
+		db(db.Reservations.id==id).delete()
+		redirect(URL('reservation'))
+
 	def validate(form):
 		if form.vars.get('Waitlist') and form.vars.get('Provisional'):
 			form.errors['Waitlist'] = "Waitlist and Provisional should not both be set"
-		if int(form.vars.get('Ticket_')) != db.Reservations.Ticket_.default:
+		if form.vars.get('Ticket_') and int(form.vars.get('Ticket_')) != db.Reservations.Ticket_.default:
 			ticket = tickets.find(lambda t: t.id == int(form.vars.get('Ticket_', '0'))).first()
 			if ticket.Qualify and (not form.vars.get('Notes') or form.vars.get('Notes').strip()==''):
 				form.errors['Notes']=ticket.Qualify	#documentation required

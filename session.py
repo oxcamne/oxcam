@@ -93,7 +93,7 @@ you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _h
  		#rate limit the IP and email, impose VERIFY_TIMEOUT minute delay between login attempts
 		now = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
 		user = db(db.users.email==form.vars.get('email').lower()).select().first()
-		if not (VERIFY_TIMEOUT and last and now < last.when_issued + datetime.timedelta(minutes=VERIFY_TIMEOUT)):
+		if not (VERIFY_TIMEOUT and last and last.when_issued and now < last.when_issued + datetime.timedelta(minutes=VERIFY_TIMEOUT)):
 			session['email'] = form.vars['email'].lower()
 			if RECAPTCHA_KEY and not challenge and not (user and user.trusted and user.remote_addr == request.remote_addr):
 				redirect(URL('login', vars=dict(challenge=True, url=request.query.url)))	#not trusted email/IP, challenge with recaptcha

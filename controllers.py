@@ -397,7 +397,7 @@ def member_reservations(member_id):
 					Column('conf', lambda row: res_conf(member_id, row.Reservations.Event) or ''),
 					Column('cost', lambda row: event_cost(row.Reservations.Event, member_id) or ''),
 					Column('tbc', lambda row: event_unpaid(row.Reservations.Event, member_id) or '')],
-			grid_class_style=grid_style,
+			grid_class_style=grid_style, search_queries=[],
 			formstyle=form_style,
 			details=False, editable = False, create = False, deletable = False)
 	return locals()
@@ -440,6 +440,7 @@ def affiliations(ismember, member_id):
 		if not session.access:
 			redirect(URL('accessdenied'))
 		write = ACCESS_LEVELS.index(session.access) >= ACCESS_LEVELS.index('write')
+		db.Affiliations.Matr.requires = None	#allow admin to add affiliations with unknown year of matriculation
 	db.Affiliations.Member.default=member_id
 
 
@@ -1068,7 +1069,7 @@ def check_in(event_id):
 		rsvtn = db.Reservations[request.query.rsvtn_id]
 		if rsvtn.Event != event_id:
 			raise Exception('Invalid event id')
-		rsvtn.update_record(Checked_in=not rsvtn.Checked_in)
+		rsvtn.update_record(Checked_in=request.query.get('check_in')=='True')
 		groupcheckedin = res_checked_in(rsvtn.Member, event_id)
 		if groupcheckedin & (groupcheckedin != res_conf(rsvtn.Member, event_id)):
 			back += f"?search_value={rsvtn.Lastname}"
@@ -1082,9 +1083,12 @@ def check_in(event_id):
 									A(f"{row.Lastname+', '+row.Firstname}",
 									_href=URL(f"manage_reservation/{row.Member}/{event_id}",
 									vars=dict(back=back)), _style='white-space: normal')),
-					required_fields=[db.Reservations.Host, db.Reservations.Lastname, db.Reservations.Firstname, db.Reservations.Member]),
-				Column('check in', lambda row: A( "⬤"if row.Checked_in else "〇", _href=URL(f"check_in/{event_id}",
-									vars=dict(rsvtn_id=row.id))), required_fields=[db.Reservations.Checked_in]),
+					required_fields=[db.Reservations.Host, db.Reservations.Lastname, db.Reservations.Firstname,
+					  					db.Reservations.Member, db.Reservations.Checked_in]),
+				Column('check in', lambda row: A("⬤" if row.Checked_in else "〇", _href=URL(f"check_in/{event_id}",
+			   		vars=dict(rsvtn_id=row.id, check_in=not row.Checked_in)),
+					_class="check-in-link",
+				))
 			],
 			details=False, editable=False, create=False,
 			deletable=False, search_queries=[],

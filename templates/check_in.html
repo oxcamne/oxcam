@@ -11,7 +11,27 @@
 [[=grid.render()]]
 </div>
 
+<style>
+.checking-in {
+    opacity: 0.5;
+    pointer-events: none;
+    transition: opacity 0.2s;
+}
+</style>
+
 <script>
+document.addEventListener("DOMContentLoaded", function() {
+    document.querySelectorAll(".check-in-link").forEach(function(link) {
+        link.addEventListener("click", function(e) {
+            // Immediate feedback
+            link.classList.add("checking-in");
+            // Optionally, change the icon or show a spinner
+            link.textContent = "⏳"; // or use a spinner icon
+            // Allow the navigation to continue
+        });
+    });
+});
+
 function applyFilter() {
     let searchValue = document.getElementById("search").value.toLowerCase();
     let uncheckedOnly = document.getElementById("unchecked-only").checked;

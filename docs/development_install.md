@@ -6,67 +6,38 @@ For development purposes you can use any Windows, Mac, or Linux machine to set u
 
 ### Prerequisites
 
-You need to have Python installed. It should be the same version as is running on the production web server, currently 3.10. The Python.org website makes it most convenient to download the latest version of Python which is currently 3.11.
+You will be using the terminal app, or bash depending on your environment, in what follows.
 
-On the Mac or Linux, the most convenient way to install the desired 3.10 version is to use 'homebrew'. Homebrew is also the way to install git, which is also required. You can [install homebrew here](https://brew.sh/).
+You need to have Python installed. It should be version 3.8 or higher. The [Python.org](https://www.python.org/downloads/) website makes it most convenient to download the latest version of Python which at the time of writing is 3.13.6
 
-Once homebrew is installed, you can install git, and Python 3.10, with the following commands on a terminal:
+On the Mac or Linux, the most convenient way to install python is to use 'homebrew', which also makes it easy to select Python versions other than the latest. Homebrew is also the way to install git, which is also required. You can [install homebrew here](https://brew.sh/).
+
+Once homebrew is installed, you can install git, and Python, with the following commands on a terminal (if you need to install an earlier version of python, specify as, e.g. python@3.11):
 
 ```bash
 $ brew install git
 ...
-$ brew install python@3.10
+$ brew install python
 ...
 ```
 
-If you are going to use VScode, as recommended, download and install it [here](https://code.visualstudio.com/download). The rest of this document assumes the use of VScode.
+If you are going to use VScode, as recommended, [download and install it](https://code.visualstudio.com/download). The rest of this document assumes the use of VScode.
 
-### Install OxCam Source Code from Github
+### Install Py4web and OxCam Source Code from Github
 
 First identify where you wish to put a source code distribution of py4web, which will also include our proprietary software. It will all be contained in a folder 'py4web'.
 
 Open a terminal and navigate to where you want to place the py4web folder. Download the py4web code and the oxcam code using the following commands:
 
 ```bash
-$ git clone https://github.com/web2py/py4web.git
+git clone https://github.com/web2py/py4web.git
 ...
-$ cd py4web/apps
-$ git clone https://github.com/oxcamne/oxcam.git
+cd py4web/apps
+git clone https://github.com/oxcamne/oxcam.git
 ...
 ```
 
-This creates the py4web folder (directory) and downloads the latest version of py4web along with a copy of it's git repository and then, within py4web's apps folder, the latest version of oxcam with a copy of its git repository.
-
-We are following the procedure '[Installing from source (locally)](https://py4web.com/_documentation/static/en/chapter-03.html#installing-from-source-locally)' in the py4web documentation BUT executing ONLY the git clone command at this stage as we first want to setup the correct environment.
-
-### Select Py4web Release to Run
-
-As noted in the py4web documentation, you have now loaded the latest 'master' version of py4web. This is what I normally use in development, but you may prefer to use the latest released version. Check the history after navigating back to the py4web directory, for example:
-
-```bash
-$ cd ..
-$ git log
-commit 119fa7fc9051449f8326a815cfe81b5e9e7504cc (HEAD, tag: v1.20231029.2)
-Author: Massimo Di Pierro <massimo.dipierro@gmail.com>
-Date:   Sun Oct 29 18:33:02 2023 -0700
-
-    version 1.20231029.2
-
-commit af3dd0e08c4ac1d3fbd8be4da49d93e033af1bfc
-Author: Massimo Di Pierro <massimo.dipierro@gmail.com>
-Date:   Sun Oct 29 18:32:14 2023 -0700
-
-    new auth.start_impersonating, is_impersonating, stop_impersonating
-
-commit 40660361e3f9b8d66f5454eebc185d5f35bc1167 (tag: v1.20231029.1)
-Author: Massimo Di Pierro <massimo.dipierro@gmail.com>
-Date:   Sun Oct 29 14:19:35 2023 -0700
-:
-```
-
-In the example the latest commit is a tagged version, so probably have a safe version. You may wish to find a recent tagged version (page onward using the 'z' key if necessary, hit 'q' when done). When you find the one you want, copy the hash (the long string after 'commit') and use it to checkout, thus:
-
-```$ git checkout 119fa7fc9051449f8326a815cfe81b5e9e7504cc```
+This creates the py4web folder (directory) and downloads the latest version of py4web along with a copy of it's git repository and then, within py4web's apps folder, the latest version of oxcam with a copy of its git repository. In development you would normally use the latest version software on the main branches of these products on Github.
 
 At this point we are done with the standalone terminal window, and will continue using vscode.
 
@@ -74,9 +45,9 @@ At this point we are done with the standalone terminal window, and will continue
 
 Launch Vscode, and open the workspace on the py4web folder you have now created. This is a good time to install the Vscode extensions you may need. Make sure the Microsoft IntelliSense Python extension is included. I also recommend installing the Git History extension (Don Jayamanne).
 
-Before continuing, it is good practice to set up a python virtual environment for the workspace we just created, to ensure that we have a stable python setup which matches that in production on Pythonanywhere, regardless of other versions of python which may be installed on your machine.
+Before continuing, it is good practice to set up a python virtual environment for the workspace we just created, to ensure that we have a stable python setup which matches that in production, regardless of other versions of python which may be installed on your machine.
 
-In the Code/View menu click on Command Palette... and search for the Python: Create Environment command. Click on it, and then select Venv. You will then be presented with a list of possible Python version sources which should include the desired version as noted earlier. You will be given the option to open up a terminal window within Vscode to observe the creation process. Also tick the boxes to process the all the requirements files. This will include all the python modules py4web and oxcam need in the venv.
+In the Code/View menu click on Command Palette... and search for the Python: Create Environment command. Click on it, and then select Venv. You will then be presented with a list of possible Python versions found on your machine. You will be given the option to open up a terminal window within Vscode to observe the creation process. Also tick the boxes to process the all the requirements files. This will include all the python modules py4web and oxcam need in the venv (you may see only oxcam listed - py4web no longer uses a requirements.txt file and it's dependencies will be added laterc)
 
 Then in Command Palette find the Python: Select Interpreter. Click on this and then in the list presented click on the venv that you just created. This ensures that Py4web will always use this environment.
 
@@ -84,19 +55,17 @@ Then in Command Palette find the Python: Select Interpreter. Click on this and t
 
 Once the virtual environment is set up, you can use a terminal window within VScode to complete the Py4web installation. Your prompt might be something like:
 
-```(.venv) Davids-Air:py4web davidmanns$```
+```(.venv) davidmanns@Mac py4web %```
 
 The (venv) confirms that you are operating in the virtual environment. As shown you should be looking at the py4web folder itself. Now execute the commands:
 
 ```bash
-$ pip install  --upgrade -r requirements.txt
-...
-$ pip install  --upgrade -r ./apps/oxcam/requirements.txt
-...
-$ ./py4web.py setup apps
-...
-$ ./py4web.py set_password
-...
+make assets
+make test
+python -m pip install .
+pip install  --upgrade -r ./apps/oxcam/requirements.txt$ py4web setup apps
+py4web set_password
+py4web run apps
 ```
 
 This password is for running the Py4web dashboard on the localhost [http://127.0.0.1:8000/_dashboard](http://127.0.0.1:8000/_dashboard) so it doesn't need to be a strong password. The pip install's may be unnecessary as the VScode Create Environment may detect py4web and oxcam's requirements.txt files and have already taken care of this, but running them again is benign.

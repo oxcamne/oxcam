@@ -4,7 +4,7 @@ This file contains controllers used to manage the user's session
 from py4web import URL, request, redirect, action, Field, HTTP
 from .common import db, session, flash, logger, auth
 from .settings import SUPPORT_EMAIL, TIME_ZONE, SOCIETY_SHORT_NAME, PAGE_BANNER, DATE_FORMAT,\
-		RECAPTCHA_KEY, RECAPTCHA_SECRET, VERIFY_TIMEOUT
+		RECAPTCHA_KEY, RECAPTCHA_SECRET, VERIFY_TIMEOUT, SMTP_TRANS
 from .models import ACCESS_LEVELS, member_name, CAT
 from .utilities import email_sender
 from yatl.helpers import A, H6, XML, P, DIV, INPUT
@@ -26,7 +26,9 @@ for an explanation see the blog article from which I cribbed
 def checkaccess(requiredaccess):
 	def wrap(f):
 		def wrapped_f(*args, **kwds):
-			if db(db.Colleges.id>0).count()==0 and not session.logged_in:
+			if not SMTP_TRANS:	#settings_private.py not yet set up
+				redirect(URL('setup_settings_private'))
+			if not db(db.Colleges.id>0).count() and not session.logged_in:	#database not loaded yet
 				redirect(URL('login', vars=dict(url=URL('db_restore'))))
 			member_id = session.member_id
 			if member_id:

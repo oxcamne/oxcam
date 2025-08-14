@@ -13,12 +13,14 @@ from .common import db, session, flash
 from .session import checkaccess
 from py4web.utils.form import Form, FormStyleBulma
 from py4web.utils.grid import Grid, GridClassStyleBulma
-from yatl.helpers import XML, H5
-from .settings import SOCIETY_SHORT_NAME, PAGE_BANNER, GRACE_PERIOD
+from yatl.helpers import XML, H5, CAT
+from .settings import SOCIETY_SHORT_NAME, PAGE_BANNER, GRACE_PERIOD, SMTP_TRANS
 from py4web.utils.factories import Inject
 from io import StringIO, TextIOWrapper
-from pydal.validators import IS_NOT_EMPTY
+from pydal.validators import IS_NOT_EMPTY, IS_EMAIL
 from urllib.parse import urlparse, parse_qs
+import re
+from pathlib import Path
 
 preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER))
 
@@ -101,7 +103,7 @@ def db_restore():
 	header = f"Restore {SOCIETY_SHORT_NAME} database from backup file"
 	
 	form = Form([Field('overwrite_existing_database', 'boolean',
-	       				default=False, comment='clear if new empty database'),
+		   				default=False, comment='clear if new empty database'),
 				Field('backup_file', 'upload', uploadfield = False)],
 				submit_value = 'Restore')
 	
@@ -119,6 +121,77 @@ def db_restore():
 			flash.set(f"{str(e)}")
 
 	return locals( )
+
+@action("setup_settings_private", method=['POST', 'GET'])
+@preferred
+def setup_settings_private():
+	if SMTP_TRANS:	#settings_private.py already set up
+		redirect(URL('accessdenied'))
+
+	access = session.access	#for layout.html
+	header = CAT(
+		H5("Setup settings_private.py"),
+		XML(
+"This file contains private settings, such as SMTP server details, payment processor keys, etc.<br>\
+Minimally, you need to set up the SMTP server details to send emails. \
+You can use a Gmail account, which will normally use 2-step verification, \
+so you will need to create an Application Password. Search Gmail documentation for details. \
+By default this will also be your support email address<br><br>\
+You can later edit the settings_private.py file directly to complete your customization, \
+using the editor in the py4web dashboard.<br><br>\
+You can also load an initial minimal database by ticking the option. \
+This will allow you to run the application, build and maintain a mailing list, and send mailings.<br>\
+Alternatively, after restarting py4web, you can load a previously saved database backup using oxcam/db_restore.<br>"
+		)
+	)
+	
+	form = Form([
+				Field('smtp_server', 'string', default='smtp.gmail.com',),
+				Field('smtp_port', 'integer', default=587),
+				Field('smtp_user', 'string', default='email_address', requires=IS_EMAIL()),
+				Field('smtp_password', 'string', default='password', requires=IS_NOT_EMPTY()),
+				Field('load_minimal_database', 'boolean',
+		   				default=False, comment='load initial empty database')
+				]
+			)
+	
+	if form.accepted:
+		try:
+			this_dir = Path(__file__).parent
+			template_path = this_dir / "settings_private_template.py"
+			target_path = this_dir / "settings_private.py"
+			with open(template_path, "r", encoding="utf-8") as f:
+				content = f.read()
+			# Replace the SMTP_TRANS line specifically
+			smtp_line_pattern = (
+				r"SMTP_TRANS\s*=\s*Email_Account\(\s*['\"]smtp_server['\"]\s*,\s*['\"]smtp_port['\"]\s*,\s*['\"]email_username['\"]\s*,\s*['\"]email_password['\"]\s*\)"
+			)
+			smtp_line_replacement = (
+				f'SMTP_TRANS = Email_Account('
+				f'"{form.vars["smtp_server"]}", '
+				f'{form.vars["smtp_port"]}, '
+				f'"{form.vars["smtp_user"]}", '
+				f'"{form.vars["smtp_password"]}")'
+			)
+			content = re.sub(smtp_line_pattern, smtp_line_replacement, content)
+			content = content.replace("your_support_email", form.vars["smtp_user"])
+			with open(target_path, "w", encoding="utf-8") as f:
+				f.write(content)
+			done = "settings_private.py created/updated successfully."
+			if form.vars.get('load_minimal_database'):
+				# Load the minimal database
+				with (this_dir / "minimal_database.csv").open("rb") as f:
+					db.import_from_csv_file(
+						TextIOWrapper(f, encoding='utf-8'),
+						id_map={}
+					)
+				done += (" Minimal database loaded successfully.")
+			done += (" Please restart py4web before continuing. Then visit My Account to set up your admin account.")
+			flash.set(done)
+		except Exception as e:
+			flash.set(f"{str(e)}")
+
+	return locals()
 
 @action("db_backup")
 @action.uses("download.html", db, session, Inject(response=response))

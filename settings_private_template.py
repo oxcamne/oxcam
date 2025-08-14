@@ -8,16 +8,34 @@ Customize for your organization and instance
 SOCIETY_NAME = 'your_group_name'
 SOCIETY_SHORT_NAME = 'your_group_short_name'    #ideally, the domain name omitting the .xxx part
 				#also use as your username if using Pythonanywhere server
-SOCIETY_LOGO = 'your_logo_file_name' 		#should be placed in py4web/apps/oxcam/static directory
+SOCIETY_LOGO = 'oxcamne_no_pad.png' 		#should be placed in py4web/apps/oxcam/static directory
 				#Your favicon.ico should also be placed in py4web/apps/oxcam/static directory
+				#note, oxcamne_no_pad.png and favicon.ico are part of the distribution and have both university arms
 
 DB_URL = f'your_database_server_url'   #e.g. https://{SOCIETY_SHORT_NAME}.pythonanywhere.com/oxcam
 
 SUPPORT_EMAIL = 'your_support_email'
 
 # html trailer for email notices:
-VISIT_WEBSITE_INSTRUCTIONS = f"<br><br>Visit us at 'your_web_site_url' or your_social_media"
+VISIT_WEBSITE_INSTRUCTIONS = f"<br><br>Visit us at 'your_web_site_url' or 'your_social_media'"
 				#your_web_site_url might be www.{SOCIETY_SHORT_NAME}.org or similar, or {DB_URL}/web/home
+
+from dataclasses import dataclass
+import decimal
+
+@dataclass
+class Email_Account:
+	server: str
+	port: int
+	username: str
+	password: str
+
+#SMTP server for sending transactional messages (e.g. a gmail account)
+SMTP_TRANS = Email_Account('smtp_server', 'smtp_port', 'email_username', 'email_password')
+
+#SMTP server for sending bulk messages (e.g. a mailing service such as mailgun)
+#for small groups, this can be the same as SMTP_TRANS
+SMTP_BULK = SMTP_TRANS
 
 #localization settings
 import locale
@@ -35,45 +53,8 @@ CURRENCY_SYMBOL = locale.nl_langinfo(locale.CRNCYSTR)[1:]
 TIME_ZONE = tz.gettz('America/New_York')
 #see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 
-# set True only for live production instance, False for development/testing
-IS_PRODUCTION = True
-#if False, email is suppressed except to the following listed emails:
+#on Test/Development instance, email is suppressed except to the following listed emails:
 ALLOWED_EMAILS = []
-
-from dataclasses import dataclass
-import decimal
-
-@dataclass
-class Membership:
-	category: str
-	description: str
-	qualification: str = None
-
-"""
-list of Membership definitions (may be empty list)
-NOTE <dues> in description will be replaced by the figure in e.g. Stripe's dues products.
-"""
-MEMBERSHIPS = [
-	Membership('Full', "all matriculated alumni and members of the Universities of \
-Oxford and Cambridge. Annual dues are <dues> payable by subscription. In future years, you'll \
-receive a reminder a week before the next auto-payment is made."),
-	Membership('Student', "full time students (current or graduated within \
-the last 12 months). Annual dues are <dues>, renewable annually",
-"Please note details of your full-time course (current or graduated within last 12 months).")
-]
-
-@dataclass
-class Email_Account:
-	server: str
-	port: int
-	username: str
-	password: str
-
-#SMTP host connection for transactional messages (e.g. a gmail account)
-SMTP_TRANS = Email_Account('smtp.somewhere.com', 'port', 'username', 'password')
-
-#SMTP host connection for bulk messages (e.g. a mailing service such as mailgun)
-SMTP_BULK = Email_Account('smtp.somewhere.com', 'port', 'username', 'password')
 
 class PaymentProcessor:
 	def __init__(self, name, public_key, secret_key, dues_products):
@@ -82,24 +63,48 @@ class PaymentProcessor:
 		self.secret_key = secret_key
 		self.dues_products = dues_products
 
-""" available processors, first is defaault: 
+""" To implement payment processing, define a list of PaymentProcessor objects, e.g. by uncommenting the definition
+below and filling in the keys.
+Include dues_products = {...} with the product ids for the dues categories in MEMBERSHIPS if you will have paid memberships.
+Currently only Stripe is supported. 
+NOTE all the keys and product ids have both production and test/development values. The dues_products dictionary
+should contain the product ids for the dues categories in MEMBERSHIPS, which are used to create the payment links.
 NOTE the local copy in pay_processors module contains the full implementions.
 Access using the functions paymentprocessor(name) in the pay_procesors module
-"""
 PAYMENTPROCESSORS = [
 	PaymentProcessor(name = 'stripe',
-		public_key = "<-- stripe production public key -->" if IS_PRODUCTION else "<-- stripe test public key -->",
-		secret_key = "<-- stripe production secret key -->" if IS_PRODUCTION else "<-- stripe test secret key -->",
+		public_key = "<-- stripe public key -->"",
+		secret_key = "<-- stripe secret key -->" ,
 		dues_products = {
-			'Full': "<-- stripe production product id -->" if IS_PRODUCTION else "<-- stripe test product id -->",
-			'Student': "<-- stripe production product id -->" if IS_PRODUCTION else "<-- stripe test product id -->"
+			'Full': "<-- stripe product id -->",
+			'Student': "<-- stripe product id -->"
 		}
 	)
 ]
+"""
 
-#Gooogle reCAPTCHA keys (set all to None if not using Captcha)
-RECAPTCHA_KEY = "production_recaptcha_site_key" if IS_PRODUCTION else "develomemnt_recaptcha_site_key"
-RECAPTCHA_SECRET = "production_recaptcha_secret" if IS_PRODUCTION else "develomemnt_recaptcha_secret"
+@dataclass
+class Membership:
+	category: str
+	description: str
+	qualification: str = None
+
+"""
+To implement membership categories, define a list of Membership objects, such as the list below, which
+are the categories used by the Oxford & Cambridge Society of New England.
+MEMBERSHIPS = [
+	Membership('Full', "all matriculated alumni and members of the Universities of \
+Oxford and Cambridge. Annual dues are <dues> payable by subscription. In future years, you'll \
+receive a reminder a week before the next auto-payment is made."),
+	Membership('Student', "full time students (current or graduated within \
+the last 12 months). Annual dues are <dues>, renewable annually",
+"Please note details of your full-time course (current or graduated within last 12 months).")
+]
+"""
+
+#Gooogle reCAPTCHA keys (set all to empty string if not using Captcha)
+RECAPTCHA_KEY = ""
+RECAPTCHA_SECRET = ""
 
 VERIFY_TIMEOUT = 3	#minutes enforced between verification emails
 
@@ -112,15 +117,15 @@ PAGE_BANNER = f'<h4><span style="color: blue"><em>{SOCIETY_NAME}</em>\
 <img src="{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" /></span></h4>'
 
 # html letterhead for email/notices:
-LETTERHEAD = f'<h2><span style="color: blue"><em>{SOCIETY_NAME}</em></span> \
-<img src="{DB_URL}/static/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" />\
-</h2><br><br>'
+LETTERHEAD = f'<h2><span style="color: blue"><em>{SOCIETY_NAME}</em>\
+<img src="https://oxcamne.pythonanywhere.com/oxcam/static/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" /></span></h2><br><br>'
+# note, on a development instance, this must refer to the production server, as email services don't
+# have access to the local server.
 
-# database connection string:
-DB_URI = "sqlite://storage.db"
 """
+To use a database other than SQLite, define the database URI and pool size.
 SQLite is built into Py4web and should be adequate except for extremely large groups.
-On PythonAnywhere you can alternatively use MySQL, e.g.:
+For example, if using PythonAnywhere, you can use MySQL:
 DB_URI = f"mysql://{SOCIETY_SHORT_NAME}:<--- database password here --->@{SOCIETY_SHORT_NAME}.mysql.pythonanywhere-services.com/{SOCIETY_SHORT_NAME}$default"
 DB_POOL_SIZE = 10
 """
@@ -130,9 +135,6 @@ THREAD_SUPPORT = False
 # Note, PythonAnywhere doesn't support threads, must run
 # these processes as scheduled tasks. Set True if your
 # environment supports threads, e.g. in development environment.
-
-# access levels for group administrators DO NOT CHANGE, used in @checkaccess(None|any)
-ACCESS_LEVELS = ['read', 'write', 'accounting', 'admin']
 
 GRACE_PERIOD = 45
 """
@@ -150,5 +152,3 @@ LOGGERS = [
 	"warning:stdout",
 	"info:oxcam.log:%(asctime)s - %(levelname)s - %(message)s"
 ]  # syntax "severity:filename:format" filename can be stderr or stdout
-
-ALLOWED_ACTIONS = []    #disable Py4web's auth

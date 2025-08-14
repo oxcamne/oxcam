@@ -22,7 +22,7 @@ import datetime
 import os
 from pathlib import Path
 from .common import db
-from .settings import SOCIETY_SHORT_NAME, IS_PRODUCTION, SUPPORT_EMAIL,\
+from .settings import SOCIETY_SHORT_NAME, ALLOWED_EMAILS, SUPPORT_EMAIL,\
 		SOCIETY_NAME, DB_URL, DATE_FORMAT, TIME_ZONE
 from .utilities import member_greeting, email_sender
 from .pay_processors import paymentprocessor
@@ -63,14 +63,14 @@ and selecting join/renew from the menu of choices, \
 or cancel membership to receive no futher reminders.</p><p>\
 We are very grateful for your membership support and hope that you will renew!</p>\
 If you have any questions, please contact {SUPPORT_EMAIL}"
-			if IS_PRODUCTION:
+			if not ALLOWED_EMAILS:
 				email_sender(to=primary_email(m.id), sender=SUPPORT_EMAIL, subject='Renewal Reminder', body=text)
 			print(f"Renewal Reminder sent to {primary_email(m.id)}")
 
 	subs = db((db.Members.Pay_subs!=None)&(db.Members.Pay_subs!='Cancelled')).select()
 	for m in subs:
 		if paymentprocessor(m.Pay_source).subscription_cancelled(m):	#subscription no longer operational
-			if IS_PRODUCTION:
+			if not ALLOWED_EMAILS:
 				text = f"{member_greeting(m)}"
 				text += f"<p>We have been unable to process your auto-renewal and as a result your membership has been cancelled. </p><p>\
 We hope you will <a href={DB_URL}/my_account> reinstate your membership</a>, \

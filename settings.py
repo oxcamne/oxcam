@@ -115,7 +115,102 @@ SCHEDULER_MAX_CONCURRENT_RUNS = 1
 USE_CELERY = False
 CELERY_BROKER = "redis://localhost:6379/0"
 
-# try import private settings
+"""
+The settings below allow oxcam to run before settings_private.py is created.
+
+Configures the app for a particular alumni group/Society,
+and for a particular running instance, e.g. production or development
+Customize for your organization and instance
+"""
+
+# organization name and domain/short_name, etc:
+SOCIETY_NAME = 'your_group_name'
+SOCIETY_SHORT_NAME = 'your_group_short_name'    #ideally, the domain name omitting the .xxx part
+				#also use as your username if using Pythonanywhere server
+SOCIETY_LOGO = 'oxcamne_no_pad.png' 		#should be placed in py4web/apps/oxcam/static directory
+				#Your favicon.ico should also be placed in py4web/apps/oxcam/static directory
+				#note, oxcamne_no_pad.png and favicon.ico are part of the distribution and have both university arms
+
+DB_URL = f'your_database_server_url'   #e.g. https://{SOCIETY_SHORT_NAME}.pythonanywhere.com/oxcam
+
+SUPPORT_EMAIL = 'your_support_email'
+
+# html trailer for email notices:
+VISIT_WEBSITE_INSTRUCTIONS = f"<br><br>Visit us at 'your_web_site_url' or 'your_social_media'"
+				#your_web_site_url might be www.{SOCIETY_SHORT_NAME}.org or similar, or {DB_URL}/web/home
+
+#SMTP server for sending transactional messages (e.g. a gmail account)
+SMTP_TRANS = None #indicates that setttings_private.py does not exist yet!
+
+#SMTP server for sending bulk messages (e.g. a mailing service such as mailgun)
+#for small groups, this can be the same as SMTP_TRANS
+SMTP_BULK = None
+
+#localization settings
+import locale
+from dateutil import tz
+locale.setlocale(locale.LC_ALL, '')
+"""
+as above, takes the default settings for the server. You can check what this is using a 
+command line terminal on the server using the "locale" command.
+Use "locale -a" to see list of supported locale's.
+You can specify by replacing the empty '' above with the preferred locale
+"""
+DATE_FORMAT = locale.nl_langinfo(locale.D_FMT)
+CURRENCY_SYMBOL = locale.nl_langinfo(locale.CRNCYSTR)[1:]
+#don't currently deal with currency symbols that follow the amount
+TIME_ZONE = tz.gettz('America/New_York')
+#see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+
+#on Test/Development instance, email is suppressed except to the following listed emails:
+ALLOWED_EMAILS = []
+
+MEMBERSHIPS = []
+
+class PaymentProcessor:
+	def __init__(self, name, public_key, secret_key, dues_products):
+		self.name = name	#should be lower case, single word (underscore allowed)
+		self.public_key = public_key
+		self.secret_key = secret_key
+		self.dues_products = dues_products
+
+PAYMENTPROCESSORS = []
+RECAPTCHA_KEY = None
+RECAPTCHA_SECRET = None
+VERIFY_TIMEOUT = 3	#minutes enforced between verification emails
+
+"""
+Review the following settings and adjust as needed, but no changes are likely to be needed
+"""
+
+# html web page banner Customize:
+PAGE_BANNER = f'<h4><span style="color: blue"><em>{SOCIETY_NAME}</em>\
+<img src="{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" /></span></h4>'
+
+# html letterhead for email/notices:
+LETTERHEAD = f'<h2><span style="color: blue"><em>{SOCIETY_NAME}</em>\
+<img src="https://oxcamne.pythonanywhere.com/oxcam/static/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" /></span></h2><br><br>'
+
+# if True, run email daemon & daily maintenance in server threads
+THREAD_SUPPORT = False
+# Note, PythonAnywhere doesn't support threads, must run
+# these processes as scheduled tasks. Set True if your
+# environment supports threads, e.g. in development environment.
+
+# access levels for group administrators DO NOT CHANGE, used in @checkaccess(None|any)
+ACCESS_LEVELS = ['read', 'write', 'accounting', 'admin']
+
+GRACE_PERIOD = 45
+
+# logger settings
+LOGGERS = [
+	"warning:stdout",
+	"info:oxcam.log:%(asctime)s - %(levelname)s - %(message)s"
+]  # syntax "severity:filename:format" filename can be stderr or stdout
+
+ALLOWED_ACTIONS = []    #disable Py4web's auth
+
+# try import the real private settings
 try:
     from .settings_private import *
 except (ImportError, ModuleNotFoundError):

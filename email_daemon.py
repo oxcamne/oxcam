@@ -28,7 +28,7 @@ NOTE PythonAnywhere doesn't support threading so this runs instead
 import time, os, random, pickle, datetime, re, smtplib, markdown
 from pathlib import Path
 from .common import db, logger
-from .settings import VISIT_WEBSITE_INSTRUCTIONS, TIME_ZONE, THREAD_SUPPORT, IS_PRODUCTION,\
+from .settings import VISIT_WEBSITE_INSTRUCTIONS, TIME_ZONE, THREAD_SUPPORT,\
 	ALLOWED_EMAILS, SUPPORT_EMAIL, SMTP_BULK, DATE_FORMAT
 from .utilities import member_profile, event_confirm, member_greeting, generate_hash, email_sender, template_expand
 from .models import primary_email
@@ -53,7 +53,7 @@ def send_notice(notice):
 		row = rows[i]
 		member = db.Members[row.get('Member') or row.get('Members.id') or row.get('id')]
 		to = row.get(db.Emails.Email) or primary_email(member.id)
-		if not to or (not IS_PRODUCTION and not (to.lower() in ALLOWED_EMAILS)):
+		if not to or (ALLOWED_EMAILS and not (to.lower() in ALLOWED_EMAILS)):
 			continue
 
 		body_expanded = template_expand(notice.Body, locals())

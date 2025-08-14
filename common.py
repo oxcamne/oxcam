@@ -1,17 +1,35 @@
 """
-This file defines cache, session, and translator T object for the app
-These are fixtures that every app needs so probably you will not be editing this file
+This module sets up core fixtures and utilities for a py4web application, including:
+
+- Logging: Configures a custom logger using application settings.
+- Database: Connects to the database using settings from the configuration.
+- Caching: Instantiates a cache object for use throughout the app.
+- Translation: Sets up the translation object for internationalization.
+- Session Management: Selects and configures the session backend (cookies, Redis, Memcache, or database) based on settings.
+- Authentication: Initializes the Auth object, configures its parameters, and defines authentication tables and actions.
+- Email: Configures the email sender for authentication-related emails if SMTP settings are provided.
+- User Groups: Sets up tagging for user groups if the authentication database is available.
+- Auth Plugins: Optionally registers authentication plugins (PAM, LDAP, OAuth2 for Google, GitHub, Facebook, Okta) based on settings.
+- File Download: Defines an action for downloading uploaded files if an upload folder is specified.
+- Scheduler: Optionally starts a background scheduler for running tasks if enabled in settings.
+- Decorators: Provides convenience action factories for authenticated and unauthenticated routes.
+
+This file is intended to be a foundational part of the application and typically does not require modification.
 """
+
 import os
 import sys
-from py4web import Session, Cache, Translator, Flash, DAL, Field, action
+
+from pydal.tools.scheduler import Scheduler
+from pydal.tools.tags import Tags
+
+from py4web import DAL, Cache, Field, Flash, Session, Translator, action
 from py4web.server_adapters.logging_utils import make_logger
-from py4web.utils.mailer import Mailer
 from py4web.utils.auth import Auth
 from py4web.utils.downloader import downloader
-from pydal.tools.tags import Tags
-from pydal.tools.scheduler import Scheduler
 from py4web.utils.factories import ActionFactory
+from py4web.utils.mailer import Mailer
+
 from . import settings
 
 # #######################################################
@@ -43,7 +61,7 @@ if settings.SESSION_TYPE == "cookies":
     session = Session(secret=settings.SESSION_SECRET_KEY)
 
 elif settings.SESSION_TYPE == "redis":
-    import redis
+    import redis  # type: ignore[reportMissingImports]
 
     host, port = settings.REDIS_SERVER.split(":")
     # for more options: https://github.com/andymccurdy/redis-py/blob/master/redis/client.py
@@ -56,7 +74,9 @@ elif settings.SESSION_TYPE == "redis":
     session = Session(secret=settings.SESSION_SECRET_KEY, storage=conn)
 
 elif settings.SESSION_TYPE == "memcache":
-    import memcache, time
+    import time
+
+    import memcache  # type: ignore[reportMissingImports]
 
     conn = memcache.Client(settings.MEMCACHE_CLIENTS, debug=0)
     session = Session(secret=settings.SESSION_SECRET_KEY, storage=conn)
@@ -81,6 +101,7 @@ auth.param.block_previous_password_num = 3
 auth.param.default_login_enabled = settings.DEFAULT_LOGIN_ENABLED
 auth.define_tables()
 auth.fix_actions()
+auth.logger = logger
 
 flash = auth.flash
 
@@ -173,6 +194,22 @@ if settings.OAUTH2OKTA_CLIENT_ID:
     )
 
 # #######################################################
+# Enable optional API token plugins
+# #######################################################
+
+# curl -H "Authorization: Bearer {token}"
+# create tokens in db.auth_simple_token
+#
+# simple_token_plugin = SimpleTokenPlugin(auth)
+# auth.token_plugins.append(simple_token_plugin)
+
+# curl -H "Authorization: Bearer {token}"
+# create tokens with JwtTokenPlugin(auth).make(user, expiration)
+#
+# jwt_token_plugin = JwtTokenPlugin(auth)
+# auth.token_plugins.append(jwt_token_plugin)
+
+# #######################################################
 # Define a convenience action to allow users to download
 # files uploaded and reference by Field(type='upload')
 # #######################################################
@@ -209,6 +246,8 @@ auth.enable(uses=(session, T, db), env=dict(T=T))
 # Define convenience decorators
 # They can be used instead of @action and @action.uses
 # They should NEVER BE MIXED with @action and @action.uses
+# If you need to provide extra fixtures for a specific controller
+# add them like this: @authenticated(uses=[extra_fixture])
 # #######################################################
 unauthenticated = ActionFactory(db, session, T, flash, auth)
 authenticated = ActionFactory(db, session, T, flash, auth.user)

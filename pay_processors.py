@@ -22,12 +22,16 @@ preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=
 
 #locate named or default processor
 def paymentprocessor(name=session.pay_source):
+	if not PAYMENTPROCESSORS:
+		return None
 	return next((p for p in PAYMENTPROCESSORS if p.name==name)) if name else PAYMENTPROCESSORS[0]
 
 def stripeprocessor():
+	if not PAYMENTPROCESSORS:
+		return None
 	return next((p for p in PAYMENTPROCESSORS if p.name=='stripe'))
 
-stripe_client = stripe.StripeClient(stripeprocessor().secret_key, stripe_version="2024-10-28.acacia")
+stripe_client = stripe.StripeClient(stripeprocessor().secret_key, stripe_version="2024-10-28.acacia") if stripeprocessor() else None 
 
 class StripeProcessor(PaymentProcessor):
 

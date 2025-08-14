@@ -13,9 +13,9 @@ import datetime, re, smtplib, markdown, base64, decimal
 from email.message import EmailMessage
 
 #check if member is in good standing at a particular date
-#if no paid membership categories always return True
+#if no paid membership categories always return False
 def member_good_standing(member, date):
-	return member and (len(MEMBERSHIPS)==0 or (member.Membership and ((not member.Paiddate or member.Paiddate>=date)\
+	return member and (MEMBERSHIPS and (member.Membership and ((not member.Paiddate or member.Paiddate>=date)\
 			or member.Charged or (member.Pay_subs and member.Pay_subs != 'Cancelled'))))
 
 def ageband(year, matr):

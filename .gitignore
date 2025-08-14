@@ -47,7 +47,7 @@ workspace.code-workspace
 venv
 docs/_build
 *.csv
-!db_oxcam_minimal.csv
+!minimal_database.csv
 settings_private.py
 databases/*
 static/images/*

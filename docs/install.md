@@ -2,22 +2,54 @@
 
 ## Installation
 
-The oxcam software is held on Github at [https://github.com/oxcamne/oxcam](https://github.com/oxcamne/oxcam). This section assumes that you have read the README displayed there and satisfied the pre-requisites, so that you have a web server successfully running Py4web.
+The oxcam software is held on Github at [https://github.com/oxcamne/oxcam](https://github.com/oxcamne/oxcam). This section assumes that you have read the [README](https://github.com/oxcamne/oxcam?tab=readme-ov-file) displayed there and satisfied the pre-requisites, so that ***you have a web server successfully running Py4web***.
 
-On your server open a bash terminal session at the py4web 'apps' directory, issue the commands:
+This documentation is intended for groups adopting oxcam to run it's website and database.
+
+For technical users contributing to the support/development of the software, see [development installation](development_install).
+
+### Find the latest version of the oxcam software
+
+Browse to [https://github.com/oxcamne/oxcam](https://github.com/oxcamne/oxcam) and click on the latest version of OxCam on the releases section of the page. You should see something like:
+
+![oxcam_version](images/oxcam_version.png)
+
+Right-click on the Source code (zip) link and select 'copy link'
+
+### Install the oxcam software on your server
+
+On your server open a bash terminal session (you may already have a bash session in a browser tab from installing py4web). Navigate to the parent of the py4web directory (cd ~ if you are on Pythonanywhere), then, pasting in the copied link:
 
 ```bash
-    git clone https://github.com/oxcamne/oxcam.git
-    pip install --upgrade -r oxcam/requirements.txt
+    wget https://github.com/oxcamne/oxcam/archive/refs/tags/v1.0.0.zip
+    unzip v1.0.0
+    mv oxcam-1.0.0 py4web/apps/oxcam
+    pip install --upgrade -r py4web/apps/oxcam/requirements.txt
 ```
 
-This clones the software into a new directory apps/oxcam, and ensures that necessary Python packages are installed. You may need to precede 'pip' with 'python ' or 'python3 ' depending on your environment.
+This copies the software into a new directory apps/oxcam, and ensures that necessary Python packages are installed. You may need to precede 'pip' with 'python ' or 'python3 ' depending on your environment.
 
-Note that if you are installing on Pythonanywhere, you can open a bash terminal session (they call this a console) from various places on their site, and that from the 'Files' tab you can edit files, such as the settings file described below.
+You should also have the Py4web dashboard (<your_py4web_url>/_dashboard) running in a browser tab.
 
-### Configure the software for your organization
+### Restart Py4web, Check that Oxcam is running
 
-You next need to create a 'settings_private.py' file in apps/oxcam. Customize the contents from the code below, which is taken from the OxCamNE environment (with sensitive keys removed). A copy of this is included in the kit as settings_private_template.py which you can copy or rename:
+Expand the top (Installed Applications) tab of the Py4web dashboard, and **click the Reload Apps button.** You should now see oxcam in the list of running apps.
+
+### Start Oxcam and Initial Configuration
+
+In a new browser tab, start the oxcam app (<your_py4web_url>/oxcam). You should see a screen like this:
+
+![setup_oxcam](images/setup_oxcam.png)
+
+Follow the on-screen instructions to define the email account to be used by oxcam. Normally you would also tick the 'load minimal database' checkbox.
+
+After successfully submitting the form, return to the Py4web dashboard and **click the Reload Apps button again**.
+
+### Complete the customization for your group
+
+You need to edit the settings_private.py file just created. You can use the Py4web dashboard app to do this, restarting the running apps after all edits.
+
+In the dashboard 'Installed Applications' section, click on the 'oxcam' app. Then find 'settings_private.py' in the 'Files in oxcam' section. This opens the file in an editor, it will look like:
 
 ```python
 """
@@ -30,16 +62,34 @@ Customize for your organization and instance
 SOCIETY_NAME = 'your_group_name'
 SOCIETY_SHORT_NAME = 'your_group_short_name'    #ideally, the domain name omitting the .xxx part
                 #also use as your username if using Pythonanywhere server
-SOCIETY_LOGO = 'your_logo_file_name'    #should be placed in py4web/apps/oxcam/static directory
+SOCIETY_LOGO = 'oxcamne_no_pad.png'             #should be placed in py4web/apps/oxcam/static directory
                 #Your favicon.ico should also be placed in py4web/apps/oxcam/static directory
+                #note, oxcamne_no_pad.png and favicon.ico are part of the distribution and have both university arms
 
 DB_URL = f'your_database_server_url'   #e.g. https://{SOCIETY_SHORT_NAME}.pythonanywhere.com/oxcam
 
-SUPPORT_EMAIL = 'your_support_email'
+SUPPORT_EMAIL = 'oxcamne@oxcamne.org'
 
 # html trailer for email notices:
-VISIT_WEBSITE_INSTRUCTIONS = f"<br><br>Visit us at 'your_web_site_url' or your_social_media"
+VISIT_WEBSITE_INSTRUCTIONS = f"<br><br>Visit us at 'your_web_site_url' or 'your_social_media'"
                 #your_web_site_url might be www.{SOCIETY_SHORT_NAME}.org or similar, or {DB_URL}/web/home
+
+from dataclasses import dataclass
+import decimal
+
+@dataclass
+class Email_Account:
+    server: str
+    port: int
+    username: str
+    password: str
+
+#SMTP server for sending transactional messages (e.g. a gmail account)
+SMTP_TRANS = Email_Account("smtp.gmail.com", 587, "oxcamne@oxcamne.org", "uajlvccbmkekakja")
+
+#SMTP server for sending bulk messages (e.g. a mailing service such as mailgun)
+#for small groups, this can be the same as SMTP_TRANS
+SMTP_BULK = SMTP_TRANS
 
 #localization settings
 import locale
@@ -57,45 +107,8 @@ CURRENCY_SYMBOL = locale.nl_langinfo(locale.CRNCYSTR)[1:]
 TIME_ZONE = tz.gettz('America/New_York')
 #see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 
-# set True only for live production instance, False for development/testing
-IS_PRODUCTION = True
-#if False, email is suppressed except to the following listed emails:
+#on Test/Development instance, email is suppressed except to the following listed emails:
 ALLOWED_EMAILS = []
-
-from dataclasses import dataclass
-import decimal
-
-@dataclass
-class Membership:
-    category: str
-    description: str
-    qualification: str = None
-
-"""
-list of Membership definitions (may be empty list)
-NOTE <dues> in description will be replaced by the figure in e.g. Stripe's dues products.
-"""
-MEMBERSHIPS = [
-    Membership('Full', "all matriculated alumni and members of the Universities of \
-Oxford and Cambridge. Annual dues are <dues> payable by subscription. In future years, you'll \
-receive a reminder a week before the next auto-payment is made."),
-    Membership('Student', "full time students (current or graduated within \
-the last 12 months). Annual dues are <dues>, renewable annually",
-"Please note details of your full-time course (current or graduated within last 12 months).")
-]
-
-@dataclass
-class Email_Account:
-    server: str
-    port: int
-    username: str
-    password: str
-
-#SMTP host connection for transactional messages (e.g. a gmail account)
-SMTP_TRANS = Email_Account('smtp.somewhere.com', 'port', 'username', 'password')
-
-#SMTP host connection for bulk messages (e.g. a mailing service such as mailgun)
-SMTP_BULK = Email_Account('smtp.somewhere.com', 'port', 'username', 'password')
 
 class PaymentProcessor:
     def __init__(self, name, public_key, secret_key, dues_products):
@@ -104,26 +117,50 @@ class PaymentProcessor:
         self.secret_key = secret_key
         self.dues_products = dues_products
 
-""" available processors, first is defaault: 
+""" To implement payment processing, define a list of PaymentProcessor objects, e.g. by uncommenting the definition
+below and filling in the keys.
+Include dues_products = {...} with the product ids for the dues categories in MEMBERSHIPS if you will have paid memberships.
+Currently only Stripe is supported. 
+NOTE all the keys and product ids have both production and test/development values. The dues_products dictionary
+should contain the product ids for the dues categories in MEMBERSHIPS, which are used to create the payment links.
 NOTE the local copy in pay_processors module contains the full implementions.
 Access using the functions paymentprocessor(name) in the pay_procesors module
-"""
 PAYMENTPROCESSORS = [
     PaymentProcessor(name = 'stripe',
-        public_key = "<-- stripe production public key -->" if IS_PRODUCTION else "<-- stripe test public key -->",
-        secret_key = "<-- stripe production secret key -->" if IS_PRODUCTION else "<-- stripe test secret key -->",
+        public_key = "<-- stripe public key -->"",
+        secret_key = "<-- stripe secret key -->" ,
         dues_products = {
-            'Full': "<-- stripe production product id -->" if IS_PRODUCTION else "<-- stripe test product id -->",
-            'Student': "<-- stripe production product id -->" if IS_PRODUCTION else "<-- stripe test product id -->"
+            'Full': "<-- stripe product id -->",
+            'Student': "<-- stripe product id -->"
         }
     )
 ]
+"""
 
-#Gooogle reCAPTCHA keys (set all to None if not using Captcha)
-RECAPTCHA_KEY = "production_recaptcha_site_key" if IS_PRODUCTION else "develomemnt_recaptcha_site_key"
-RECAPTCHA_SECRET = "production_recaptcha_secret" if IS_PRODUCTION else "develomemnt_recaptcha_secret"
+@dataclass
+class Membership:
+    category: str
+    description: str
+    qualification: str = None
 
-VERIFY_TIMEOUT = 3  #minutes enforced between verification emails
+"""
+To implement membership categories, define a list of Membership objects, such as the list below, which
+are the categories used by the Oxford & Cambridge Society of New England.
+MEMBERSHIPS = [
+    Membership('Full', "all matriculated alumni and members of the Universities of \
+Oxford and Cambridge. Annual dues are <dues> payable by subscription. In future years, you'll \
+receive a reminder a week before the next auto-payment is made."),
+    Membership('Student', "full time students (current or graduated within \
+the last 12 months). Annual dues are <dues>, renewable annually",
+"Please note details of your full-time course (current or graduated within last 12 months).")
+]
+"""
+
+#Gooogle reCAPTCHA keys (set all to empty string if not using Captcha)
+RECAPTCHA_KEY = ""
+RECAPTCHA_SECRET = ""
+
+VERIFY_TIMEOUT = 3   #minutes enforced between verification emails
 
 """
 Review the following settings and adjust as needed, but no changes are likely to be needed
@@ -134,15 +171,15 @@ PAGE_BANNER = f'<h4><span style="color: blue"><em>{SOCIETY_NAME}</em>\
 <img src="{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" /></span></h4>'
 
 # html letterhead for email/notices:
-LETTERHEAD = f'<h2><span style="color: blue"><em>{SOCIETY_NAME}</em></span> \
-<img src="{DB_URL}/static/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" />\
-</h2><br><br>'
+LETTERHEAD = f'<h2><span style="color: blue"><em>{SOCIETY_NAME}</em>\
+<img src="https://oxcamne.pythonanywhere.com/oxcam/static/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" /></span></h2><br><br>'
+# note, on a development instance, this must refer to the production server, as email services don't
+# have access to the local server.
 
-# database connection string:
-DB_URI = "sqlite://storage.db"
 """
+To use a database other than SQLite, define the database URI and pool size.
 SQLite is built into Py4web and should be adequate except for extremely large groups.
-On PythonAnywhere you can alternatively use MySQL, e.g.:
+For example, if using PythonAnywhere, you can use MySQL:
 DB_URI = f"mysql://{SOCIETY_SHORT_NAME}:<--- database password here --->@{SOCIETY_SHORT_NAME}.mysql.pythonanywhere-services.com/{SOCIETY_SHORT_NAME}$default"
 DB_POOL_SIZE = 10
 """
@@ -152,9 +189,6 @@ THREAD_SUPPORT = False
 # Note, PythonAnywhere doesn't support threads, must run
 # these processes as scheduled tasks. Set True if your
 # environment supports threads, e.g. in development environment.
-
-# access levels for group administrators DO NOT CHANGE, used in @checkaccess(None|any)
-ACCESS_LEVELS = ['read', 'write', 'accounting', 'admin']
 
 GRACE_PERIOD = 45
 """
@@ -172,8 +206,6 @@ LOGGERS = [
     "warning:stdout",
     "info:oxcam.log:%(asctime)s - %(levelname)s - %(message)s"
 ]  # syntax "severity:filename:format" filename can be stderr or stdout
-
-ALLOWED_ACTIONS = []    #disable Py4web's auth
 ```
 
 Notes:
@@ -183,8 +215,7 @@ Notes:
 1. The database is configured to use SQLite - this probably provides adequate performance
 for all but the largest groups.
 
-1. Setting IS_PRODUCTION False only prevents the daily maintenance process from
-sending out notices such as membership dues reminders. Any test environment can still send out email, but will suppress all email except to ALLOWED_EMAILS.
+1. Adding email addresses to ALLOWED_EMAILS prevents email being sent to any other addresses. Note that in a test environment you can use test keys for Stripe and other services.
 
 1. Set THREAD_SUPPORT True only if your environment supports threading. PythonAnywhere does not, but typically a desktop development environment does. If set True, then the email daemon is started in its own thread whenever py4web/oxcam is started, and in turn spawns the daily_maintenance job in its own thread at midnight.
 
@@ -195,50 +226,31 @@ possible also this [support guide](https://oxcamne.github.io/oxcam/support) as
 well as including organization specific information.
 
 1. In the prototype membership categories are included for full and student
-members, as used by OxCamNE. Adjust as needed. If you do not have paid memberships MEMBERSHIPS should be an empty list, '[]'.
+members, as used by OxCamNE, but are commented out. You can uncomment them by moving the enclosing """ line.
 
 1. The email settings configure two SMTP servers. One is used for transactional emails, such as login email verification, transaction confirms, and emails addressed explicitly, the other for bulk emails, sent to mailing list or filtered sets of members. OxCamNE uses an email service provider which, among other things, ensures that messages are authenticated by SPF and DKIM records. Small groups could use, e.g. a gmail address with an [app password](https://support.google.com/accounts/answer/185833?hl=en). In production, for transactional messages we use our google workspace account directly, whereas bulk messages are sent via our email service provider, mailgun. These settings should be present even if you are not using mailing list functionality.
 
-1. PaymentProcessor is a base class for all payment processors that might be supported. Each supported payment processor will be implemented as a subclass of PaymentProcessor. PAYMENTPROCESSORS is a list of payment processor instances, currently only Stripe has been written. The first one in the list is the default for new customers. The implementations are in pay_processors.py. Go [here](stripe.md) for more information on setting up and using Stripe.
+1. PaymentProcessor is a base class for all payment processors that might be supported. Each supported payment processor will be implemented as a subclass of PaymentProcessor. PAYMENTPROCESSORS is a list of payment processor instances, currently only Stripe has been written. The first one in the list is the default for new customers. The implementations are in pay_processors.py. Currently, oxcam supports [Stripe](stripe.md) as its payment processor.
 
 1. You can set up Google reCaptcha for production and development. Once a user successfully signs in, the IP address will be trusted for 90 days and Captcha will not be enforced during that period.
 
 1. Setting VERIFY_TIMEOUT to a non-zero value enforces a time-out between sending verification emails to a particular email address or IP address. Like reCaptcha, this is an anti-spammer tool.
 
-### Start the database
+### Start Building Your Database
 
-Once the app is installed and your settings_private.py file is configured you should restart py4web using the big green button on the Pythonanywhere console *Web* tab.
+Open a new browser tab and browse to <your_py4web_url>/oxcam. Login using your personal email. The address you specified in the setup form will be used to send an email verification message to your personal account.
 
-When first started the app creates an empty database in a databases/ folder in the py4web/apps/oxcam directory.
-
-### Load a Minimal Database
-
-Browse to the database at \<your_py4web_url\>/oxcam. You will be asked to login using your email. Oxcam sends a one-time
-link to your email. The link opens a new tab ready for you to upload a copy of database contents:
-
-![db_restore form](images/db_restore.png)
-
-The kit contains a file, db_oxcam_minimal.csv in the py4web/apps/oxcam directory. Csv files are used to backup and restore the contents of the database.
+If you checked 'Load Minimal Database' in the setup form, the login will take you to the My Account menu which will include the option to join the mailing list. Joining the mailing list will create your 'member' account with full admin privileges. You now have a working Oxcam system that can manage a mailing list and free events, but without paid events, paid membership categories, online payments, or accounting.
 
 The minimal database initializes the content copied from our OxCamNE database in the tables: Colleges, Email_Lists, Pages, CoA, Bank_Accounts, and Bank_Rules. Any and all of these tables you may wish to edit once your are up and running, for example many of the web pages may be inapplicable or need modification for your group.
 
-To use the minimal database file, copy it from the kit to your local device where you browser is running. Click Browse and find the .csv file, then click restore. You will then need to login once more, and will be taken to the index page:
+If your group is for alumni of only one of the Universities, you will wish to eliminate the irrelevant Colleges. You can do this by going to the 'Databases in Oxcam' section of the Py4web dashboard and clicking the button for the db.Colleges table. Type e.g. 'name contains oxford' to identify the colleges you **don't** want and then you can easily delete them.
 
-![inital index](images/Initial_index.png)
+If you did not load the Minimal Database, the login will take you to a database restore page:
 
-### Add yourself to the database
+![db_restore form](images/db_restore.png)
 
-The database does not contain any member records so can not do anything very interesting. If you do not have membership configured, you'll see only the
-mailing list option. Either joining the mailing list or as a member creates a
-member record. The form to join the mailing list looks like:
-
-![mailing list](images/mailing_list.png)
-
-Once you have created your own record, as it is first into the database it is automatically assigned 'admin' access and all the function links appear on the navigation bar:
-
-![navigation bar](images/navigation_bar.png)
-
-If your group is for alumni of only one of the Universities, you may wish to eliminate the irrelevant Colleges. You can use **db_tool** to do this.
+Use the 'browse' button to locate the backup database you wish to load. You do not need to click 'clear existing database'. After the database is loaded, you will need to log in again which will connect with your record in the restored database.
 
 ### Scheduled Tasks
 

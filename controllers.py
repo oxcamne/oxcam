@@ -34,7 +34,7 @@ from py4web import action, request, response, redirect, URL, Field, HTTP, abort
 from yatl.helpers import H5, H6, XML, TABLE, TH, TD, THEAD, TR, HTML, P, BUTTON, INPUT
 from .common import db, session, flash
 from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
-	MEMBERSHIPS, TIME_ZONE, PAGE_BANNER, IS_PRODUCTION,\
+	MEMBERSHIPS, TIME_ZONE, PAGE_BANNER,\
 	ALLOWED_EMAILS, DATE_FORMAT, CURRENCY_SYMBOL, SMTP_TRANS
 from .pay_processors import paymentprocessor
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
@@ -73,11 +73,12 @@ def my_account():
 	member = db.Members[session.member_id] if session.member_id else None
 	access = session.access	#for layout.html
 
-	if len(MEMBERSHIPS)>0 and (not member or not member_good_standing(member, (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)+datetime.timedelta(days=GRACE_PERIOD)).date())):
-		header = CAT(header, A("Join or Renew your Membership", _href=URL('registration')), XML('<br>'))
-		# allow renewal once within GRACE_PERIOD of expiration.
-	else:
-		header = CAT(header, A("Update your member profile or contact information", _href=URL('registration')), XML('<br>'))
+	if MEMBERSHIPS:
+		if (not member or not member_good_standing(member, (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)+datetime.timedelta(days=GRACE_PERIOD)).date())):
+			header = CAT(header, A("Join or Renew your Membership", _href=URL('registration')), XML('<br>'))
+			# allow renewal once within GRACE_PERIOD of expiration.
+		else:
+			header = CAT(header, A("Update your member profile or contact information", _href=URL('registration')), XML('<br>'))
 
 	if member:
 		header = CAT(header, A("Update your email address and/or mailing list subscriptions",
@@ -86,7 +87,7 @@ def my_account():
 	else:
 		header = CAT(header, A("Join our mailing list(s)", _href=URL("registration", vars=dict(mail_lists='Y'))), XML('<br>'))
 
-	if member and member.Pay_subs!='Cancelled' and member_good_standing(member, (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)-datetime.timedelta(days=GRACE_PERIOD)).date()):
+	if MEMBERSHIPS and member and member.Pay_subs!='Cancelled' and member_good_standing(member, (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)-datetime.timedelta(days=GRACE_PERIOD)).date()):
 		#the GRACE_PERIOD check means that a member without a subscription can cancel after expiration to turn of the nagging reminders.
 		if member.Pay_subs:
 			header = CAT(header, A("View membership subscription/Update credit card", _href=URL(f'{member.Pay_source}_view_card')), XML('<br>'))
@@ -123,22 +124,23 @@ def members():
 	admin = ACCESS_LEVELS.index(session.access) >= ACCESS_LEVELS.index('admin')
 	if not admin:
 		db.Members.Access.writable = False
-	search_form=Form([
-		Field('mailing_list', 'reference Email_Lists', default = request.query.get('mailing_list'),
-				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Email_Lists', '%(Listname)s', zero="mailing?"))),
-		Field('event', 'reference Events',  default = request.query.get('event'),
-				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Events',
-				lambda r: f"{r.DateTime.strftime(DATE_FORMAT)} {r.Description[:25]}",
-				orderby = ~db.Events.DateTime, zero="event?")),
-				comment = "exclude/select confirmed event registrants (with/without mailing list selection) "),
-		Field('good_standing', 'boolean',  default = request.query.get('good_standing'),
-				comment='tick to limit to members in good standing'),
-		Field('field', 'string', default = request.query.get('field'),
-				requires=IS_EMPTY_OR(IS_IN_SET(['Affiliation', 'Email']+db.Members.fields,
-								zero='field?'))),
-		Field('value', 'string', default = request.query.get('value'))],
-		keep_values=True, formstyle=FormStyleBulma)
-	
+	fields = [
+		Field('mailing_list', 'reference Email_Lists', default=request.query.get('mailing_list'),
+			requires=IS_EMPTY_OR(IS_IN_DB(db, 'Email_Lists', '%(Listname)s', zero="mailing?"))),
+		Field('event', 'reference Events',  default=request.query.get('event'),
+			requires=IS_EMPTY_OR(IS_IN_DB(db, 'Events',
+			lambda r: f"{r.DateTime.strftime(DATE_FORMAT)} {r.Description[:25]}",
+			orderby=~db.Events.DateTime, zero="event?")),
+			comment="exclude/select confirmed event registrants (with/without mailing list selection) "),
+		Field('field', 'string', default=request.query.get('field'),
+			requires=IS_EMPTY_OR(IS_IN_SET(['Affiliation', 'Email'] + db.Members.fields, zero='field?'))),
+		Field('value', 'string', default=request.query.get('value'))
+	]
+	if MEMBERSHIPS:
+		fields.insert(2, Field('good_standing', 'boolean', default=request.query.get('good_standing'),
+							comment='tick to limit to members in good standing'))
+
+	search_form = Form(fields, keep_values=True, formstyle=FormStyleBulma)	
 	if parsed['mode'] == 'select':
 		header = CAT(header, A("Send Email to Specific Address(es)",
 						_href=URL('composemail', vars=dict(back=back))), XML('<br>'))
@@ -169,13 +171,14 @@ def members():
 								vars=dict(back=request.url))), XML('<br>'),
 					A('Email addresses and subscriptions', _href=URL(f'emails/N/{member_id}',
 								vars=dict(back=request.url))), XML('<br>'),
-					A('Dues payments', _href=URL('transactions', vars=dict(
-						query=f"(db.AccTrans.Account=={acdues})&(db.AccTrans.Member=={member_id})",
-						back=request.url))), XML('<br>'),
 					A('Send Email to Member', _href=URL('composemail',
 					 	vars=dict(query=f"db.Members.id=={member_id}", qdesc=member_name(member_id),
 				 					back=request.url))))
-			
+			if MEMBERSHIPS:
+				header = CAT(header, A('Dues payments', _href=URL('transactions', vars=dict(
+						query=f"(db.AccTrans.Account=={acdues})&(db.AccTrans.Member=={member_id})",
+						back=request.url))), XML('<br>'))
+
 			if member_good_standing(member, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()):
 				header = CAT(header, XML('<br>'), A('Cancel Membership',
 						_href=URL(f"cancel_subscription/{member_id}", vars=dict(back=request.url))))
@@ -264,10 +267,12 @@ selecting an event AND a mailing list selects the mailing list less attendees \
 AND includes the event Details in email notices.<br>\
 You can filter on a member record field \
 using an optional operator (=, !=, <, >, <=, >=) together with a value."))
-		footer = CAT(A("View Recent New Members", _href=URL('new_members', vars={'back': request.url})), XML('<br>'),
-			A("Export Membership Analytics", _href=URL('member_analytics')), XML('<br>'),
-			A("Export Selected Records", _href=URL('members_export',
-						vars=dict(query=query, left=left or '', qdesc=qdesc))))
+		footer = A("Export Selected Records", _href=URL('members_export',
+						vars=dict(query=query, left=left or '', qdesc=qdesc)))
+		if MEMBERSHIPS:
+			footer = CAT(footer, XML('<br>'),
+				A("View Recent New Members", _href=URL('new_members', vars={'back': request.url})), XML('<br>'),
+				A("Export Membership Analytics", _href=URL('member_analytics')), XML('<br>'))
 
 	def member_deletable(id): #deletable if not member, never paid dues or attended recorded event, or on mailing list
 		m = db.Members[id]
@@ -287,20 +292,28 @@ using an optional operator (=, !=, <, >, <=, >=) together with a value."))
 		if not form.vars.get('id'):
 			return	#adding record
 		
-	grid = Grid(eval(query), left=eval(left) if left else None,
-		 	orderby=db.Members.Lastname|db.Members.Firstname,
-			columns=[Column('Name', lambda r: member_name(r['id'])),
-					db.Members.Membership, db.Members.Paiddate,
-					Column('Affiliations', lambda r: member_affiliations(r['id'])),
-					db.Members.Access],
-			headings=['Name', 'Status', 'Until', 'College', 'Access'],
-			details=not write, editable=write, create=write, show_id=True,
-			grid_class_style=grid_style,
-			formstyle=form_style,
-			search_form=search_form,
-			validation=validate,
-			deletable=lambda r: write and member_deletable(r['id'])
-			)
+	columns = [
+		Column('Name', lambda r: member_name(r['id'])),
+	]
+	if MEMBERSHIPS:
+		columns += [db.Members.Membership, db.Members.Paiddate]
+	columns += [
+		Column('Affiliations', lambda r: member_affiliations(r['id'])),
+		db.Members.Access
+	]
+
+	grid = Grid(
+		eval(query), left=eval(left) if left else None,
+		orderby=db.Members.Lastname|db.Members.Firstname,
+		columns=columns,
+		headings=['Name'] + (['Status', 'Until'] if MEMBERSHIPS else []) + ['College', 'Access'],
+		details=not write, editable=write, create=write, show_id=True,
+		grid_class_style=grid_style,
+		formstyle=form_style,
+		search_form=search_form,
+		validation=validate,
+		deletable=lambda r: write and member_deletable(r['id'])
+	)
 	return locals()
 
 @action('members_export', method=['GET'])
@@ -521,7 +534,8 @@ def emails(ismember, member_id):
 
 	if parsed['mode'] == 'select':
 		member = db.Members[member_id]
-		paymentprocessor(member.Pay_source).update_email(member)
+		if member.Pay_source:
+			paymentprocessor(member.Pay_source).update_email(member)
 	else:
 		if parsed['mode']=='new':
 			db.Emails.Email.writable = True
@@ -703,6 +717,15 @@ def events():
 
 	header = H5('Events')
 
+	if not MEMBERSHIPS:
+		db.Events.Members_only.readable=db.Events.Members_only.writable=False
+		db.Events.Members_only.default=False
+		db.Events.Allow_join.readable=db.Events.Allow_join.writable=False
+		db.Events.Allow_join.default=False
+
+	if not db(db.Colleges.Oxbridge==False).count():
+		db.Events.Sponsors.readable=db.Events.Sponsors.writable=False
+
 	if parsed['mode'] == 'select':
 		footer = CAT(A("Export all Events as CSV file", _href=URL('events_export')), XML('<br>'),
 			A("Export event analytics as CSV file", _href=URL('event_analytics')))
@@ -716,14 +739,16 @@ def events():
 			urlpage = URL(f"event_page/{event.id}", scheme=True) if event.Details else event.Page
 			header = CAT(A('back', _href=back), H5('Event Record'),
 						"Booking link is ", A(url, _href=url), XML('<br>'),
-						"Event page is ", A(urlpage, _href=urlpage), XML('<br>'),
-						A('Table Assignment Tool', _href=URL(f'assign_tables/{event_id}', scheme=True)), XML('<br>'),
-						A('Ticket Types', _href=URL(f'tickets/{event_id}',
-								vars=dict(back=request.url))), XML('<br>'),
+						"Event page is ", A(urlpage, _href=urlpage))
+			if paymentprocessor():
+				header = CAT(header, XML('<br>'),
+						A('Ticket Types', _href=URL(f'tickets/{event_id}', vars=dict(back=request.url))))
+			header = CAT(header, XML('<br>'),
 						A('Selections', _href=URL(f'selections/{event_id}',
-								vars=dict(back=request.url))), XML('<br>'),
+								vars=dict(back=request.url))), " e.g. meal choices", XML('<br>'),
 						A('Survey', _href=URL(f'survey/{event_id}',
 								vars=dict(back=request.url))), XML('<br>'),
+						A('Table Assignment Tool', _href=URL(f'assign_tables/{event_id}', scheme=True)), XML('<br>'),
 						A('Make a Copy of This Event', _href=URL(f'event_copy/{event_id}',
 								vars=dict(referrer=request.query.referrer))))
 
@@ -804,7 +829,7 @@ def tickets(event_id):
 	grid = Grid(db.Event_Tickets.Event==event_id,
 			columns=[db.Event_Tickets.Ticket, db.Event_Tickets.Price, db.Event_Tickets.Qualify, db.Event_Tickets.Count,
 				db.Event_Tickets.Waiting, Column('Sold', lambda t: tickets_sold(t.id))],
-			details=not write, create=write, editable=write,
+			details=not write, create=write and paymentprocessor(), editable=write,
 			deletable= lambda t: write and db(db.Reservations.Ticket_==t.id).count()==0,
 			validation=validation, search_queries=[],
 			grid_class_style=grid_style,
@@ -828,6 +853,7 @@ def selections(event_id):
 	header = CAT(A('back', _href=back),
 		  		H5('Event Selections'),
 		  		H6(event.Description),
+				"Each row is one multiple choice option for the event, e.g. meal choice,", XML('<br>'),
 				"Note, changes made here are not reflected in any existing reservations!")
 
 	def validation(form):
@@ -870,6 +896,7 @@ def survey(event_id):
 	header = CAT(A('back', _href=back),
 		  		H5('Event Survey'),
 		  		H6(event.Description),
+				"The first row is a multiple choice survey question, the rest are the possible answers.", XML('<br>'),
 				"Note, survey elements cannot be modified once chosen")
 
 	def validation(form):
@@ -961,7 +988,7 @@ def event_reservations(event_id):
 		Field('status', 'string', default = request.query.get('status') or 'confirmed',
 				requires=IS_IN_SET(['confirmed', 'tbc', 'checked_in', 'no_show', 'waitlist', 'provisional'], zero='status?'),),
 	]
-	if db(db.Event_Tickets.Event==event_id).count()>1:
+	if db(db.Event_Tickets.Event==event_id).count():
 		search_fields.append(
 			Field('ticket', 'reference Event_Tickets', default = request.query.get('ticket'),
 					requires=IS_EMPTY_OR(IS_IN_DB(db(db.Event_Tickets.Event==event_id), db.Event_Tickets.id,
@@ -1033,25 +1060,49 @@ def event_reservations(event_id):
 		))))
 	header = CAT(header, XML('<br>'), "Use dropdowns to filter (includes reservation if member or any guest fits filter):")
 
-	grid = Grid(eval(query),
-			left=db.Members.on(db.Members.id == db.Reservations.Member),
-			orderby=db.Reservations.Created if status=='waitlist' else db.Reservations.Lastname|db.Reservations.Firstname,
-			columns=[Column('member', lambda row: A(member_name(row.Reservations.Member),
-										   _href=URL(f"manage_reservation/{row.Reservations.Member}/{event_id}",
-											vars=dict(back=request.url)),
-										   _style='white-space: normal'), required_fields=[db.Reservations.Member]),
-						db.Members.Membership, db.Members.Paiddate, db.Reservations.Affiliation, db.Reservations.Notes,
-						Column('cost', lambda row: cost.get(row.Reservations.Member) or ''),
-						Column('tbc', lambda row: (cost.get(row.Reservations.Member) or 0)-paid.get(row.Reservations.Member) or ''),
-						Column('count', lambda row: (res_wait(row.Reservations.Member, event_id) if status=='waitlist'\
-					  		else res_prov(row.Reservations.Member, event_id) if status=='provisional'\
-							else res_checked_in(row.Reservations.Member, event_id, True) if status=='checked_in'\
-							else res_checked_in(row.Reservations.Member, event_id, False) if status=='no_show'\
-							else res_conf(row.Reservations.Member, event_id)) or'')],
-			headings=['Member', 'Type', 'Until', 'College', 'Notes', 'Cost', 'Tbc', '#'],
-			search_form=search_form if len(search_fields)>0 else None,
-			details=False, editable = False, create = False, deletable = False,
-			rows_per_page=200, grid_class_style=grid_style, formstyle=form_style)
+	columns = [
+		Column('member', lambda row: A(member_name(row['Member']),
+			_href=URL(f"manage_reservation/{row['Member']}/{event_id}",
+			vars=dict(back=request.url)),
+			_style='white-space: normal'), required_fields=[db.Reservations.Member]),
+	]
+	if MEMBERSHIPS:
+		columns += [db.Members.Membership, db.Members.Paiddate]
+	columns += [db.Reservations.Affiliation, db.Reservations.Notes]
+	if db(db.Event_Tickets.Event==event_id).count():
+		columns += [Column('cost', lambda row: cost.get(row['Member']) or ''),
+					Column('tbc', lambda row: (cost.get(row['Member']) or 0) - paid.get(row['Member']) or '')
+		]
+	columns += [Column('count', lambda row: (
+			res_wait(row['Member'], event_id) if status=='waitlist'
+			else res_prov(row['Member'], event_id) if status=='provisional'
+			else res_checked_in(row['Member'], event_id, True) if status=='checked_in'
+			else res_checked_in(row['Member'], event_id, False) if status=='no_show'
+			else res_conf(row['Member'], event_id)
+		) or '')
+	]
+	headings = ['Member']
+	if MEMBERSHIPS:
+		headings += ['Type', 'Until'
+		]
+	headings += ['College', 'Notes']
+	if db(db.Event_Tickets.Event==event_id).count():
+		headings += ['Cost', 'Tbc'
+		]
+	headings += ['#'
+	]
+
+	grid = Grid(
+		eval(query),
+		left=db.Members.on(db.Members.id == db.Reservations.Member),
+		orderby=db.Reservations.Created if status=='waitlist' else db.Reservations.Lastname|db.Reservations.Firstname,
+		columns=columns,
+		headings=headings,
+		search_form=search_form if len(search_fields)>0 else None,
+		details=False, editable=False, create=False, deletable=False,
+		rows_per_page=200, grid_class_style=grid_style, formstyle=form_style
+	)
+	grid.render()
 	return locals()
 		
 @action('check_in/<event_id:int>', method=['POST', 'GET'])
@@ -1362,7 +1413,7 @@ def reservation():
 			else:
 				header = CAT(header,  XML(f"Your place(s) are not allocated until you click the 'Checkout' button.<br>"))
 		if payment>0 and payment>int(session.get('dues') or 0):
-			header = CAT(header, XML(f"Your registration will be confirmed when your payment of {CURRENCY_SYMBOL}{payment}{dues_tbc} is received at Checkout.<br>"))
+			header = CAT(header, XML(f"Your registration will be confirmed when your payment of {CURRENCY_SYMBOL}{payment}{dues_tbc} is received.<br>"))
 		elif session.get('dues'):
 			header = CAT(header, XML(f"Checkout to pay your {CURRENCY_SYMBOL}{session.dues} membership dues, or wait to see if a space becomes available."))
 
@@ -1529,7 +1580,11 @@ def reservation():
 					msg_send(member, subject, message)	
 					flash.set('Thank you. Confirmation has been sent by email.')
 				redirect(URL(f'reservation'))
-			paymentprocessor().checkout(request.url)
+			if paymentprocessor():
+				paymentprocessor().checkout(request.url)
+			else:
+				flash.set("Please contact the event organizer to arrange payment.")
+			redirect(URL('reservation'))
 	return locals()
 
 @action('doorlist_export/<event_id:int>', method=['GET'])
@@ -2379,7 +2434,7 @@ def composemail():
 			db(db.EMProtos.id == proto.id).delete()
 			flash.set("Template deleted: "+ proto.Subject)
 			redirect(request.query.back)
-		if not IS_PRODUCTION:
+		if ALLOWED_EMAILS:
 			to = form2.vars.get('to')
 			if to:
 				for em in to:
@@ -2596,7 +2651,7 @@ XML(f"This event is open to \
 {'all alumni of Oxford & Cambridge' if not event.Members_only else f'members of {SOCIETY_SHORT_NAME}'}\
 {' and members of sponsoring organizations (list at the top of the Affiliations dropdown)' if event.Sponsors else ''}\
 {' and their guests' if not event.Guests or event.Guests>1 else ''}.<br>"))
-	elif not request.query.get('mail_lists'):
+	elif MEMBERSHIPS and not request.query.get('mail_lists'):
 		header = CAT(header, XML('<br>'.join([f"<b>{m.category} Membership</b> is open to {m.description.replace('<dues>', CURRENCY_SYMBOL+str(paymentprocessor(name=None).get_dues(m.category)))}" for m in MEMBERSHIPS])))
 
 	#gather the person's information as necessary (may have only email)
@@ -2617,11 +2672,11 @@ XML(f"This event is open to \
 
 	if event:
 		mustjoin = event.Members_only and not event.Sponsors
-		if len(MEMBERSHIPS)>0 and (event.Members_only or event.Allow_join) and not good_standing:
+		if MEMBERSHIPS and (event.Members_only or event.Allow_join) and not good_standing:
 			fields.append(Field('join_or_renew', 'boolean', default=mustjoin,
 				comment=' this event is restricted to OxCamNE members' if mustjoin else \
 					' tick if you are an Oxbridge alum and also wish to join OxCamNE or renew your membership'))
-	elif not request.query.get('mail_lists') and len(MEMBERSHIPS)>0:
+	elif not request.query.get('mail_lists') and MEMBERSHIPS:
 		fields.append(Field('membership', 'string',
 						default=member.Membership if member and member.Membership else '',
 						requires=IS_IN_SET([m.category for m in MEMBERSHIPS]),
@@ -2691,7 +2746,7 @@ Please login with the email you used before{f'<em>, possibly {suggest}, </em>' i
 			member = db.Members[member_id]
 			session.member_id = member_id
 			session.access = set_access
-			if request.query.get('mail_lists'):
+			if request.query.get('mail_lists') or not MEMBERSHIPS:	#just managing mailing lists
 				db.Emails.Mailings.default = [list.id for list in db(db.Email_Lists.Member==True).select()]
 			email_id = db.Emails.insert(Member=member_id, Email=session.get('email'))
 
@@ -2708,15 +2763,16 @@ Please login with the email you used before{f'<em>, possibly {suggest}, </em>' i
 			flash.set("Please complete your membership application, then you'll return to event registration")
 			redirect(URL('registration', vars=dict(join_or_renew='Y')))	#go deal with membership
 			
-		if (request.query.get('mail_lists')):
+		if request.query.get('mail_lists') or not MEMBERSHIPS:	#just managing mailing lists
 			flash.set("Please review your subscription settings below.")
 			redirect(URL(f"emails/Y/{member_id}",vars=dict(back=URL('my_account'))))
 				
 		if request.query.get('join_or_renew') or not event:	#collecting dues with event registration, or joining/renewing
-			#membership dues payment
-			#get the subscription plan id (Full membership) or 1-year price (Student) from Stripe Products
-			session['dues'] = str(paymentprocessor(member.Pay_source).get_dues(form.vars.get('membership')))
-			session['membership'] = form.vars.get('membership')
+			if MEMBERSHIPS:
+				#membership dues payment
+				#get the subscription plan id (Full membership) or 1-year price (Student) from Stripe Products
+				session['dues'] = str(paymentprocessor(member.Pay_source).get_dues(form.vars.get('membership')))
+				session['membership'] = form.vars.get('membership')
 			#ensure the default mailing list subscriptions are in place in the primary email
 			email = db(db.Emails.Member==member.id).select(orderby=~db.Emails.Modified).first()
 			mailings = email.Mailings or []
@@ -2821,7 +2877,8 @@ def cancel_subscription(member_id=None):
 	form = Form([], submit_value='Cancel Subscription')
 	
 	if form.accepted:
-		paymentprocessor(member.Pay_source).cancel_subscription(member)
+		if member.Pay_subs and member.Pay_subs != 'Cancelled':
+			paymentprocessor(member.Pay_source).cancel_subscription(member)
 		member.update_record(Pay_subs = 'Cancelled', Pay_next=None)
 		#if we simply cleared Pay_subs then the daily backup daemon might issue membership reminders!
 		if not member.Paiddate:	#just joined but changed their mind?

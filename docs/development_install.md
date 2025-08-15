@@ -47,13 +47,13 @@ Launch Vscode, and open the workspace on the py4web folder you have now created.
 
 Before continuing, it is good practice to set up a python virtual environment for the workspace we just created, to ensure that we have a stable python setup which matches that in production, regardless of other versions of python which may be installed on your machine.
 
-In the Code/View menu click on Command Palette... and search for the Python: Create Environment command. Click on it, and then select Venv. You will then be presented with a list of possible Python versions found on your machine. You will be given the option to open up a terminal window within Vscode to observe the creation process. Also tick the boxes to process the all the requirements files. This will include all the python modules py4web and oxcam need in the venv (you may see only oxcam listed - py4web no longer uses a requirements.txt file and it's dependencies will be added laterc)
+In the Code/View menu click on Command Palette... and search for the Python: Create Environment command. Click on it, and then select Venv. You will then be presented with a list of possible Python versions found on your machine. Tick the boxes to process the oxcam requirements.txt file. This will include all the additional python modules oxcam needs in the venv (you may see only oxcam listed - py4web no longer uses a requirements.txt file and it's dependencies will be added later).
 
 Then in Command Palette find the Python: Select Interpreter. Click on this and then in the list presented click on the venv that you just created. This ensures that Py4web will always use this environment.
 
 ### Finish Setting Up Py4web
 
-Once the virtual environment is set up, you can use a terminal window within VScode to complete the Py4web installation. Your prompt might be something like:
+Once the virtual environment is set up, you can use a terminal window within VScode to complete the Py4web installation. You may need to open a terminal window by selecting Terminal in the View menu. Your prompt might be something like:
 
 ```(.venv) davidmanns@Mac py4web %```
 
@@ -62,10 +62,9 @@ The (venv) confirms that you are operating in the virtual environment. As shown 
 ```bash
 make assets
 make test
-python -m pip install .
-pip install  --upgrade -r ./apps/oxcam/requirements.txt$ py4web setup apps
+pip install  --upgrade -r ./apps/oxcam/requirements.txt
+py4web setup apps
 py4web set_password
-py4web run apps
 ```
 
 This password is for running the Py4web dashboard on the localhost [http://127.0.0.1:8000/_dashboard](http://127.0.0.1:8000/_dashboard) so it doesn't need to be a strong password. The pip install's may be unnecessary as the VScode Create Environment may detect py4web and oxcam's requirements.txt files and have already taken care of this, but running them again is benign.
@@ -77,7 +76,7 @@ You should also use VScode to edit the py4web/.vscode/launch.json. This already 
     "configurations": [
         {
             "name": "Python: py4web",
-            "type": "python",
+            "type": "dbugpy",
             "request": "launch",
             "program": "py4web.py",
             "args": ["run", "-L 20", "apps"
@@ -87,7 +86,7 @@ You should also use VScode to edit the py4web/.vscode/launch.json. This already 
         },
         {
             "name": "Python: daily",
-            "type": "python",
+            "type": "dbugpy",
             "request": "launch",
             "program": "py4web.py",
             "args": [
@@ -98,7 +97,7 @@ You should also use VScode to edit the py4web/.vscode/launch.json. This already 
         },
         {
             "name": "Python: email",
-            "type": "python",
+            "type": "dbugpy",
             "request": "launch",
             "program": "py4web.py",
             "args": [

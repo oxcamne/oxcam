@@ -1556,7 +1556,8 @@ def reservation():
 		elif adding==0 and payment<=0:
 			form2 = ''	#don't need the Checkout form
 		elif form2.accepted:
-			host_reservation.update_record(Survey_=form2.vars.get('survey'), Comment=form2.vars.get('comment'))
+			if not host_reservation.Survey_ and not host_reservation.Comment: #may have returned from payment page, then checked out again
+				host_reservation.update_record(Survey_=form2.vars.get('survey'), Comment=form2.vars.get('comment'))
 			for row in all_guests:
 				if row.Provisional==True:
 					if row.Ticket_:
@@ -1609,7 +1610,7 @@ def doorlist_export(event_id):
 		selection = db.Event_Selections[row.Reservations.Selection_] if row.Reservations.Selection_ else None
 		selection_name = selection.Short_name or selection.Selection if selection else ''
 		survey = db.Event_Survey[row.Reservations.Survey_] if row.Reservations.Survey_ else ''
-		survey_name = survey.Short_name or survey.item if survey else ''
+		survey_name = survey.Short_name or survey.Item if survey else ''
 		writer.writerow([row.Members.Lastname, row.Members.Firstname, row.Reservations.Notes or '',
 							row.Reservations.Lastname, row.Reservations.Firstname, row.Reservations.Affiliation.Name if row.Reservations.Affiliation else '',
 							primary_matriculation(row.Reservations.Member) or '' if row.Reservations.Host==True else '',

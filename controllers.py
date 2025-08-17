@@ -173,7 +173,7 @@ def members():
 								vars=dict(back=request.url))), XML('<br>'),
 					A('Send Email to Member', _href=URL('composemail',
 					 	vars=dict(query=f"db.Members.id=={member_id}", qdesc=member_name(member_id),
-				 					back=request.url))))
+				 					back=request.url))), XML('<br>'))
 			if MEMBERSHIPS:
 				header = CAT(header, A('Dues payments', _href=URL('transactions', vars=dict(
 						query=f"(db.AccTrans.Account=={acdues})&(db.AccTrans.Member=={member_id})",
@@ -296,10 +296,13 @@ using an optional operator (=, !=, <, >, <=, >=) together with a value."))
 		Column('Name', lambda r: member_name(r['id'])),
 	]
 	if MEMBERSHIPS:
-		columns += [db.Members.Membership, db.Members.Paiddate]
+		columns += [
+			Column('Membership', lambda r: r['Membership'] or '', required_fields=[db.Members.Membership]),
+			Column('Paiddate', lambda r: r['Paiddate'] or '', required_fields=[db.Members.Paiddate])
+		]
 	columns += [
 		Column('Affiliations', lambda r: member_affiliations(r['id'])),
-		db.Members.Access
+		Column('Access', lambda r: r['Access'] or '', required_fields=[db.Members.Access])
 	]
 
 	grid = Grid(
@@ -1061,24 +1064,27 @@ def event_reservations(event_id):
 	header = CAT(header, XML('<br>'), "Use dropdowns to filter (includes reservation if member or any guest fits filter):")
 
 	columns = [
-		Column('member', lambda row: A(member_name(row['Member']),
-			_href=URL(f"manage_reservation/{row['Member']}/{event_id}",
+		Column('member', lambda row: A(member_name(row.Reservations.Member),
+			_href=URL(f"manage_reservation/{row.Reservations.Member}/{event_id}",
 			vars=dict(back=request.url)),
 			_style='white-space: normal'), required_fields=[db.Reservations.Member]),
 	]
 	if MEMBERSHIPS:
-		columns += [db.Members.Membership, db.Members.Paiddate]
+		columns += [
+			Column('Membership', lambda r: r['Members']['Membership'] or '', required_fields=[db.Members.Membership]),
+			Column('Paiddate', lambda r: r['Members']['Paiddate'] or '', required_fields=[db.Members.Paiddate])
+		]
 	columns += [db.Reservations.Affiliation, db.Reservations.Notes]
 	if db(db.Event_Tickets.Event==event_id).count():
-		columns += [Column('cost', lambda row: cost.get(row['Member']) or ''),
-					Column('tbc', lambda row: (cost.get(row['Member']) or 0) - paid.get(row['Member']) or '')
+		columns += [Column('cost', lambda row: cost.get(row.Reservations.Member) or ''),
+					Column('tbc', lambda row: (cost.get(row.Reservations.Member) or 0) - paid.get(row.Reservations.Member) or '')
 		]
 	columns += [Column('count', lambda row: (
-			res_wait(row['Member'], event_id) if status=='waitlist'
-			else res_prov(row['Member'], event_id) if status=='provisional'
-			else res_checked_in(row['Member'], event_id, True) if status=='checked_in'
-			else res_checked_in(row['Member'], event_id, False) if status=='no_show'
-			else res_conf(row['Member'], event_id)
+			res_wait(row.Reservations.Member, event_id) if status=='waitlist'
+			else res_prov(row.Reservations.Member, event_id) if status=='provisional'
+			else res_checked_in(row.Reservations.Member, event_id, True) if status=='checked_in'
+			else res_checked_in(row.Reservations.Member, event_id, False) if status=='no_show'
+			else res_conf(row.Reservations.Member, event_id)
 		) or '')
 	]
 	headings = ['Member']
@@ -1278,6 +1284,11 @@ Deleting or moving member on/off waitlist will also affect all guests."))
 	else:
 		db.Reservations.Ticket_.writable = db.Reservations.Ticket_.readable = False
 	
+	survey = db(db.Event_Survey.Event==event_id).select()
+	if len(survey)>0:
+		event_survey = [(s.id, s.Short_name) for s in survey[1:]]
+		db.Reservations.Survey_.writable=True
+		db.Reservations.Survey_.requires=IS_EMPTY_OR(IS_IN_SET(event_survey))
 
 	if  parsed['mode']=='edit' or parsed['mode']=='new':	#editing or creating reservation
 		if host_reservation and (parsed['mode']=='new' or host_reservation.id!=id):
@@ -1422,17 +1433,16 @@ def reservation():
 						Modified=host_reservation.Modified)
 
 		fields = []
-		if host_reservation.Provisional:
-			#add questions to checkout (form2) as applicable
-			survey = db(db.Event_Survey.Event==session.event_id).select()
-			if len(survey)>0:
-				event_survey = [(s.id, s.Item) for s in survey[1:]]
-				fields.append(Field('survey', requires=IS_IN_SET(event_survey, zero=survey[0].Item,
-									error_message='Please make a selection'),
-									default = host_reservation.Survey_))
-			if event.Comment:
-				fields.append(Field('comment', 'string', comment=event.Comment,
-									default = host_reservation.Comment))
+		#add questions to checkout (form2) as applicable
+		survey = db(db.Event_Survey.Event==session.event_id).select()
+		if len(survey)>0:
+			event_survey = [(s.id, s.Item) for s in survey[1:]]
+			fields.append(Field('survey', requires=IS_IN_SET(event_survey, zero=survey[0].Item,
+								error_message='Please make a selection'),
+								default = host_reservation.Survey_))
+		if event.Comment:
+			fields.append(Field('comment', 'string', comment=event.Comment,
+								default = host_reservation.Comment))
 		form2 = Form(fields, formstyle=FormStyleBulma, keep_values=True, submit_value='Checkout')
 
 	elif parsed['mode']!='delete':
@@ -1556,8 +1566,7 @@ def reservation():
 		elif adding==0 and payment<=0:
 			form2 = ''	#don't need the Checkout form
 		elif form2.accepted:
-			if not host_reservation.Survey_ and not host_reservation.Comment: #may have returned from payment page, then checked out again
-				host_reservation.update_record(Survey_=form2.vars.get('survey'), Comment=form2.vars.get('comment'))
+			host_reservation.update_record(Survey_=form2.vars.get('survey'), Comment=form2.vars.get('comment'))
 			for row in all_guests:
 				if row.Provisional==True:
 					if row.Ticket_:

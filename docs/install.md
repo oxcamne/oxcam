@@ -2,30 +2,29 @@
 
 ## Installation
 
-The oxcam software is held on Github at [https://github.com/oxcamne/oxcam](https://github.com/oxcamne/oxcam). This section assumes that you have read the [README](https://github.com/oxcamne/oxcam?tab=readme-ov-file) displayed there and satisfied the pre-requisites, so that ***you have a web server successfully running Py4web***.
-
 This documentation is intended for groups adopting oxcam to run it's website and database.
 
-For technical users contributing to the support/development of the software, see [development installation](development_install).
+The oxcam software is held on Github at [https://github.com/oxcamne/oxcam](https://github.com/oxcamne/oxcam). This section assumes that you have read the [README](https://github.com/oxcamne/oxcam?tab=readme-ov-file) and that you have a web server ready to host py4web and, within that, the oxcam app.
+
+The server might be an account on a cloud based hosting service such as [Pythonanywhere](https://www.pythonanywhere.com). The more technically adept could use a desktop Mac, Windows, or Linux machine.
+
+For technical users contributing to the support/development of the oxcam app, see [development installation](development_install) for information on setting up your development environment.
+
+### Install Py4web
+
+If you are installing on Pythonanywhere, [please follow this process](py4web_pythonanywhere).
+
+Otherwise, follow the [Py4web Installing from pip, using a virtual environment](https://py4web.com/_documentation/static/en/chapter-03.html#installing-from-pip-using-a-virtual-environment) instructions to install and start py4web.
 
 ### Find the latest version of the oxcam software
 
-Browse to [https://github.com/oxcamne/oxcam](https://github.com/oxcamne/oxcam) and click on the latest version of OxCam on the releases section of the page. You should see something like:
+Browse to [https://github.com/oxcamne/oxcam](https://github.com/oxcamne/oxcam) and click on the latest version of OxCam on the releases section on the right of the page. You should see something like:
 
 ![oxcam_version](images/oxcam_version.png)
 
 Right-click on the Source code (zip) link and select 'copy link'
 
 ### Install the oxcam software on your server
-
-On your server open a bash terminal session (you may already have a bash session in a browser tab from installing py4web). Navigate to the parent of the py4web directory (cd ~ if you are on Pythonanywhere), then, pasting in the copied link:
-
-```bash
-    wget https://github.com/oxcamne/oxcam/archive/refs/tags/v1.0.0.zip
-    unzip v1.0.0
-    mv oxcam-1.0.0 py4web/apps/oxcam
-    pip install --upgrade -r py4web/apps/oxcam/requirements.txt
-```
 
 This copies the software into a new directory apps/oxcam, and ensures that necessary Python packages are installed. You may need to precede 'pip' with 'python ' or 'python3 ' depending on your environment.
 
@@ -213,7 +212,7 @@ Notes:
 1. As shown here, the locale is set to the server default settings. It could be set to any supported locale. The  locales supported on the server can be listed using the 'locale' terminal command. Setting the locale determines the date format used and the currency symbol.
 
 1. The database is configured to use SQLite - this probably provides adequate performance
-for all but the largest groups.
+for all but the largest groups. The template has a commented out section showing how you might configure to use MY_SQL if you are running on Pythonanywhere.
 
 1. Adding email addresses to ALLOWED_EMAILS prevents email being sent to any other addresses. Note that in a test environment you can use test keys for Stripe and other services.
 
@@ -234,7 +233,7 @@ members, as used by OxCamNE, but are commented out. You can uncomment them by mo
 
 1. You can set up Google reCaptcha for production and development. Once a user successfully signs in, the IP address will be trusted for 90 days and Captcha will not be enforced during that period.
 
-1. Setting VERIFY_TIMEOUT to a non-zero value enforces a time-out between sending verification emails to a particular email address or IP address. Like reCaptcha, this is an anti-spammer tool.
+1. Setting VERIFY_TIMEOUT to a non-zero value enforces a time-out between sending verification emails to a particular email address or IP address. Like reCaptcha, this is an anti-spammer tool and it is recommended you set it to at least 1 minute.
 
 ### Start Building Your Database
 
@@ -242,7 +241,7 @@ Open a new browser tab and browse to <your_py4web_url>/oxcam. Login using your p
 
 If you checked 'Load Minimal Database' in the setup form, the login will take you to the My Account menu which will include the option to join the mailing list. Joining the mailing list will create your 'member' account with full admin privileges. You now have a working Oxcam system that can manage a mailing list and free events, but without paid events, paid membership categories, online payments, or accounting.
 
-The minimal database initializes the content copied from our OxCamNE database in the tables: Colleges, Email_Lists, Pages, CoA, Bank_Accounts, and Bank_Rules. Any and all of these tables you may wish to edit once your are up and running, for example many of the web pages may be inapplicable or need modification for your group.
+The minimal database initializes the content copied from our OxCamNE database in the tables: Colleges, Email_Lists, Pages, CoA, Bank_Accounts, and Bank_Rules. Any and all of these tables you may wish to edit once your are up and running, for example many of the web pages may be inapplicable or need modification for your group, but having all these elements in the minimal database provides useful templates.
 
 If your group is for alumni of only one of the Universities, you will wish to eliminate the irrelevant Colleges. You can do this by going to the 'Databases in Oxcam' section of the Py4web dashboard and clicking the button for the db.Colleges table. Type e.g. 'name contains oxford' to identify the colleges you **don't** want and then you can easily delete them.
 
@@ -274,3 +273,18 @@ py4web/py4web.py call py4web/apps oxcam.email_daemon.email_daemon
 
 py4web/py4web.py call py4web/apps oxcam.daily_maintenance.daily_maintenance
 ```
+
+### How to update the oxcam app when a newer version is released
+
+Start by finding the latest version of the oxcam app on Github as described earlier, and copying the .zip link.
+
+On your web server open a bash terminal session. Navigate to the parent of the py4web directory (cd ~ if you are on Pythonanywhere), then, pasting in the copied link in the wget command and using the current latest version:
+
+```bash
+    wget https://github.com/oxcamne/oxcam/archive/refs/tags/v1.1.0.zip
+    unzip v1.1.0
+    cp -r --force oxcam-1.1.0/. py4web/apps/oxcam
+    pip install --upgrade -r py4web/apps/oxcam/requirements.txt
+```
+
+You must restart Py4web, e.g. using the big green button on the Pythonanywhere Console Web tab.

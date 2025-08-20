@@ -180,7 +180,7 @@ def members():
 						back=request.url))), XML('<br>'))
 
 			if member_good_standing(member, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()):
-				header = CAT(header, XML('<br>'), A('Cancel Membership',
+				header = CAT(header, A('Cancel Membership',
 						_href=URL(f"cancel_subscription/{member_id}", vars=dict(back=request.url))))
 
 	if request.query.get('mailing_list'):

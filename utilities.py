@@ -4,7 +4,7 @@ This file contains functions shared by multiple controllers
 from py4web import URL, request
 from .common import db
 from .settings import TIME_ZONE, SUPPORT_EMAIL, LETTERHEAD, GRACE_PERIOD, CURRENCY_SYMBOL,\
-	DB_URL, SOCIETY_SHORT_NAME, MEMBERSHIPS, DATE_FORMAT, SMTP_TRANS, PAGE_BANNER
+	WEB_URL, SOCIETY_SHORT_NAME, MEMBERSHIPS, DATE_FORMAT, SMTP_TRANS, PAGE_BANNER
 from .models import primary_email, event_cost, member_name, res_selection,\
 	res_unitcost, event_revenue, page_name
 from .website import about_content, history_content, upcoming_events	#called to construct page content
@@ -268,7 +268,7 @@ def event_confirm(event_id, member_id, dues=0, event_only=False):
 	if host_reservation.Notes:
 		body += f"<b>Notes:</b> {host_reservation.Notes}<br>"
 	if tbc + dues_unpaid>0:
-		body += f"To pay online please visit {DB_URL}/registration/{event_id}<br>"
+		body += f"To pay online please visit {WEB_URL}/registration/{event_id}<br>"
 						#scheme=True doesn't pick up the domain in the email_daemon!
 	elif event.Notes and not resvtns[0].Waitlist and not resvtns[0].Provisional:
 		body += markdown.markdown(event.Notes)

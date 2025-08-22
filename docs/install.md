@@ -12,9 +12,20 @@ For technical users contributing to the support/development of the oxcam app, se
 
 ### Install Py4web
 
-If you are installing on Pythonanywhere, [please follow this process](py4web_pythonanywhere).
+If you are installing on Pythonanywhere, [please follow this process](py4web_pythonanywhere). You will use the Pythonanywhere console to start, stop and restart your py4web server.
 
-Otherwise, follow the [Py4web Installing from pip, using a virtual environment](https://py4web.com/_documentation/static/en/chapter-03.html#installing-from-pip-using-a-virtual-environment) instructions to install and start py4web.
+Otherwise, follow the [Py4web Installing from pip, using a virtual environment](https://py4web.com/_documentation/static/en/chapter-03.html#installing-from-pip-using-a-virtual-environment) instructions to install and start py4web. If you are restarting your terminal to run py4web remember to re-enable your venv:
+
+```bash
+. venv/bin/activate
+py4web run apps
+```
+
+Verify that you can open the Py4web dashboard (<your_py4web_url>/_dashboard) in a new browser tab, using the password you setup when installing py4web. When you expand the 'Installed Applications' section it should look something like this:
+
+![py4web dashboard](images/py4web_dashboard.png)
+
+Keep this dashboard open for use later!
 
 ### Find the latest version of the oxcam software
 
@@ -26,13 +37,31 @@ Right-click on the Source code (zip) link and select 'copy link'
 
 ### Install the oxcam software on your server
 
-This copies the software into a new directory apps/oxcam, and ensures that necessary Python packages are installed. You may need to precede 'pip' with 'python ' or 'python3 ' depending on your environment.
+On your server open a bash terminal session (you may already have a bash session in a browser tab from installing py4web). Navigate to the parent of the py4web directory (cd ~ if you are on Pythonanywhere), then, pasting the copied link into the wget  or curl command:
 
-You should also have the Py4web dashboard (<your_py4web_url>/_dashboard) running in a browser tab.
+on Linux:
+
+```bash
+    wget https://github.com/oxcamne/oxcam/archive/refs/tags/v1.1.0.zip
+    unzip v1.1.0
+    mv oxcam-1.1.0 py4web/apps/oxcam
+    pip install --upgrade -r py4web/apps/oxcam/requirements.txt
+```
+
+on Mac:
+
+```bash
+    curl -LO https://github.com/oxcamne/oxcam/archive/refs/tags/v1.1.0.zip
+    unzip v1.1.0
+    mv oxcam-1.1.0 ~/apps/oxcam
+    pip install --upgrade -r ~/apps/oxcam/requirements.txt
+```
+
+This copies the software into a new directory apps/oxcam, and ensures that necessary Python packages are installed. You may need to precede 'pip' with 'python ' or 'python3 ' depending on your environment.
 
 ### Restart Py4web, Check that Oxcam is running
 
-Expand the top (Installed Applications) tab of the Py4web dashboard, and **click the Reload Apps button.** You should now see oxcam in the list of running apps.
+Expand the top (Installed Applications) tab of the Py4web dashboard, and **click the Reload Apps button.** You should now see oxcam in the list of running apps. It will indicate in red if it did not load correctly.
 
 ### Start Oxcam and Initial Configuration
 
@@ -46,194 +75,11 @@ After successfully submitting the form, return to the Py4web dashboard and **cli
 
 ### Complete the customization for your group
 
-You need to edit the settings_private.py file just created. You can use the Py4web dashboard app to do this, restarting the running apps after all edits.
+You need to edit the settings_private.py file just created. You can use the Py4web dashboard app to do this, restarting the running apps after saving all edits.
 
-In the dashboard 'Installed Applications' section, click on the 'oxcam' app. Then find 'settings_private.py' in the 'Files in oxcam' section. This opens the file in an editor, it will look like:
+In the dashboard 'Installed Applications' section, click on the 'oxcam' app. Then find 'settings_private.py' in the 'Files in oxcam' section. This opens the file in an editor (scroll down if necessary).
 
-```python
-"""
-Configures the app for a particular alumni group/Society,
-and for a particular running instance, e.g. production or development
-Customize for your organization and instance
-"""
-
-# organization name and domain/short_name, etc:
-SOCIETY_NAME = 'your_group_name'
-SOCIETY_SHORT_NAME = 'your_group_short_name'    #ideally, the domain name omitting the .xxx part
-                #also use as your username if using Pythonanywhere server
-SOCIETY_LOGO = 'oxcamne_no_pad.png'             #should be placed in py4web/apps/oxcam/static directory
-                #Your favicon.ico should also be placed in py4web/apps/oxcam/static directory
-                #note, oxcamne_no_pad.png and favicon.ico are part of the distribution and have both university arms
-
-DB_URL = f'your_database_server_url'   #e.g. https://{SOCIETY_SHORT_NAME}.pythonanywhere.com/oxcam
-
-SUPPORT_EMAIL = 'oxcamne@oxcamne.org'
-
-# html trailer for email notices:
-VISIT_WEBSITE_INSTRUCTIONS = f"<br><br>Visit us at 'your_web_site_url' or 'your_social_media'"
-                #your_web_site_url might be www.{SOCIETY_SHORT_NAME}.org or similar, or {DB_URL}/web/home
-
-from dataclasses import dataclass
-import decimal
-
-@dataclass
-class Email_Account:
-    server: str
-    port: int
-    username: str
-    password: str
-
-#SMTP server for sending transactional messages (e.g. a gmail account)
-SMTP_TRANS = Email_Account("smtp.gmail.com", 587, "oxcamne@oxcamne.org", "uajlvccbmkekakja")
-
-#SMTP server for sending bulk messages (e.g. a mailing service such as mailgun)
-#for small groups, this can be the same as SMTP_TRANS
-SMTP_BULK = SMTP_TRANS
-
-#localization settings
-import locale
-from dateutil import tz
-locale.setlocale(locale.LC_ALL, '')
-"""
-as above, takes the default settings for the server. You can check what this is using a 
-command line terminal on the server using the "locale" command.
-Use "locale -a" to see list of supported locale's.
-You can specify by replacing the empty '' above with the preferred locale
-"""
-DATE_FORMAT = locale.nl_langinfo(locale.D_FMT)
-CURRENCY_SYMBOL = locale.nl_langinfo(locale.CRNCYSTR)[1:]
-#don't currently deal with currency symbols that follow the amount
-TIME_ZONE = tz.gettz('America/New_York')
-#see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
-
-#on Test/Development instance, email is suppressed except to the following listed emails:
-ALLOWED_EMAILS = []
-
-class PaymentProcessor:
-    def __init__(self, name, public_key, secret_key, dues_products):
-        self.name = name    #should be lower case, single word (underscore allowed)
-        self.public_key = public_key
-        self.secret_key = secret_key
-        self.dues_products = dues_products
-
-""" To implement payment processing, define a list of PaymentProcessor objects, e.g. by uncommenting the definition
-below and filling in the keys.
-Include dues_products = {...} with the product ids for the dues categories in MEMBERSHIPS if you will have paid memberships.
-Currently only Stripe is supported. 
-NOTE all the keys and product ids have both production and test/development values. The dues_products dictionary
-should contain the product ids for the dues categories in MEMBERSHIPS, which are used to create the payment links.
-NOTE the local copy in pay_processors module contains the full implementions.
-Access using the functions paymentprocessor(name) in the pay_procesors module
-PAYMENTPROCESSORS = [
-    PaymentProcessor(name = 'stripe',
-        public_key = "<-- stripe public key -->"",
-        secret_key = "<-- stripe secret key -->" ,
-        dues_products = {
-            'Full': "<-- stripe product id -->",
-            'Student': "<-- stripe product id -->"
-        }
-    )
-]
-"""
-
-@dataclass
-class Membership:
-    category: str
-    description: str
-    qualification: str = None
-
-"""
-To implement membership categories, define a list of Membership objects, such as the list below, which
-are the categories used by the Oxford & Cambridge Society of New England.
-MEMBERSHIPS = [
-    Membership('Full', "all matriculated alumni and members of the Universities of \
-Oxford and Cambridge. Annual dues are <dues> payable by subscription. In future years, you'll \
-receive a reminder a week before the next auto-payment is made."),
-    Membership('Student', "full time students (current or graduated within \
-the last 12 months). Annual dues are <dues>, renewable annually",
-"Please note details of your full-time course (current or graduated within last 12 months).")
-]
-"""
-
-#Gooogle reCAPTCHA keys (set all to empty string if not using Captcha)
-RECAPTCHA_KEY = ""
-RECAPTCHA_SECRET = ""
-
-VERIFY_TIMEOUT = 3   #minutes enforced between verification emails
-
-"""
-Review the following settings and adjust as needed, but no changes are likely to be needed
-"""
-
-# html web page banner Customize:
-PAGE_BANNER = f'<h4><span style="color: blue"><em>{SOCIETY_NAME}</em>\
-<img src="{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" /></span></h4>'
-
-# html letterhead for email/notices:
-LETTERHEAD = f'<h2><span style="color: blue"><em>{SOCIETY_NAME}</em>\
-<img src="https://oxcamne.pythonanywhere.com/oxcam/static/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" /></span></h2><br><br>'
-# note, on a development instance, this must refer to the production server, as email services don't
-# have access to the local server.
-
-"""
-To use a database other than SQLite, define the database URI and pool size.
-SQLite is built into Py4web and should be adequate except for extremely large groups.
-For example, if using PythonAnywhere, you can use MySQL:
-DB_URI = f"mysql://{SOCIETY_SHORT_NAME}:<--- database password here --->@{SOCIETY_SHORT_NAME}.mysql.pythonanywhere-services.com/{SOCIETY_SHORT_NAME}$default"
-DB_POOL_SIZE = 10
-"""
-
-# if True, run email daemon & daily maintenance in server threads
-THREAD_SUPPORT = False
-# Note, PythonAnywhere doesn't support threads, must run
-# these processes as scheduled tasks. Set True if your
-# environment supports threads, e.g. in development environment.
-
-GRACE_PERIOD = 45
-"""
-Renewal within this number of days after expiration extends membership
-continuously from the expiration date.
-Also, member can renew this number of days prior to expiration. 
-Renewal notices are sent at expiration plus -9, 0, 9, 18 days.
-Auto renewal will be attempted multiple times at the anniversary of payment
-and during following 3 weeks. So we set the grace period to cover 18+21 \
-days.
-"""
-
-# logger settings
-LOGGERS = [
-    "warning:stdout",
-    "info:oxcam.log:%(asctime)s - %(levelname)s - %(message)s"
-]  # syntax "severity:filename:format" filename can be stderr or stdout
-```
-
-Notes:
-
-1. As shown here, the locale is set to the server default settings. It could be set to any supported locale. The  locales supported on the server can be listed using the 'locale' terminal command. Setting the locale determines the date format used and the currency symbol.
-
-1. The database is configured to use SQLite - this probably provides adequate performance
-for all but the largest groups. The template has a commented out section showing how you might configure to use MY_SQL if you are running on Pythonanywhere.
-
-1. Adding email addresses to ALLOWED_EMAILS prevents email being sent to any other addresses. Note that in a test environment you can use test keys for Stripe and other services.
-
-1. Set THREAD_SUPPORT True only if your environment supports threading. PythonAnywhere does not, but typically a desktop development environment does. If set True, then the email daemon is started in its own thread whenever py4web/oxcam is started, and in turn spawns the daily_maintenance job in its own thread at midnight.
-
-1. There are various 'branding' elements such as logo, organization name,
-web site addresses, help site address (for volunteers), support email, etc.
-The help site might embed the [User Guide](https://oxcamne.github.io/oxcam) and
-possible also this [support guide](https://oxcamne.github.io/oxcam/support) as
-well as including organization specific information.
-
-1. In the prototype membership categories are included for full and student
-members, as used by OxCamNE, but are commented out. You can uncomment them by moving the enclosing """ line.
-
-1. The email settings configure two SMTP servers. One is used for transactional emails, such as login email verification, transaction confirms, and emails addressed explicitly, the other for bulk emails, sent to mailing list or filtered sets of members. OxCamNE uses an email service provider which, among other things, ensures that messages are authenticated by SPF and DKIM records. Small groups could use, e.g. a gmail address with an [app password](https://support.google.com/accounts/answer/185833?hl=en). In production, for transactional messages we use our google workspace account directly, whereas bulk messages are sent via our email service provider, mailgun. These settings should be present even if you are not using mailing list functionality.
-
-1. PaymentProcessor is a base class for all payment processors that might be supported. Each supported payment processor will be implemented as a subclass of PaymentProcessor. PAYMENTPROCESSORS is a list of payment processor instances, currently only Stripe has been written. The first one in the list is the default for new customers. The implementations are in pay_processors.py. Currently, oxcam supports [Stripe](stripe.md) as its payment processor.
-
-1. You can set up Google reCaptcha for production and development. Once a user successfully signs in, the IP address will be trusted for 90 days and Captcha will not be enforced during that period.
-
-1. Setting VERIFY_TIMEOUT to a non-zero value enforces a time-out between sending verification emails to a particular email address or IP address. Like reCaptcha, this is an anti-spammer tool and it is recommended you set it to at least 1 minute.
+This is a Python file, and the Dashboard's editor is python aware, so it will flag syntax errors. The file is self documented, go through it carefully to make the necessary customizations.
 
 ### Start Building Your Database
 
@@ -280,6 +126,8 @@ Start by finding the latest version of the oxcam app on Github as described earl
 
 On your web server open a bash terminal session. Navigate to the parent of the py4web directory (cd ~ if you are on Pythonanywhere), then, pasting in the copied link in the wget command and using the current latest version:
 
+on Linux:
+
 ```bash
     wget https://github.com/oxcamne/oxcam/archive/refs/tags/v1.1.0.zip
     unzip v1.1.0
@@ -287,4 +135,26 @@ On your web server open a bash terminal session. Navigate to the parent of the p
     pip install --upgrade -r py4web/apps/oxcam/requirements.txt
 ```
 
-You must restart Py4web, e.g. using the big green button on the Pythonanywhere Console Web tab.
+on Mac:
+
+```bash
+    curl -LO https://github.com/oxcamne/oxcam/archive/refs/tags/v1.1.0.zip
+    unzip v1.1.0
+    cp -R oxcam-1.1.0/. ~/apps/oxcam
+    pip install --upgrade -r ~/apps/oxcam/requirements.txt
+```
+
+You must restart Py4web, e.g. using the big green button on the Pythonanywhere Console Web tab or
+clicking the Reload Apps button on the Py4web Dashboard.
+
+### How to update to a new release of Py4web
+
+With a system or bash terminal at your py4web directory run the command:
+
+`python3 -m pip install --upgrade py4web`
+
+This will not update the built in apps, most importantly the _dashboard. *To update these, first go the py4web/apps directly and delete all the apps **other than oxcam**.* Then return the terminal to py4web and run:
+
+`py4web setup apps` or `python3 py4web setup apps`
+
+Finally, you must restart py4web.

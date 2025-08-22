@@ -131,13 +131,13 @@ SOCIETY_LOGO = 'oxcamne_no_pad.png' 		#should be placed in py4web/apps/oxcam/sta
 				#Your favicon.ico should also be placed in py4web/apps/oxcam/static directory
 				#note, oxcamne_no_pad.png and favicon.ico are part of the distribution and have both university arms
 
-DB_URL = f'your_database_server_url'   #e.g. https://{SOCIETY_SHORT_NAME}.pythonanywhere.com/oxcam
+WEB_URL = f'your_database_server_url'   #e.g. https://{SOCIETY_SHORT_NAME}.pythonanywhere.com/oxcam
 
 SUPPORT_EMAIL = 'your_support_email'
 
 # html trailer for email notices:
 VISIT_WEBSITE_INSTRUCTIONS = f"<br><br>Visit us at 'your_web_site_url' or 'your_social_media'"
-				#your_web_site_url might be www.{SOCIETY_SHORT_NAME}.org or similar, or {DB_URL}/web/home
+				#your_web_site_url might be www.{SOCIETY_SHORT_NAME}.org or similar, or {WEB_URL}/web/home
 
 #SMTP server for sending transactional messages (e.g. a gmail account)
 SMTP_TRANS = None #indicates that setttings_private.py does not exist yet!

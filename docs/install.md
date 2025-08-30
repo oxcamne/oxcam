@@ -2,9 +2,9 @@
 
 ## Installation
 
-This documentation is intended for groups adopting oxcam to run it's website and database.
+This documentation is intended for groups adopting oxcam to run their website and database.
 
-The oxcam software is held on Github at [https://github.com/oxcamne/oxcam](https://github.com/oxcamne/oxcam). This section assumes that you have read the [README](https://github.com/oxcamne/oxcam?tab=readme-ov-file) and that you have a web server ready to host py4web and, within that, the oxcam app.
+The oxcam software is held on Github at [https://github.com/oxcamne/oxcam](https://github.com/oxcamne/oxcam). This section assumes that you have read the [README](https://github.com/oxcamne/oxcam?tab=readme-ov-file) and that you have a web server ready to host py4web and the oxcam app.
 
 The server might be an account on a cloud based hosting service such as [Pythonanywhere](https://www.pythonanywhere.com). The more technically adept could use a desktop Mac, Windows, or Linux machine.
 
@@ -14,12 +14,32 @@ For technical users contributing to the support/development of the oxcam app, se
 
 If you are installing on Pythonanywhere, [please follow this process](py4web_pythonanywhere). You will use the Pythonanywhere console to start, stop and restart your py4web server.
 
-Otherwise, follow the [Py4web Installing from pip, using a virtual environment](https://py4web.com/_documentation/static/en/chapter-03.html#installing-from-pip-using-a-virtual-environment) instructions to install and start py4web. If you are restarting your terminal to run py4web remember to re-enable your venv:
+Otherwise using a terminal where you wish to create your virtual environment and py4web:
 
 ```bash
+mkdir py4web
+cd py4web
+python3 -m venv venv
+. venv/bin/activate
+pip install --upgrade py4web --no-cache-dir
+py4web setup apps
+py4web set_password
+py4web run apps
+```
+
+When running `py4web setup apps` be sure to answer 'Y' to create the apps directory and to load, at a minimum, the _dashboard app.
+
+If you are later restarting your terminal to run py4web remember to re-enable your venv:
+
+```bash
+cd py4web
 . venv/bin/activate
 py4web run apps
 ```
+
+Your terminal prompt should show that the (venv) is in place, e.g.:
+
+`(venv) davidmanns@Mac py4web %`
 
 Verify that you can open the Py4web dashboard (<your_py4web_url>/_dashboard) in a new browser tab, using the password you setup when installing py4web. When you expand the 'Installed Applications' section it should look something like this:
 
@@ -37,9 +57,9 @@ Right-click on the Source code (zip) link and select 'copy link'
 
 ### Install the oxcam software on your server
 
-On your server open a bash terminal session (you may already have a bash session in a browser tab from installing py4web). Navigate to the parent of the py4web directory (cd ~ if you are on Pythonanywhere), then, pasting the copied link into the wget  or curl command:
+On your server open a bash terminal session (you may already have a bash session in a browser tab from installing py4web). Navigate to the parent of the py4web directory (cd ~ if you are on Pythonanywhere), then, pasting the copied link into the wget  or curl command (adjust these commands to the latest version number):
 
-on Linux:
+on Linux/Pythonanywhere:
 
 ```bash
     wget https://github.com/oxcamne/oxcam/archive/refs/tags/v1.1.0.zip
@@ -53,8 +73,8 @@ on Mac:
 ```bash
     curl -LO https://github.com/oxcamne/oxcam/archive/refs/tags/v1.1.0.zip
     unzip v1.1.0
-    mv oxcam-1.1.0 ~/apps/oxcam
-    pip install --upgrade -r ~/apps/oxcam/requirements.txt
+    mv oxcam-1.1.0 py4web/apps/oxcam
+    pip install --upgrade -r py4web/apps/oxcam/requirements.txt
 ```
 
 This copies the software into a new directory apps/oxcam, and ensures that necessary Python packages are installed. You may need to precede 'pip' with 'python ' or 'python3 ' depending on your environment.
@@ -140,8 +160,8 @@ on Mac:
 ```bash
     curl -LO https://github.com/oxcamne/oxcam/archive/refs/tags/v1.1.0.zip
     unzip v1.1.0
-    cp -R oxcam-1.1.0/. ~/apps/oxcam
-    pip install --upgrade -r ~/apps/oxcam/requirements.txt
+    cp -R oxcam-1.1.0/. py4web/apps/oxcam
+    pip install --upgrade -r py4web/apps/oxcam/requirements.txt
 ```
 
 You must restart Py4web, e.g. using the big green button on the Pythonanywhere Console Web tab or
@@ -149,12 +169,12 @@ clicking the Reload Apps button on the Py4web Dashboard.
 
 ### How to update to a new release of Py4web
 
-With a system or bash terminal at your py4web directory run the command:
+With a system or bash terminal at your py4web directory and your venv running run the command:
 
 `python3 -m pip install --upgrade py4web`
 
 This will not update the built in apps, most importantly the _dashboard. *To update these, first go the py4web/apps directly and delete all the apps **other than oxcam**.* Then return the terminal to py4web and run:
 
-`py4web setup apps` or `python3 py4web setup apps`
+`py4web setup apps`
 
 Finally, you must restart py4web.

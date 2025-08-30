@@ -86,6 +86,6 @@ Return to the *Web* tab and click the big green button to reload the application
 
 Open a new browser tab to check you have a working py4web installation.
 
-Browse to [the Python Dashboard](https://yourusername/pythonanywhere.com/_dashboard )- you need to replace yourusername with your Pythonanywhere username, and should be prompted for the password you selected earlier.
+Browse to [https://yourusername/pythonanywhere.com/_dashboard](https://yourusername/pythonanywhere.com/_dashboard) (you need to replace yourusername with your Pythonanywhere username), and you should be prompted for the password you selected earlier.
 
 Continue following the [install](install#find-the-latest-version-of-the-oxcam-software) script to install the oxcam app in your new py4web installation.

@@ -24,6 +24,7 @@ The path follows the bottlepy syntax.
 session, db, T, auth, and tempates are examples of Fixtures.
 Warning: Fixtures MUST be declared with @action.uses({fixtures}) else your app will result in undefined behavior
 """
+from py4web.utils import form
 from py4web.utils.grid import Grid, GridClassStyleBulma, Column
 from py4web.utils.form import Form, FormStyleBulma
 
@@ -1177,24 +1178,23 @@ def assign_tables(event_id):
 			grid_class_style=grid_style, rows_per_page=100, formstyle=form_style)
 
 	search_form = Form([
-		Field('table', 'string',
-			widget=lambda field, value: INPUT(_name='table', _type='text', _value=request.query.get('table'), _placeholder="table?"),
-			requires=IS_NOT_EMPTY()),
+		Field('assign', 'string', requires=IS_NOT_EMPTY(), default=request.query.get('assign')),
 		Field('host', 'reference Members', requires=IS_IN_DB(db(
 			(db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)&(db.Reservations.Host==True)),
 			db.Reservations.Member, '%(Lastname)s, %(Firstname)s', zero='host member?')),],
 		formstyle=FormStyleBulma, submit_value='Submit')
+	search_form.structure.find("#no_table_assign")[0]["_placeholder"] = "table?"
 
 	if search_form.accepted:	#Assign button clicked
 		select_vars = {}
-		if search_form.vars.get('table'):
-			select_vars['table'] = search_form.vars.get('table')
+		if search_form.vars.get('assign'):
+			select_vars['assign'] = search_form.vars.get('assign')
 			if search_form.vars.get('host'):
-				db(eval(query+"&(db.Reservations.Member==search_form.vars.get('host'))")).update(Table=search_form.vars.get('table'))
+				db(eval(query+"&(db.Reservations.Member==search_form.vars.get('host'))")).update(Table=search_form.vars.get('assign'))
 		redirect(URL(f"assign_tables/{event_id}", vars=select_vars))
 
 	grid = Grid(eval(query), left = db.Members.on(db.Members.id==db.Reservations.Member),
-			orderby=db.Reservations.Table|db.Members.Lastname|db.Members.Firstname|~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname,
+			orderby=~db.Reservations.Table|db.Members.Lastname|db.Members.Firstname|~db.Reservations.Host|db.Reservations.Lastname|db.Reservations.Firstname,
 			columns=[
 				Column('Guest', lambda row: CAT(('+ ' if not row.Reservations.Host else ''),
 									A(f"{row.Reservations.Lastname+', '+row.Reservations.Firstname}",
@@ -1209,6 +1209,7 @@ def assign_tables(event_id):
 			deletable=False, search_form=search_form,
 			grid_class_style=grid_style,rows_per_page=1000, search_button_text='Assign',
 			formstyle=form_style)
+	grid.render()
 	return locals()
 
 #this controller is used by privileged users to manage event registrations.
@@ -2272,11 +2273,11 @@ def transactions():
 				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Events',
 				lambda r: f"{r.DateTime.strftime(DATE_FORMAT)} {r.Description[:25]}",
 				orderby = ~db.Events.DateTime, zero="event?"))),
-		Field('notes', 'string',
-		   		widget=lambda field, value: INPUT(_name='notes', _type='text', _value=request.query.get('notes'), _placeholder="notes?")),
-		Field('reference', 'string',
-		   		widget=lambda field, value: INPUT(_name='reference', _type='text', _value=request.query.get('reference'), _placeholder="ref?"))],
+		Field('notes', 'string'),
+		Field('reference', 'string')],
 		keep_values=True, formstyle=FormStyleBulma)
+	search_form.structure.find("#no_table_notes")[0]["_placeholder"] = "notes?"
+	search_form.structure.find("#no_table_reference")[0]["_placeholder"] = "ref?"
 
 	if parsed['mode'] == 'select':	#viewing transactions
 		bank_id_match=re.match('db.AccTrans.Bank==([0-9]+)$', query)

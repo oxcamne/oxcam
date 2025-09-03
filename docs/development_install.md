@@ -54,10 +54,10 @@ Once the virtual environment is set up, you can use a terminal window within VSc
 The (venv) confirms that you are operating in the virtual environment. As shown you should be looking at the py4web folder itself. Now execute the commands:
 
 ```bash
-pip install -e .
 make assets
 make test
 py4web setup apps
+pip install -e .
 py4web set_password
 ```
 
@@ -70,7 +70,7 @@ You should also use VScode to edit the py4web/.vscode/launch.json. This already 
     "configurations": [
         {
             "name": "Python: py4web",
-            "type": "dbugpy",
+            "type": "debugpy",
             "request": "launch",
             "program": "py4web.py",
             "args": ["run", "-L 20", "apps"
@@ -80,7 +80,7 @@ You should also use VScode to edit the py4web/.vscode/launch.json. This already 
         },
         {
             "name": "Python: daily",
-            "type": "dbugpy",
+            "type": "debugpy",
             "request": "launch",
             "program": "py4web.py",
             "args": [
@@ -91,7 +91,7 @@ You should also use VScode to edit the py4web/.vscode/launch.json. This already 
         },
         {
             "name": "Python: email",
-            "type": "dbugpy",
+            "type": "debugpy",
             "request": "launch",
             "program": "py4web.py",
             "args": [

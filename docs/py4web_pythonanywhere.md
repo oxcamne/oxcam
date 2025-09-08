@@ -38,13 +38,11 @@ After the password is stored, you will be prompted:
 
 `Type "/home/davidmanns/.local/bin/py4web run apps" "to start the py4web server.`
 
-**Do Not do this !!**
-
-But do not close the bash terminal tab in your browser as you may need it later when installing **oxcam**.
+***DO NOT DO THIS!!*** Your environment is not yet ready to run.
 
 ### Create your Py4web Website
 
-Open the *Web* tab in a new browser tab by right clicking on 'web' in the menu at top right and selecting 'open in new tab'. The web page should show that you have no web apps. Click the blue button to start the process of creating a new app. This will display a box showing what the URL of you site will be. You will see that it uses your Pythonanywhere username. You will append `'/oxcam'` to form the base URL that you will actually use for the public, or `'/_dashboard'` to access the py4web dashboard.
+Switch to the *Web* tab in a new browser tab by clicking on 'web' in the menu at top right. The web page should show that you have no web apps. Click the blue button to start the process of creating a new app. This will display a box showing what the URL of you site will be. You will see that it uses your Pythonanywhere username. You will append `'/oxcam'` to form the base URL that you will actually use for the public website, or `'/_dashboard'` to access the py4web dashboard.
 
 Click next, and at the following screens select **Bottle** and then the latest version of Python 3.
 
@@ -82,10 +80,10 @@ application = wsgi(password_file=password_file,
 
 Be sure to **Save** the edited file using the button at the top of the screen!
 
-Return to the *Web* tab and click the big green button to reload the application.
+Return to the *Web* tab and click the big green button to load the application.
 
 Open a new browser tab to check you have a working py4web installation.
 
-Browse to [https://yourusername/pythonanywhere.com/_dashboard](https://yourusername/pythonanywhere.com/_dashboard) (you need to replace yourusername with your Pythonanywhere username), and you should be prompted for the password you selected earlier.
+Browse to [https://yourusername/pythonanywhere.com/_dashboard](https://yourusername/pythonanywhere.com/_dashboard) (you need to replace yourusername with your Pythonanywhere username), and you should be prompted for the password you selected earlier. You are now (hopefully) looking at the py4web dashboard. You will be using this to install the oxcam app.
 
-Continue following the [install](install#find-the-latest-version-of-the-oxcam-software) script to install the oxcam app in your new py4web installation.
+Continue to [install the oxcam app in your new py4web site](install#find-the-latest-version-of-the-oxcam-software).

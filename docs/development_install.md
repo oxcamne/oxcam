@@ -119,12 +119,6 @@ cd oxcam
 pip install --upgrade -r requirements.txt
 ```
 
-### Configure setting_private.py
-
-In the py4web/apps/oxcam folder there will be a settings_private.py file to configure the particular alumni group.
-
-If you will be starting a new group an initial settings_private.py file will be created when you first start Py4web after installing the oxcam app. If you are maintaining the app for an existing group you might start using a database backup file from your running instance. This would also be loaded when you first start Py4web.
-
 ### Start Py4web and oxcam
 
 Go to the debugger section of Vscode and launch using the py4web configuration of the edited launch.json file. You should see something like the following in Vscode's terminal window:
@@ -169,7 +163,7 @@ Hit Ctrl-C to quit.
 
 Now open the py4web dashboard at [http://127.0.0.1:8000/_dashboard](http://127.0.0.1:8000/_dashboard). You should see all the standard applications, plus oxcam, running. If any are flagged in red, there is a problem to investigate.
 
-You can now run the oxcam app at [http://127.0.0.1:8000/oxcam](http://127.0.0.1:8000/oxcam). You will be asked to login by verifying your email, the [please continue here](install#start-oxcam-and-initial-configuration).
+You can now run the oxcam app at [http://127.0.0.1:8000/oxcam](http://127.0.0.1:8000/oxcam). You will be asked to login by verifying your email, then [please continue here](install#start-oxcam-and-initial-configuration).
 
 ### Updating Py4web
 
@@ -186,11 +180,10 @@ This is conservative approach, `make test` and `py4web setup apps` are not neede
 
 ### Updating Oxcam
 
-Normally you should not need to do this, unless you are one of multiple collaborating developers. In this case your system (or Vscode) terminal should be at the py4web/apps directory. Issue the commands:
+Normally you should not need to do this, unless you are one of multiple collaborating developers. In this case your system (or Vscode) terminal should be at the py4web/apps/oxcam directory. Issue the commands:
 
 ```bash
 git pull
-cd oxcam
 pip install --upgrade -r requirements.txt
 ```
 

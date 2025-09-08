@@ -45,43 +45,19 @@ Verify that you can open the Py4web dashboard (<your_py4web_url>/_dashboard) in 
 
 ![py4web dashboard](images/py4web_dashboard.png)
 
-Keep this dashboard open for use later!
+### Download the latest version of the oxcam software
 
-### Find the latest version of the oxcam software
-
-Browse to [https://github.com/oxcamne/oxcam](https://github.com/oxcamne/oxcam) and click on the latest version of OxCam on the releases section on the right of the page. You should see something like:
+Open a new browser tab and browse to [https://github.com/oxcamne/oxcam](https://github.com/oxcamne/oxcam) and click on the latest version of OxCam on the releases section on the right of the page. You should see something like:
 
 ![oxcam_version](images/oxcam_version.png)
 
-Right-click on the Source code (zip) link and select 'copy link'
+Right-click on the Source code (zip) link under 'Assets' and select 'copy link'
 
-### Install the oxcam software on your server
+Return to the Py4web Dashboard tab, and click Create/Upload App. Fill in the popup form, pasting in the link copied from Github:
 
-On your server open a bash terminal session (you may already have a bash session in a browser tab from installing py4web). Navigate to the parent of the py4web directory (cd ~ if you are on Pythonanywhere), then, pasting the copied link into the wget  or curl command (adjust these commands to the latest version number):
+![app_upload](images/app_upload.png)
 
-on Linux/Pythonanywhere:
-
-```bash
-    wget https://github.com/oxcamne/oxcam/archive/refs/tags/v1.1.0.zip
-    unzip v1.1.0
-    mv oxcam-1.1.0 py4web/apps/oxcam
-    pip install --upgrade -r py4web/apps/oxcam/requirements.txt
-```
-
-on Mac:
-
-```bash
-    curl -LO https://github.com/oxcamne/oxcam/archive/refs/tags/v1.1.0.zip
-    unzip v1.1.0
-    mv oxcam-1.1.0 py4web/apps/oxcam
-    pip install --upgrade -r py4web/apps/oxcam/requirements.txt
-```
-
-This copies the software into a new directory apps/oxcam, and ensures that necessary Python packages are installed. You may need to precede 'pip' with 'python ' or 'python3 ' depending on your environment.
-
-### Restart Py4web, Check that Oxcam is running
-
-Expand the top (Installed Applications) tab of the Py4web dashboard, and **click the Reload Apps button.** You should now see oxcam in the list of running apps. It will indicate in red if it did not load correctly.
+Click the 'Create' button, the oxcam software will be installed and dashboard should now show that oxcam is running. You can close your Github browser tab.
 
 ### Start Oxcam and Initial Configuration
 
@@ -91,15 +67,7 @@ In a new browser tab, start the oxcam app (<your_py4web_url>/oxcam). You should 
 
 Follow the on-screen instructions to define the email account to be used by oxcam. Normally you would also tick the 'load minimal database' checkbox.
 
-After successfully submitting the form, return to the Py4web dashboard and **click the Reload Apps button again**.
-
-### Complete the customization for your group
-
-You need to edit the settings_private.py file just created. You can use the Py4web dashboard app to do this, restarting the running apps after saving all edits.
-
-In the dashboard 'Installed Applications' section, click on the 'oxcam' app. Then find 'settings_private.py' in the 'Files in oxcam' section. This opens the file in an editor (scroll down if necessary).
-
-This is a Python file, and the Dashboard's editor is python aware, so it will flag syntax errors. The file is self documented, go through it carefully to make the necessary customizations.
+After successfully submitting the form, return to the Py4web dashboard and **click the Reload Apps button** to restart the oxcam software.
 
 ### Start Building Your Database
 
@@ -116,6 +84,14 @@ If you did not load the Minimal Database, the login will take you to a database 
 ![db_restore form](images/db_restore.png)
 
 Use the 'browse' button to locate the backup database you wish to load. You do not need to click 'clear existing database'. After the database is loaded, you will need to log in again which will connect with your record in the restored database.
+
+### Complete the customization for your group
+
+Further customization is done by editing the settings_private.py file just created. You can use the Py4web dashboard app to do this, restarting the running apps after saving all edits.
+
+In the dashboard 'Installed Applications' section, click on the 'oxcam' app. Then find 'settings_private.py' in the 'Files in oxcam' section. This opens the file in an editor (scroll down if necessary).
+
+This is a Python file, and the Dashboard's editor is python aware, so it will flag any syntax errors. The file is self documented, go through it carefully to make the necessary customizations.
 
 ### Scheduled Tasks
 
@@ -141,6 +117,8 @@ py4web/py4web.py call py4web/apps oxcam.daily_maintenance.daily_maintenance
 ```
 
 ### How to update the oxcam app when a newer version is released
+
+The current version of the py4web dashboard does not allow the app to be updated directly from Github.
 
 Start by finding the latest version of the oxcam app on Github as described earlier, and copying the .zip link.
 

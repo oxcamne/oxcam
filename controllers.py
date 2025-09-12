@@ -752,7 +752,6 @@ def events():
 								vars=dict(back=request.url))), " e.g. meal choices", XML('<br>'),
 						A('Survey', _href=URL(f'survey/{event_id}',
 								vars=dict(back=request.url))), XML('<br>'),
-						A('Table Assignment Tool', _href=URL(f'assign_tables/{event_id}', scheme=True)), XML('<br>'),
 						A('Make a Copy of This Event', _href=URL(f'event_copy/{event_id}',
 								vars=dict(referrer=request.query.referrer))))
 
@@ -1002,9 +1001,8 @@ def event_reservations(event_id):
 			Field('selection', 'reference Event_Selections', default = request.query.get('selection'),
 					requires=IS_EMPTY_OR(IS_IN_DB(db(db.Event_Selections.Event==event_id), db.Event_Selections.id,
 								'%(Short_name)s', zero="selection?"))))
-	survey = db(db.Event_Survey.Event==event_id).select()
-	if len(survey)>0:
-		event_survey = [(s.id, s.Short_name) for s in survey[1:]]
+	event_survey = [(s.id, s.Short_name) for s in db(db.Event_Survey.Event==event_id).select()[1:]]
+	if event_survey:
 		search_fields.append(Field('survey', requires=IS_EMPTY_OR(IS_IN_SET(event_survey, zero="survey?",
 			error_message='Please make a selection')), default = request.query.get('survey')))
 
@@ -1023,8 +1021,11 @@ def event_reservations(event_id):
 				XML("Click on the member name to view/edit reservation details."),
 				XML('<br>'))
 
-	query = f'(db.Reservations.Event=={event_id})'
+	query = f'(db.Reservations.Event=={event_id})&(db.Reservations.Host==True)'
 	status = request.query.get('status') or 'confirmed'
+	ticket = db.Event_Tickets[request.query.get('ticket')].Short_name if request.query.get('ticket') else ''
+	selection = db.Event_Selections[request.query.get('selection')].Short_name if request.query.get('selection') else ''
+	survey = db.Event_Survey[request.query.get('survey')].Short_name if request.query.get('survey') else ''
 	if status == 'tbc':
 		query += f"&db.Reservations.Member.belongs({tbc})"
 	#for waitlist, provisional, checked_in, no_show, include hosts with any guests meeting criteria
@@ -1039,9 +1040,9 @@ def event_reservations(event_id):
 (db.Reservations.Checked_in==True)).select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
 	else:	#confirmed, no show
 		query += '&(db.Reservations.Waitlist==False)&(db.Reservations.Provisional==False)'
-		header = CAT(header, A('Export confirmed registrations as CSV file',
-			 _href=(URL(f'doorlist_export/{event_id}', scheme=True))), XML('<br>'),
-			 A('Check-in Tool', _href=URL(f'check_in/{event_id}', scheme=True)), XML('<br>'),)
+		header = CAT(header,
+			A('Check-in Tool', _href=URL(f'check_in/{event_id}', scheme=True)), XML('<br>'),
+			A('Table Assignment Tool', _href=URL(f'assign_tables/{event_id}', scheme=True)), XML('<br>'))
 		
 	if status == 'no_show':
 		query += f"&db.Reservations.Member.belongs([r.Member for r in db((db.Reservations.Event=={event_id})&\
@@ -1055,14 +1056,12 @@ def event_reservations(event_id):
 	if request.query.survey:
 		query += f"&db.Reservations.Member.belongs([r.Member for r in db((db.Reservations.Event=={event_id})&\
 (db.Reservations.Survey_=={request.query.survey})).select(db.Reservations.Member, orderby=db.Reservations.Member, distinct=True)])"
-	query += '&(db.Reservations.Host==True)'
 
 	header = CAT(header, A('Send Email to filtered registrations', _href=URL('composemail', vars=dict(query=query,
 		left  = "[db.Emails.on(db.Emails.Member==db.Reservations.Member),db.Members.on(db.Members.id==db.Reservations.Member)]",	
-		qdesc=f"{event.Description} {status}",
-		back=request.url
-		))))
-	header = CAT(header, XML('<br>'), "Use dropdowns to filter (includes reservation if member or any guest fits filter):")
+		qdesc=f"{event.Description} {status} {ticket} {selection} {survey}"))), XML('<br>'),
+		 A('Export Doorlist as CSV file', _href=(URL(f'doorlist_export/{event_id}', scheme=True))), XML('<br>'),
+		"Use dropdowns to filter (includes reservation if member or any guest fits filter):")
 
 	columns = [
 		Column('member', lambda row: A(member_name(row.Reservations.Member),
@@ -1130,7 +1129,7 @@ def check_in(event_id):
 		rsvtn.update_record(Checked_in=request.query.get('check_in')=='True')
 		groupcheckedin = res_checked_in(rsvtn.Member, event_id)
 		if groupcheckedin & (groupcheckedin != res_conf(rsvtn.Member, event_id)):
-			back += f"?search_value={rsvtn.Lastname}"
+			back += f"?search_value={rsvtn.Lastname[0:3]}"
 		redirect(back)
 
 	grid = Grid((db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False),
@@ -1472,6 +1471,7 @@ def reservation():
 		db.Reservations.Waitlist.readable = False
 		db.Reservations.Checked_in.readable = False
 		db.Reservations.Table.readable = False
+		db.Reservations.Table.writable = False
 
 		if host_reservation:
 			#update member's name from member record in case corrected
@@ -1628,7 +1628,7 @@ def doorlist_export(event_id):
 							primary_email(row.Reservations.Member) if row.Reservations.Host==True else '',
 							row.Members.Cellphone if row.Reservations.Host==True else '',
 							survey_name, row.Reservations.Comment or '',
-							'✔' if row.Reservations.Checked_in else ''])
+							'Y' if row.Reservations.Checked_in else ''])
 	return locals()
 	
 @action('event_copy/<event_id:int>', method=['GET'])

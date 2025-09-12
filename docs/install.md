@@ -57,7 +57,15 @@ Return to the Py4web Dashboard tab, and click Create/Upload App. Fill in the pop
 
 ![app_upload](images/app_upload.png)
 
+If this is your initial install, select the New App radio button, if you are updating to a new version of oxcam, select Update.
+
 Click the 'Create' button, the oxcam software will be installed and dashboard should now show that oxcam is running. You can close your Github browser tab.
+
+If this is your initial installation of oxcam, you will need to install some additional Python modules on which it depends. With your terminal still at the py4web directory, type the command:
+
+`pip install --upgrade -r apps/oxcam/requirements.txt`
+
+Finally, reload the apps using the 'Reload Apps' button on the Py4web Dashboard.
 
 ### Start Oxcam and Initial Configuration
 
@@ -118,41 +126,36 @@ py4web/py4web.py call py4web/apps oxcam.daily_maintenance.daily_maintenance
 
 ### How to update the oxcam app when a newer version is released
 
-The current version of the py4web dashboard does not allow the app to be updated directly from Github.
+The Py4web Dashboard should be used to update the oxcam app. Open the Py4web dashboard (<your_py4web_url>/_dashboard) in a new browser tab, using the password you setup when installing py4web, and expand the 'Installed Applications' section.
 
-Start by finding the latest version of the oxcam app on Github as described earlier, and copying the .zip link.
-
-On your web server open a bash terminal session. Navigate to the parent of the py4web directory (cd ~ if you are on Pythonanywhere), then, pasting in the copied link in the wget command and using the current latest version:
-
-on Linux:
-
-```bash
-    wget https://github.com/oxcamne/oxcam/archive/refs/tags/v1.1.0.zip
-    unzip v1.1.0
-    cp -r --force oxcam-1.1.0/. py4web/apps/oxcam
-    pip install --upgrade -r py4web/apps/oxcam/requirements.txt
-```
-
-on Mac:
-
-```bash
-    curl -LO https://github.com/oxcamne/oxcam/archive/refs/tags/v1.1.0.zip
-    unzip v1.1.0
-    cp -R oxcam-1.1.0/. py4web/apps/oxcam
-    pip install --upgrade -r py4web/apps/oxcam/requirements.txt
-```
-
-You must restart Py4web, e.g. using the big green button on the Pythonanywhere Console Web tab or
-clicking the Reload Apps button on the Py4web Dashboard.
+Follow a similar process to the original install to [install the new version of the oxcam app](install#download-the-latest-version-of-the-oxcam-software).
 
 ### How to update to a new release of Py4web
 
-With a system or bash terminal at your py4web directory and your venv running run the command:
+If your server is a Pythonanywhere instance:
+
+With a bash terminal at your py4web directory run the command:
 
 `python3 -m pip install --upgrade py4web`
 
-This will not update the built in apps, most importantly the _dashboard. *To update these, first go the py4web/apps directly and delete all the apps **other than oxcam**.* Then return the terminal to py4web and run:
+This will not update the built in apps. *To update these, first go the py4web/apps directory and delete the folder for the app to update (most likely '_dashboard')*. Then return the terminal to py4web and run:
 
 `py4web setup apps`
 
-Finally, you must restart py4web.
+Finally, you must restart py4web, either using the big green button on the Pythonanywhere console web tab.
+
+If you are running on another type of server, on the terminal running py4web, first stop py4web (type control-C), verify that your venv is running as indicated by '(venv)' at the start of the prompt - if not, run:
+
+`. venv/bin/activate`
+
+Then run the commands:
+
+`pip install --ugrade py4web`
+
+This will not update the built in apps. *To update these, first go the py4web/apps directory and delete the folder for the app to update (most likely '_dashboard')*. Then return the terminal to py4web and run:
+
+`py4web setup apps`
+
+Finally, restart py4web:
+
+`py4web run apps`

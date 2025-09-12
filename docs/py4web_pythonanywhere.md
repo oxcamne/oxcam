@@ -32,7 +32,7 @@ Next create a py4web directory using the command **`mkdir py4web`** and switch t
 
 Complete the installation by running the command **`py4web setup apps`**. Answer 'Y' to create the `apps` folder, then answer the questions relating to each py4web app to install. You can answer 'N' to most of them, but be sure to answer 'Y' to **_dashboard, _default, _documentation, _minimal, and _scaffold**.
 
-Provide a secure password for the py4web dashboard, making sure to keep track of it for future use! You need to enter the password twice to have it confirmed and stored.
+Provide a secure password for the py4web dashboard, making sure to keep track of it for future use! You need to enter the password twice to have it confirmed and stored. You can use the command **`py4web set_password`** to create or change the password at any time.
 
 After the password is stored, you will be prompted:
 
@@ -86,4 +86,4 @@ Open a new browser tab to check you have a working py4web installation.
 
 Browse to [https://yourusername/pythonanywhere.com/_dashboard](https://yourusername/pythonanywhere.com/_dashboard) (you need to replace yourusername with your Pythonanywhere username), and you should be prompted for the password you selected earlier. You are now (hopefully) looking at the py4web dashboard. You will be using this to install the oxcam app.
 
-Continue to [install the oxcam app in your new py4web site](install#find-the-latest-version-of-the-oxcam-software).
+Continue to [install the oxcam app in your new py4web site](install#download-the-latest-version-of-the-oxcam-software).

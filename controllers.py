@@ -1059,7 +1059,7 @@ def event_reservations(event_id):
 
 	header = CAT(header, A('Send Email to filtered registrations', _href=URL('composemail', vars=dict(query=query,
 		left  = "[db.Emails.on(db.Emails.Member==db.Reservations.Member),db.Members.on(db.Members.id==db.Reservations.Member)]",	
-		qdesc=f"{event.Description} {status} {ticket} {selection} {survey}"))), XML('<br>'),
+		qdesc=f"{event.Description} {status} {ticket} {selection} {survey}", back=request.url))), XML('<br>'),
 		 A('Export Doorlist as CSV file', _href=(URL(f'doorlist_export/{event_id}', scheme=True))), XML('<br>'),
 		"Use dropdowns to filter (includes reservation if member or any guest fits filter):")
 

@@ -111,7 +111,7 @@ def upcoming_events():
 		line = f"{event.DateTime.strftime('%A, %B %d ')} **[{event.Description}]({URL(f'event_page/{event.id}') if event.Details else event.Page})**".strip()
 		if event.Booking_Closed<datetime.datetime.now(TIME_ZONE).replace(tzinfo=None):
 			if not attend:
-				line = f"{event.DateTime.strftime('%A, %B %d ')} **{event.Description.strip()}** *Save the Date*"
+				line = f"{event.DateTime.strftime('%A, %B %d ')} **{event.Description.strip()} [Save the Date]({URL(f'add_to_calendar/{event.id}')})**"
 			else:
 				line += ' *Booking Closed, waitlisting*'
 		else:

@@ -177,12 +177,15 @@ def template_expand(text, context={}):
 			result = history_content()
 		elif func.startswith('about_content'):	#will be called with committee names
 			result = eval(func)
-		elif func=='registration_link':
+		elif func=='registration_link' or func=='calendar_link':
 			event_id_match=re.search(r'db\.Reservations\.Event==(\d+)', context.get('left') or '')
 			event_id = context.get('event_id') or (event_id_match.group(1) if event_id_match else None)
 			if not event_id:
 				raise Exception(f"[[{func}]] can't be used in this context")
-			result = f"{context.get('Scheme')}registration/{event_id}" if context.get('Scheme') else URL(f'registration/{event_id}', scheme=True)
+			if func=='registration_link':
+				result = f"{context.get('Scheme')}registration/{event_id}" if context.get('Scheme') else URL(f'registration/{event_id}', scheme=True)
+			else:
+				result = f"{context.get('Scheme')}add_to_calendar/{event_id}" if context.get('Scheme') else URL(f'add_to_calendar/{event_id}', scheme=True)
 		else:
 			raise Exception(f"unknown content [[{func}]]")
 		return str(result)
@@ -229,12 +232,16 @@ def msg_send(member,subject, message):
 	email_sender(to=email, sender=SUPPORT_EMAIL, bcc=SUPPORT_EMAIL, subject=subject, body=message)
 	
 #create confirmation of event
-def event_confirm(event_id, member_id, dues=0, event_only=False):
+def event_confirm(event_id, member_id=None, dues=0, event_only=False):
 	event = db.Events[event_id]
 	rows=[TR(TH('Event:', _style="text-align:left"), TD(event.Description or ''))]
 	rows.append(TR(TH('Venue:', _style="text-align:left"), TD(event.Venue or '')))
 	rows.append(TR(TH('Date:', _style="text-align:left"), TD(event.DateTime.strftime("%A %B %d, %Y"))))
-	rows.append(TR(TH('Time:', _style="text-align:left"), TD(event.DateTime.strftime("%I:%M%p"))))
+	if event.EndTime:
+		time_str = f"{event.DateTime.strftime('%I:%M%p')} - {event.EndTime.strftime('%I:%M%p')}"
+	else:
+		time_str = event.DateTime.strftime('%I:%M%p')
+	rows.append(TR(TH('Time:', _style="text-align:left"), TD(time_str)))
 	body = TABLE(*rows).__str__()
 	if event_only:
 		return body
@@ -270,8 +277,11 @@ def event_confirm(event_id, member_id, dues=0, event_only=False):
 	if tbc + dues_unpaid>0:
 		body += f"To pay online please visit {WEB_URL}/registration/{event_id}<br>"
 						#scheme=True doesn't pick up the domain in the email_daemon!
-	elif event.Notes and not resvtns[0].Waitlist and not resvtns[0].Provisional:
-		body += markdown.markdown(event.Notes)
+	else:
+		calendar_url = URL(f"add_to_calendar/{event.id}", scheme=True)
+		body += f'<a href="{calendar_url}">Add to calendar</a>'
+		if event.Notes and not resvtns[0].Waitlist and not resvtns[0].Provisional:
+			body += markdown.markdown(event.Notes)
 	return body
 
 def add_page(menu, page, url):

@@ -36,7 +36,7 @@ from yatl.helpers import H5, H6, XML, TABLE, TH, TD, THEAD, TR, HTML, P, BUTTON,
 from .common import db, session, flash
 from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
 	MEMBERSHIPS, TIME_ZONE, PAGE_BANNER,\
-	ALLOWED_EMAILS, DATE_FORMAT, CURRENCY_SYMBOL, SMTP_TRANS
+	ALLOWED_EMAILS, DATE_FORMAT, CURRENCY_SYMBOL, SMTP_TRANS, DB_URL
 from .pay_processors import paymentprocessor
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
@@ -55,6 +55,7 @@ from .website import society_emails, about_content, history_content, upcoming_ev
 from py4web.utils.factories import Inject
 import datetime, re, csv, decimal, pickle, markdown, dateutil
 from io import StringIO
+from ics import Calendar, Event
 
 preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER))
 preferred_public = action.uses("gridform_public.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER))
@@ -741,9 +742,11 @@ def events():
 			event = db.Events[event_id]
 			url = URL('registration', event_id, scheme=True)
 			urlpage = URL(f"event_page/{event.id}", scheme=True) if event.Details else event.Page
+			calendar_url = URL(f"add_to_calendar/{event.id}", scheme=True)
 			header = CAT(A('back', _href=back), H5('Event Record'),
 						"Booking link is ", A(url, _href=url), XML('<br>'),
-						"Event page is ", A(urlpage, _href=urlpage))
+						"Event page is ", A(urlpage, _href=urlpage), XML('<br>'),
+						"Download calendar link is ", A(calendar_url, _href=calendar_url))
 			if paymentprocessor():
 				header = CAT(header, XML('<br>'),
 						A('Ticket Types', _href=URL(f'tickets/{event_id}', vars=dict(back=request.url))))
@@ -1630,6 +1633,35 @@ def doorlist_export(event_id):
 							survey_name, row.Reservations.Comment or '',
 							'Y' if row.Reservations.Checked_in else ''])
 	return locals()
+
+@action('calendar_export/<event_id:int>', method=['GET'])
+@action.uses("download.html", db, session, flash, Inject(response=response))
+def calendar_export(event_id):
+	event = db.Events[event_id]
+	stream = StringIO()
+	content_type = "text/calendar"
+	filename = 'calendar.ics'
+	calendar = Calendar()
+	event_details = Event()
+	event_details.name = f"{SOCIETY_SHORT_NAME}: {event.Description}"
+	event_details.begin = event.DateTime.astimezone(dateutil.tz.UTC)
+	event_details.end = event.EndTime.astimezone(dateutil.tz.UTC) if event.EndTime else (event_details.begin + datetime.timedelta(hours=1))
+	event_details.location = event.Venue or ''
+	event_details.description = f"for details and to register please visit {DB_URL}/web/home"
+	calendar.events.add(event_details)
+	stream.write(str(calendar))
+	flash.set("A calendar .ics file has been downloaded. Opening the file may add the event to your calendar, or you may need to open your calendar and import the file.")
+	return locals()
+
+@action('add_to_calendar/<event_id:int>', method=['GET'])
+@preferred
+def add_to_calendar(event_id):
+	header = CAT(XML(event_confirm(event_id, event_only=True)), XML("<br>"),
+		XML("Use the link below to download an .ics file which may be imported into your calendar application.<br>"),
+		XML("If your application supports it opening (double clicking) the downloaded file may add the event directly to your calendar.<br>"),
+		XML(f'<a href="{URL(f"calendar_export/{event_id}")}">Download Calendar entry</a>')
+	)
+	return locals()
 	
 @action('event_copy/<event_id:int>', method=['GET'])
 @preferred
@@ -2371,9 +2403,7 @@ def transactions():
 					Column('member', lambda row: A(member_name(row.Member), _href=URL('members',
 											vars=dict(referrer=encode_url(request.url), mode='details'if access=='read' else 'edit', id=row.Member)),
 											_style='white-space: normal') if row.Member else '', required_fields=[db.AccTrans.Member]),
-	 				db.AccTrans.Amount,
-					Column('Fee', lambda row: row.Fee or "", required_fields=[db.AccTrans.Fee]),
-					db.AccTrans.CheckNumber, db.AccTrans.Accrual],
+	 				db.AccTrans.Amount, db.AccTrans.Fee, db.AccTrans.CheckNumber, db.AccTrans.Accrual],
 			headings=['Timestamp', 'Account','Event','Member','Amt', 'Fee', 'Chk#', 'Acc'],
 			validation=validate, show_id=True, search_form=search_form,
 			deletable=lambda r: r.Accrual, details=False, editable=True, create=session.get('bank_id'),
@@ -2434,7 +2464,7 @@ def composemail():
 				A('Useful Tips', _href='https://oxcamne.github.io/oxcam/send_email.html#useful-tips', _target='doc'),
 				" for additional formatting.",
 				XML('<br>'),
-				"There are custom elements [[greeting]], [[member]], [[reservation]], [[registration_link]] ",
+				"There are custom elements [[greeting]], [[member]], [[reservation]], [[registration_link]], [[calendar_link]] ",
 				"available, depending on the context.")))
 	fields.append(Field('save', 'boolean', default=proto!=None, comment='store/update template'))
 	fields.append(Field('attachment', 'upload', uploadfield=False))

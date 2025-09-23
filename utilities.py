@@ -3,13 +3,13 @@ This file contains functions shared by multiple controllers
 """
 from py4web import URL, request
 from .common import db
-from .settings import TIME_ZONE, SUPPORT_EMAIL, LETTERHEAD, GRACE_PERIOD, CURRENCY_SYMBOL,\
-	WEB_URL, SOCIETY_SHORT_NAME, MEMBERSHIPS, DATE_FORMAT, SMTP_TRANS, PAGE_BANNER
+from .settings import TIME_ZONE, SUPPORT_EMAIL, LETTERHEAD, GRACE_PERIOD,\
+	WEB_URL, SOCIETY_SHORT_NAME, MEMBERSHIPS, SMTP_TRANS, PAGE_BANNER
 from .models import primary_email, event_cost, member_name, res_selection,\
 	res_unitcost, event_revenue, page_name
 from .website import about_content, history_content, upcoming_events	#called to construct page content
 from yatl.helpers import A, TABLE, TH, THEAD, H6, TR, TD, CAT, HTML, XML
-import datetime, re, smtplib, markdown, base64, decimal
+import datetime, re, smtplib, markdown, base64, decimal, locale
 from email.message import EmailMessage
 
 #check if member is in good standing at a particular date
@@ -106,7 +106,7 @@ def get_banks(startdatetime, enddatetime):
 
 def tdnum(value, query=None, left=None, th=False):
 	#return number as TD or TH
-	nums = f'{CURRENCY_SYMBOL}{value:,.2f}' if value >= 0 else f'({CURRENCY_SYMBOL}{-value:,.2f})'
+	nums = f'{locale.currency(value, grouping=True)}'
 	numsq = A(nums, _href=URL('transactions', vars=dict(query=query, left=left, back=request.url))) if query else nums
 	return TH(numsq, _style=f'text-align:right{"; color:Red" if value <0 else ""}') if th==True else TD(numsq, _style=f'text-align:right{"; color:Red" if value <0 else ""}')
 
@@ -158,6 +158,7 @@ def bank_balance(bank_id, timestamp=datetime.datetime.now(TIME_ZONE).replace(tzi
 def template_expand(text, context={}):
 	# Expand all occurrences of [[something]] in the text
 	pattern = re.compile(r'\[\[(.*?)\]\]')
+	member_id = context.get('row').get('Member') or context.get('row').get('Members.id') or context.get('row').get('id') if context.get('row') else None
 
 	# Function to replace each match with the result of eval(some_function)
 	def replace_match(match):
@@ -166,11 +167,11 @@ def template_expand(text, context={}):
 			if not context.get('query') or func=='reservation' and not ('Reservations.Event' in context.get('query')):
 				raise Exception(f"[[{func}]] can't be used in this context")
 		if func=='greeting':
-			result = member_greeting(db.Members[context.get('row').get('Member') or context.get('row').get('Members.id') or context.get('row').get('id')])
+			result = member_greeting(db.Members[member_id])
 		elif func=='member':
-			result = member_profile(db.Members[context.get('row').get('Member') or context.get('row').get('Members.id') or context.get('row').get('id')])
+			result = member_profile(db.Members[member_id])
 		elif func=='reservation':
-			result = event_confirm(context.get('row').get('Reservations.Event'), context.get('row').get('Member') or context.get('row').get('Members.id'))
+			result = event_confirm(context.get('row').get('Reservations.Event'), member_id, context=context)
 		elif func.startswith('upcoming_events'):
 			result = upcoming_events()
 		elif func.startswith('history_content'):
@@ -183,9 +184,9 @@ def template_expand(text, context={}):
 			if not event_id:
 				raise Exception(f"[[{func}]] can't be used in this context")
 			if func=='registration_link':
-				result = f"{context.get('Scheme')}registration/{event_id}" if context.get('Scheme') else URL(f'registration/{event_id}', scheme=True)
+				result = f"{context.get('base_url')}registration/{event_id}" if context.get('base_url') else URL(f'registration/{event_id}', scheme=True)
 			else:
-				result = f"{context.get('Scheme')}add_to_calendar/{event_id}" if context.get('Scheme') else URL(f'add_to_calendar/{event_id}', scheme=True)
+				result = f"{context.get('base_url')}add_to_calendar/{event_id}" if context.get('base_url') else URL(f'add_to_calendar/{event_id}', scheme=True)
 		else:
 			raise Exception(f"unknown content [[{func}]]")
 		return str(result)
@@ -214,7 +215,7 @@ def member_profile(member):
 
 #Create the header for a member message, such as a confirmation
 def msg_header(member, subject):
-	body = f"\n\n<p>{datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).strftime(DATE_FORMAT)}<br>"
+	body = f"\n\n<p>{datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).strftime("%x")}<br>"
 	body += f"{(member.Title or '')+' '}{member.Firstname} {member.Lastname} {member.Suffix or ''}<br>"
 	if member.Address1:
 		body += f"{member.Address1}<br>"
@@ -232,7 +233,7 @@ def msg_send(member,subject, message):
 	email_sender(to=email, sender=SUPPORT_EMAIL, bcc=SUPPORT_EMAIL, subject=subject, body=message)
 	
 #create confirmation of event
-def event_confirm(event_id, member_id=None, dues=0, event_only=False):
+def event_confirm(event_id, member_id=None, dues=0, event_only=False, context={}):
 	event = db.Events[event_id]
 	rows=[TR(TH('Event:', _style="text-align:left"), TD(event.Description or ''))]
 	rows.append(TR(TH('Venue:', _style="text-align:left"), TD(event.Venue or '')))
@@ -259,17 +260,17 @@ def event_confirm(event_id, member_id=None, dues=0, event_only=False):
 		rows.append(TR(TD(f"{t.Lastname}, {t.Firstname}",
 						TD(t.Affiliation.Name if t.Affiliation else ''),
 						TD(res_selection(t.id)),
-						TD(f'{CURRENCY_SYMBOL}{price:6.2f}'),
+						TD(f'{locale.currency(price, grouping=True)}', _style="text-align:right"),
 						TH(f'waitlisted' if t.Waitlist else 'no checkout' if t.Provisional else 'confirmed' if paid>=price else 'unpaid')
 		)))
 		paid -= price
 	if dues>0:
-		rows.append(TR(TH('Membership Dues', _style="text-align:left"), TD(''), TD(''), TH(f'{CURRENCY_SYMBOL}{dues:6.2f}', _style="text-align:left")))
-	rows.append(TR(TH('Total Cost', _style="text-align:left"), TD(''), TD(''), TH(f'{CURRENCY_SYMBOL}{cost + dues:6.2f}', _style="text-align:left")))
+		rows.append(TR(TH('Membership Dues', _style="text-align:left"), TD(''), TD(''), TH(f'{locale.currency(dues, grouping=True)}', _style="text-align:right")))
+	rows.append(TR(TH('Total Cost', _style="text-align:left"), TD(''), TD(''), TH(f'{locale.currency(cost + dues, grouping=True)}', _style="text-align:right")))
 	rows.append(TR(TH('Paid', _style="text-align:left"), TD(''), TD(''),
-				TH(f'{CURRENCY_SYMBOL}{event_revenue(event_id, member_id)+dues-dues_unpaid:6.2f}', _style="text-align:left")))
+				TH(f'{locale.currency(event_revenue(event_id, member_id)+dues-dues_unpaid, grouping=True)}', _style="text-align:right")))
 	if tbc + dues_unpaid>0:
-		rows.append(TR(TH('Net amount due', _style="text-align:left"), TD(''), TD(''), TH(f'{CURRENCY_SYMBOL}{tbc+dues_unpaid:6.2f}', _style="text-align:left")))
+		rows.append(TR(TH('Net amount due', _style="text-align:left"), TD(''), TD(''), TH(f'{locale.currency(tbc+dues_unpaid, grouping=True)}', _style="text-align:right")))
 	body += TABLE(*rows).__str__()
 	host_reservation = resvtns[0]
 	if host_reservation.Notes:
@@ -278,7 +279,7 @@ def event_confirm(event_id, member_id=None, dues=0, event_only=False):
 		body += f"To pay online please visit {WEB_URL}/registration/{event_id}<br>"
 						#scheme=True doesn't pick up the domain in the email_daemon!
 	else:
-		calendar_url = URL(f"add_to_calendar/{event.id}", scheme=True)
+		calendar_url = f'{context.get('base_url')}add_to_calendar/{event.id}' if context.get('base_url') else URL(f'add_to_calendar/{event.id}', scheme=True)
 		body += f'<a href="{calendar_url}">Add to calendar</a>'
 		if event.Notes and not resvtns[0].Waitlist and not resvtns[0].Provisional:
 			body += markdown.markdown(event.Notes)

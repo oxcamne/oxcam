@@ -36,7 +36,7 @@ from yatl.helpers import H5, H6, XML, TABLE, TH, TD, THEAD, TR, HTML, P, BUTTON,
 from .common import db, session, flash
 from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
 	MEMBERSHIPS, TIME_ZONE, PAGE_BANNER,\
-	ALLOWED_EMAILS, DATE_FORMAT, CURRENCY_SYMBOL, SMTP_TRANS, DB_URL
+	ALLOWED_EMAILS, SMTP_TRANS, DB_URL
 from .pay_processors import paymentprocessor
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
@@ -53,7 +53,7 @@ from .utilities import email_sender, member_good_standing, ageband, newpaiddate,
 from .session import checkaccess
 from .website import society_emails, about_content, history_content, upcoming_events
 from py4web.utils.factories import Inject
-import datetime, re, csv, decimal, pickle, markdown, dateutil
+import datetime, re, csv, decimal, pickle, markdown, dateutil, locale
 from io import StringIO
 from ics import Calendar, Event
 
@@ -131,7 +131,7 @@ def members():
 			requires=IS_EMPTY_OR(IS_IN_DB(db, 'Email_Lists', '%(Listname)s', zero="mailing?"))),
 		Field('event', 'reference Events',  default=request.query.get('event'),
 			requires=IS_EMPTY_OR(IS_IN_DB(db, 'Events',
-			lambda r: f"{r.DateTime.strftime(DATE_FORMAT)} {r.Description[:25]}",
+			lambda r: f"{r.DateTime.strftime("%x")} {r.Description[:25]}",
 			orderby=~db.Events.DateTime, zero="event?")),
 			comment="exclude/select confirmed event registrants (with/without mailing list selection) "),
 		Field('field', 'string', default=request.query.get('field'),
@@ -226,9 +226,9 @@ def members():
 					qdesc += f' {field} {operator} {value}.'
 			elif fieldtype == 'date' or fieldtype == 'datetime':
 				try:
-					date = datetime.datetime.strptime(value, DATE_FORMAT).date()
+					date = datetime.datetime.strptime(value, "%x").date()
 				except:
-					errors = f'please use {DATE_FORMAT} format for dates'
+					errors = f'please use {"%x"} format for dates'
 				if not errors:
 					if not operator or operator == '=':
 						operator = '=='
@@ -432,7 +432,7 @@ def add_member_reservation(member_id):
 				)
 
 	form=Form([Field('event', 'reference db.Events',
-		  requires=IS_IN_DB(db, 'Events', lambda r: f"{r.DateTime.strftime(DATE_FORMAT)} {r.Description[:25]}",
+		  requires=IS_IN_DB(db, 'Events', lambda r: f"{r.DateTime.strftime("%x")} {r.Description[:25]}",
 						orderby = ~db.Events.DateTime,
 			  			zero='Please select event for new reservation from dropdown.'))],
 		formstyle=FormStyleBulma)
@@ -622,7 +622,7 @@ def new_members():
 			return 'New'
 		if transaction.Timestamp.date() < transaction.Paiddate + datetime.timedelta(days=GRACE_PERIOD):
 			return 'Renewal'
-		return transaction.Paiddate.strftime(DATE_FORMAT)
+		return transaction.Paiddate.strftime("%x")
 	
 	rows = rows.find(lambda r: classify(r) != 'Renewal')
 	ids = [r.id for r in rows]
@@ -639,7 +639,7 @@ def new_members():
 					Column("College", lambda row: primary_affiliation(row.Member), required_fields=[db.AccTrans.Member, db.AccTrans.Timestamp]),
 					Column("Matr", lambda row: primary_matriculation(row.Member)),
 					Column("Status", lambda row: db.Members[row.Member].Membership),
-					Column('Date', lambda row: row.Timestamp.strftime(DATE_FORMAT)),
+					Column('Date', lambda row: row.Timestamp.strftime("%x")),
 					Column('Previous', lambda row: classify(db.AccTrans[row.id])),
 					Column("Source", lambda row: db.Members[row.Member].Source)],
 			deletable=False, details=False, editable=False, create=False,
@@ -1415,7 +1415,7 @@ def reservation():
 			flash.set("Event is full: please use +New and Checkout to add new guests to the waitlist.")
 		elif event.Capacity and attend+adding==event.Capacity:
 			flash.set(f"Please note, this fills the event; if you add another guest all unconfirmed guests will be waitlisted.")
-		dues_tbc = f" (including {CURRENCY_SYMBOL}{session['dues']} membership dues)" if session.get('dues') else ''
+		dues_tbc = f" (including {locale.currency(decimal.Decimal(session['dues']))} membership dues)" if session.get('dues') else ''
 		payment = (int(session.get('dues') or 0)) + event_unpaid(session.event_id, session.member_id)
 		if not waitlist:
 			payment += (provisional_ticket_cost or 0)
@@ -1427,9 +1427,9 @@ def reservation():
 			else:
 				header = CAT(header,  XML(f"Your place(s) are not allocated until you click the 'Checkout' button.<br>"))
 		if payment>0 and payment>int(session.get('dues') or 0):
-			header = CAT(header, XML(f"Your registration will be confirmed when your payment of {CURRENCY_SYMBOL}{payment}{dues_tbc} is received.<br>"))
+			header = CAT(header, XML(f"Your registration will be confirmed when your payment of {locale.currency(payment)}{dues_tbc} is received.<br>"))
 		elif session.get('dues'):
-			header = CAT(header, XML(f"Checkout to pay your {CURRENCY_SYMBOL}{session.dues} membership dues, or wait to see if a space becomes available."))
+			header = CAT(header, XML(f"Checkout to pay your {locale.currency(decimal.Decimal(session['dues']))} membership dues, or wait to see if a space becomes available."))
 
 		host_reservation.update_record(Checkout=str(dict(membership=session.get('membership'),
 						dues=session.get('dues'))).replace('Decimal','decimal.Decimal'),
@@ -2136,9 +2136,9 @@ def bank_file(bank_id):
 				XML(markdown.markdown(f"To download data since **{str(bkrecent.Timestamp.date()) if bkrecent else origin}**:")),
 				A('Login to Society Account', _href=bank.Bankurl, _target='blank'), XML('<br>'),
 				XML(f"{markdown.markdown(bank.HowTo)}"))
-	
-	footer = f"Current Balance = {f'{CURRENCY_SYMBOL}{bank.Balance:8.2f}'}"
-	
+
+	footer = f"Current Balance = {locale.currency(bank.Balance)}"
+
 	form = Form([Field('downloaded_file', 'upload', uploadfield = False),
 				Field('override', 'boolean', comment = ' tick to accept new transactions unconditionally, e.g. for new bank')],
 				submit_button = 'Import')
@@ -2259,8 +2259,8 @@ def bank_file(bank_id):
 					Fee = fee if fee!=0 else None, Timestamp = timestamp,
 					CheckNumber = checknumber, Reference = reference, Accrual = False, Notes = notes)
 			if account==unalloc.id: unmatched += 1
-								
-		flash.set(f'{stored} new transactions processed, {unmatched} to allocate, new balance = {CURRENCY_SYMBOL}{bank.Balance}')
+
+		flash.set(f'{stored} new transactions processed, {unmatched} to allocate, new balance = {locale.currency(bank.Balance)}')
 	except Exception as e:
 		flash.set(f"{str(row)}: {str(e)}")
 		isok = False
@@ -2303,7 +2303,7 @@ def transactions():
 				orderby = db.Members.Lastname|db.Members.Firstname, zero="member?"))),
 		Field('event', 'reference Events', default=request.query.get('event'),
 				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Events',
-				lambda r: f"{r.DateTime.strftime(DATE_FORMAT)} {r.Description[:25]}",
+				lambda r: f"{r.DateTime.strftime("%x")} {r.Description[:25]}",
 				orderby = ~db.Events.DateTime, zero="event?"))),
 		Field('notes', 'string'),
 		Field('reference', 'string')],
@@ -2419,6 +2419,7 @@ def composemail():
 	query = request.query.get('query')
 	qdesc = request.query.get('qdesc')
 	left = request.query.get('left')
+	base_url = request.url[:request.url.find('composemail')]
 
 	header = CAT(A('back', _href=request.query.get('back')), H5("Send Email"))
 	source = society_emails(session.member_id) or [SMTP_TRANS.username]
@@ -2523,7 +2524,7 @@ def composemail():
 				db.Email_Queue.insert(Subject=form2.vars['subject'], Body=form2.vars['body'], Sender=sender,
 			 		Attachment=pickle.dumps(attachment), Attachment_Filename=attachment_filename,
 					Bcc=str(bcc), Query=query, Left=left, Qdesc=qdesc,
-					Scheme=URL('index', scheme=True).replace('index', ''))
+					Base_url=base_url)
 				flash.set(f"email notice sent to '{qdesc}' ({query_count})")
 			else:
 				to = form2.vars['to']
@@ -2695,7 +2696,7 @@ XML(f"This event is open to \
 {' and members of sponsoring organizations (list at the top of the Affiliations dropdown)' if event.Sponsors else ''}\
 {' and their guests' if not event.Guests or event.Guests>1 else ''}.<br>"))
 	elif MEMBERSHIPS and not request.query.get('mail_lists'):
-		header = CAT(header, XML('<br>'.join([f"<b>{m.category} Membership</b> is open to {m.description.replace('<dues>', CURRENCY_SYMBOL+str(paymentprocessor(name=None).get_dues(m.category)))}" for m in MEMBERSHIPS])))
+		header = CAT(header, XML('<br>'.join([f"<b>{m.category} Membership</b> is open to {m.description.replace('<dues>', 	locale.currency(paymentprocessor(name=None).get_dues(m.category)))}" for m in MEMBERSHIPS])))
 
 	#gather the person's information as necessary (may have only email)
 	fields=[]
@@ -2773,7 +2774,7 @@ Please login with the email you used before{f'<em>, possibly {suggest}, </em>' i
 	form = Form(fields, validation=validate, formstyle=FormStyleBulma, keep_values=True)
 		
 	if form.accepted:
-		notes = f"{datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).strftime(DATE_FORMAT)} {form.vars.get('notes')}" if form.vars.get('notes') else ''
+		notes = f"{datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).strftime("%x")} {form.vars.get('notes')}" if form.vars.get('notes') else ''
 		if member:
 
 			if member.Notes:
@@ -2851,9 +2852,9 @@ def profile():
 	header = H5('Profile Information')
 	if member.Paiddate:
 		header = CAT(header,
-		   XML(f"Your membership {'expired' if member.Paiddate < datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date() else 'expires'} on {member.Paiddate.strftime(DATE_FORMAT)}"))
+		   XML(f"Your membership {'expired' if member.Paiddate < datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date() else 'expires'} on {member.Paiddate.strftime("%x")}"))
 	if member.Pay_next:
-		header = CAT(header, XML(f" Renewal payment will be charged on {member.Pay_next.strftime(DATE_FORMAT)}."))
+		header = CAT(header, XML(f" Renewal payment will be charged on {member.Pay_next.strftime("%x")}."))
 	header = CAT(header,
 		  XML(f"{'<br><br>' if member.Paiddate else ''}The information on this form, except as noted, is included \
 in our online Member Directory which is available through our home page to \
@@ -2927,7 +2928,7 @@ def cancel_subscription(member_id=None):
 		if not member.Paiddate:	#just joined but changed their mind?
 			member.update_record(Membership=None, Charged=None)
 
-		effective = max(member.Paiddate or datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date(), datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()).strftime(DATE_FORMAT)
+		effective = max(member.Paiddate or datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date(), datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()).strftime("%x")
 		notification(member, 'Membership Cancelled', f'Your membership is cancelled effective {effective}.<br>Thank you for your past support of the Society.')
 		flash.set(f"{member_name(member.id) if member_id else 'your'} membership is cancelled effective {effective}.")
 		redirect(request.query.back)

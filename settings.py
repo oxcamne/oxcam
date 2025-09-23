@@ -156,8 +156,6 @@ command line terminal on the server using the "locale" command.
 Use "locale -a" to see list of supported locale's.
 You can specify by replacing the empty '' above with the preferred locale
 """
-DATE_FORMAT = "%x"	#format for displaying dates based on locale
-CURRENCY_SYMBOL = "$"	#symbol to use when displaying monetary amounts
 TIME_ZONE = tz.gettz('America/New_York')
 #see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 

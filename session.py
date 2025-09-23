@@ -3,7 +3,7 @@ This file contains controllers used to manage the user's session
 """
 from py4web import URL, request, redirect, action, Field, HTTP
 from .common import db, session, flash, logger, auth
-from .settings import SUPPORT_EMAIL, TIME_ZONE, SOCIETY_SHORT_NAME, PAGE_BANNER, DATE_FORMAT,\
+from .settings import SUPPORT_EMAIL, TIME_ZONE, SOCIETY_SHORT_NAME, PAGE_BANNER,\
 		RECAPTCHA_KEY, RECAPTCHA_SECRET, VERIFY_TIMEOUT, SMTP_TRANS
 from .models import ACCESS_LEVELS, member_name, CAT
 from .utilities import email_sender
@@ -148,7 +148,7 @@ def validate(id, token):
 	rows = db((db.Members.id == db.Emails.Member) & db.Emails.Email.ilike(user.email)).select(
 				db.Members.ALL, distinct=True)
 	header = H6("Please select which of you is signing in:")
-	members = [(row.id, member_name(row.id)+(' '+row.Membership+' member until '+(row.Paiddate.strftime(DATE_FORMAT) if row.Paiddate else '')  if row.Membership else '')) for row in rows]
+	members = [(row.id, member_name(row.id)+(' '+row.Membership+' member until '+(row.Paiddate.strftime("%x") if row.Paiddate else '')  if row.Membership else '')) for row in rows]
 	form = Form([Field('member', 'integer', requires=IS_IN_SET(members))],
 	     formstyle=FormStyleBulma, csrf_protection=False)
 	if len(rows)<=1 or 'switch_email' in request.query.url:

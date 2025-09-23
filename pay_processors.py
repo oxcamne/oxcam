@@ -7,13 +7,14 @@ The @action(path) decorator exposed the function at URL:
 The actions in this file are the implementation of the Stripe payment processor
 interface
 """
+import locale
 from py4web import action, redirect, Field, request, URL
 from .common import db, session, flash
 from .models import primary_email, event_unpaid
 from .session import checkaccess
 from .utilities import notify_support, newpaiddate, msg_header, msg_send, event_confirm
 from py4web.utils.form import Form
-from .settings import CURRENCY_SYMBOL, PaymentProcessor, PAYMENTPROCESSORS, PAGE_BANNER
+from .settings import PaymentProcessor, PAYMENTPROCESSORS, PAGE_BANNER
 from yatl.helpers import H5, BEAUTIFY, CAT, XML
 from py4web.utils.factories import Inject
 import stripe, decimal, datetime, random
@@ -266,7 +267,7 @@ def stripe_view_card():
 	renewaldate = member.Pay_next.strftime('%b %d, %Y')
 	duesamount = decimal.Decimal(subscription.plan.amount)/100
 	header = CAT(H5('Membership Subscription'),
-		  XML(f"Your next renewal payment of {CURRENCY_SYMBOL}{duesamount} will be charged to {paymentmethod.card.brand.capitalize()} \
+		  XML(f"Your next renewal payment of {locale.currency(duesamount)} will be charged to {paymentmethod.card.brand.capitalize()} \
 ....{paymentmethod.card.last4} exp {paymentmethod.card.exp_month}/{paymentmethod.card.exp_year} on {renewaldate}.<br><br>"))
 	
 	form = Form([], submit_value='Update Card on File')
@@ -311,7 +312,7 @@ def stripe_checkout_success():
 		raise Exception(f"Unexpected checkout_success callback received from Stripe, member {member.id}, event {session.get('event_id')}")
 	
 	subject = 'Registration Confirmation' if tickets_tbc > 0 else 'Thank you for your membership payment'
-	message = f"{msg_header(member, subject)}<b>Received: {CURRENCY_SYMBOL}{dues + tickets_tbc}</b><br>"
+	message = f"{msg_header(member, subject)}<b>Received: {locale.currency(dues + tickets_tbc)}</b><br>"
 	
 	if dues > 0:
 		next = None

@@ -56,9 +56,6 @@ Use "locale -a" to see list of supported locale's.
 You can specify a different localeby replacing the empty '' below with the preferred locale from the list.
 """
 locale.setlocale(locale.LC_ALL, '')
-DATE_FORMAT = "%x"	#format dates based on locale: US format mm/dd/yyyy UK format would be "%d/%m/%Y"
-CURRENCY_SYMBOL = '$'	#US dollars TODO use locale.currency() to format amounts instead
-# NOTE don't currently deal with currency symbols that follow the amount
 TIME_ZONE = tz.gettz('America/New_York')
 # see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 

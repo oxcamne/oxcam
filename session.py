@@ -57,6 +57,10 @@ def login():
 	session['logged_in'] = False
 	challenge = RECAPTCHA_KEY and request.query.get('challenge')
 
+	#store base_url and locale in context table
+	store_context('base_url', request.url[:request.url.find('/login')])
+	store_context('locale', locale.getlocale()[0]+'.'+locale.getlocale()[1])
+
 	def verify_captcha(captchaData=None):
 		if captchaData is None:
 			return False
@@ -170,10 +174,6 @@ def validate(id, token):
 		session.pay_source = member.Pay_source
 	log =f"login verified {request.remote_addr} {user.email} {request.query.url or ''} {request.environ.get('HTTP_USER_AGENT')}"
 	logger.info(log)
-
-	#store base_url and locale in context table
-	store_context('base_url', request.url[:request.url.find('/validate')])
-	store_context('locale', locale.getlocale()[0]+'.'+locale.getlocale()[1])
 	redirect(request.query.url)
 
 @action('accessdenied')

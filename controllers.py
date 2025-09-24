@@ -36,7 +36,7 @@ from yatl.helpers import H5, H6, XML, TABLE, TH, TD, THEAD, TR, HTML, P, BUTTON,
 from .common import db, session, flash
 from .settings import SOCIETY_SHORT_NAME, SUPPORT_EMAIL, GRACE_PERIOD,\
 	MEMBERSHIPS, TIME_ZONE, PAGE_BANNER,\
-	ALLOWED_EMAILS, SMTP_TRANS, DB_URL
+	ALLOWED_EMAILS, SMTP_TRANS
 from .pay_processors import paymentprocessor
 from .models import ACCESS_LEVELS, CAT, A, event_attend, event_wait, member_name,\
 	member_affiliations, member_emails, primary_affiliation, primary_email,\
@@ -1647,7 +1647,7 @@ def calendar_export(event_id):
 	event_details.begin = event.DateTime.astimezone(dateutil.tz.UTC)
 	event_details.end = event.EndTime.astimezone(dateutil.tz.UTC) if event.EndTime else (event_details.begin + datetime.timedelta(hours=1))
 	event_details.location = event.Venue or ''
-	event_details.description = f"for details and to register please visit {DB_URL}/web/home"
+	event_details.description = f"for details and to register please visit {URL(f'event_page/{event.id}', scheme=True)}"
 	calendar.events.add(event_details)
 	stream.write(str(calendar))
 	flash.set("A calendar .ics file has been downloaded. Opening the file may add the event to your calendar, or you may need to open your calendar and import the file.")
@@ -2419,7 +2419,6 @@ def composemail():
 	query = request.query.get('query')
 	qdesc = request.query.get('qdesc')
 	left = request.query.get('left')
-	base_url = request.url[:request.url.find('composemail')]
 
 	header = CAT(A('back', _href=request.query.get('back')), H5("Send Email"))
 	source = society_emails(session.member_id) or [SMTP_TRANS.username]
@@ -2523,8 +2522,7 @@ def composemail():
 			if query:
 				db.Email_Queue.insert(Subject=form2.vars['subject'], Body=form2.vars['body'], Sender=sender,
 			 		Attachment=pickle.dumps(attachment), Attachment_Filename=attachment_filename,
-					Bcc=str(bcc), Query=query, Left=left, Qdesc=qdesc,
-					Base_url=base_url)
+					Bcc=str(bcc), Query=query, Left=left, Qdesc=qdesc)
 				flash.set(f"email notice sent to '{qdesc}' ({query_count})")
 			else:
 				to = form2.vars['to']

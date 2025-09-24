@@ -25,24 +25,24 @@ in a separate thread
 NOTE PythonAnywhere doesn't support threading so this runs instead
 	as a scheduled daily task, which requires a paid account
 """
-import time, os, random, pickle, datetime, re, smtplib, markdown
+import time, os, random, pickle, datetime, re, smtplib, markdown, locale
 from pathlib import Path
 from .common import db, logger
 from .settings import VISIT_WEBSITE_INSTRUCTIONS, TIME_ZONE, THREAD_SUPPORT,\
 	ALLOWED_EMAILS, SUPPORT_EMAIL, SMTP_BULK
-from .utilities import generate_hash, email_sender, template_expand
+from .utilities import generate_hash, email_sender, template_expand, get_context
 from .models import primary_email
 from .daily_maintenance import daily_maintenance
 
 def send_notice(notice):
 	query = notice.Query
 	left = notice.Left
-	base_url = notice.Base_url
+	base_url = get_context('base_url')
 	attachment = pickle.loads(notice.Attachment) if notice.Attachment else None
 	list_unsubscribe_uri = None
 	mailing = re.search(r"Mailings\.contains\((\d+)\)", notice.Query)
 	if mailing:		#using a mailing list
-		notice.Body += VISIT_WEBSITE_INSTRUCTIONS
+		notice.Body += VISIT_WEBSITE_INSTRUCTIONS.replace('base_url', base_url)
 		mailing_list = db.Email_Lists[mailing.group(1)]
 	rows = db(eval(query)).select(left=eval(notice.Left) if notice.Left else None, distinct=True)
 	#because sending may take several minutes, for fairness send in random order
@@ -58,7 +58,7 @@ def send_notice(notice):
 
 		body_expanded = template_expand(notice.Body, locals())
 		if mailing:
-			list_unsubscribe_uri = f"{base_url}unsubscribe/{row.get(db.Emails.id)}/{mailing_list.id}/{generate_hash(to)}"
+			list_unsubscribe_uri = f"{base_url}/unsubscribe/{row.get(db.Emails.id)}/{mailing_list.id}/{generate_hash(to)}"
 			body_expanded += f"<br><br><a href={list_unsubscribe_uri}?in_msg=Y>Unsubscribe</a> from '{mailing_list.Listname}' mailing list."
 
 		retry_delay = 2
@@ -90,6 +90,7 @@ def email_daemon():
 	os.chdir(path)		 #working directory py4web
 	old_now = None
 	daily_maintenance_thread = None
+	locale.setlocale(locale.LC_ALL, get_context('locale'))  #PythonAnywhere sets locale to 'C' in tasks
 	#record start time:
 	start_time = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
 	email_list = db(db.Email_Lists.id>0).select().first()

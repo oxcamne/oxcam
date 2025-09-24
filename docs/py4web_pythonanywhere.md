@@ -14,7 +14,7 @@ Edit 'Current system image' selecting the lowest (newest) entry in the dropdown.
 
 Edit all three python version selections using the dropdowns to select and save as 3.13 (or the highest available python version).
 
-Then return to the *Dashboard* tab of the Pythonanywhere console.
+Then return to the *Dashboard* tab of the Pythonanywhere console and open a bash console by clicking the big blue button at lower left. The console prompt should look like:
 
 ```bash
 14:27 ~ $

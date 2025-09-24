@@ -6,12 +6,12 @@ from .common import db, session, flash, logger, auth
 from .settings import SUPPORT_EMAIL, TIME_ZONE, SOCIETY_SHORT_NAME, PAGE_BANNER,\
 		RECAPTCHA_KEY, RECAPTCHA_SECRET, VERIFY_TIMEOUT, SMTP_TRANS
 from .models import ACCESS_LEVELS, member_name, CAT
-from .utilities import email_sender
+from .utilities import email_sender, store_context
 from yatl.helpers import A, H6, XML, P, DIV, INPUT
 from py4web.utils.form import Form, FormStyleBulma
 from pydal.validators import IS_IN_SET, IS_EMAIL, ANY_OF
 from py4web.utils.factories import Inject
-import datetime, random, requests
+import datetime, random, requests, locale
 
 preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER))
 
@@ -170,6 +170,10 @@ def validate(id, token):
 		session.pay_source = member.Pay_source
 	log =f"login verified {request.remote_addr} {user.email} {request.query.url or ''} {request.environ.get('HTTP_USER_AGENT')}"
 	logger.info(log)
+
+	#store base_url and locale in context table
+	store_context('base_url', request.url[:request.url.find('/validate')])
+	store_context('locale', locale.getlocale()[0]+'.'+locale.getlocale()[1])
 	redirect(request.query.url)
 
 @action('accessdenied')

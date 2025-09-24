@@ -8,7 +8,6 @@ Customize for your organization and instance
 SOCIETY_NAME = 'your_group_name'
 SOCIETY_SHORT_NAME = 'your_group_short_name'    # ideally, the domain name omitting the .xxx part
 				# also use as your username if using Pythonanywhere server
-WEB_URL = f'your_database_server_url'   #e.g. https://{SOCIETY_SHORT_NAME}.pythonanywhere.com/oxcam
 """
 Your logo file should be placed in py4web/apps/oxcam/static directory and its name replacing oxcamne_no_pad.png
 Your favicon.ico should also be placed in py4web/apps/oxcam/static directory. this appears on browser tabs
@@ -17,8 +16,7 @@ NOTE oxcamne_no_pad.png and favicon.ico are part of the distribution and have bo
 SOCIETY_LOGO = 'oxcamne_no_pad.png'
 
 # html trailer for email notices:
-VISIT_WEBSITE_INSTRUCTIONS = f"<br><br>Visit us at 'your_web_site_url' or 'your_social_media'"
-				# your_web_site_url might be www.{SOCIETY_SHORT_NAME}.org or similar, or {WEB_URL}/web/home
+VISIT_WEBSITE_INSTRUCTIONS = "<br><br>Visit us at base_url/web/home "
 
 from dataclasses import dataclass
 import decimal
@@ -127,9 +125,8 @@ PAGE_BANNER = f'<h4><span style="color: blue"><em>{SOCIETY_NAME}</em>\
 
 # html letterhead for email/notices:
 LETTERHEAD = f'<h2><span style="color: blue"><em>{SOCIETY_NAME}</em>\
-<img src="{WEB_URL}/static/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" /></span></h2><br><br>'
-# NOTE as this is html to be interpreted by the browser, all URLs must refer to the web, not a localhost
-
+<img src="base_url/static/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" /></span></h2><br><br>'
+# NOTE as this is html to be interpreted by the browser, on localhost will just show 'logo' instead of the logo image
 """
 To use a database other than SQLite, define the database URI and pool size.
 SQLite is built into Py4web and should be adequate except for extremely large groups.

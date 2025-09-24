@@ -27,6 +27,10 @@ db.define_table('users',
 	Field('email_sent', 'boolean', default=False),)
 db.users.email.requires = IS_NOT_IN_DB(db, db.users.email)
 
+db.define_table('context',
+	Field('name', 'string'),	#e.g. 'base_url', 'locale'
+	Field('value', 'string'),)
+
 #include OxBridge colleges, explicit sponsors; excludes Cambridge/Oxford University
 def collegelist(sponsors=[]):
 	return [(c.id, c.Name) for c in db((db.Colleges.Oxbridge==True)|(db.Colleges.id.belongs(sponsors))).select(
@@ -357,7 +361,6 @@ db.define_table('Email_Queue',	#used for notices or messages targetted via membe
 	Field('Query', 'text'),	#query used to locate targets
 	Field('Left'),	#goes with query
 	Field('Qdesc'),	#description of target list
-	Field('Base_url'),
 	Field('Modified', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None),
        			update=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False))
 	

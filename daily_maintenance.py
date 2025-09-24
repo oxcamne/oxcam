@@ -18,18 +18,21 @@ It can also be run in development using a launch.json configuration:
         },
  
 """
-import datetime
+import datetime, locale
 import os
 from pathlib import Path
 from .common import db
 from .settings import SOCIETY_SHORT_NAME, ALLOWED_EMAILS, SUPPORT_EMAIL,\
-		SOCIETY_NAME, WEB_URL, TIME_ZONE
-from .utilities import member_greeting, email_sender
+		SOCIETY_NAME, TIME_ZONE
+from .utilities import member_greeting, email_sender, get_context
 from .pay_processors import paymentprocessor
 from .models import primary_email
 
 def daily_maintenance():
 	os.chdir(Path(__file__).resolve().parent.parent.parent) #working directory py4web
+	base_url = get_context('base_url')
+	locale.setlocale(locale.LC_ALL, get_context('locale'))  #PythonAnywhere sets locale to 'C' in tasks
+
 	#keep only most recent month's backup plus monthly (month day 1) backups for one year
 	items = os.listdir(".")
 	dname = datetime.date.today().strftime("%d") + '.csv'
@@ -58,7 +61,7 @@ def daily_maintenance():
 		if (m.Paiddate - datetime.date.today()).days % interval == 0:
 			text = f"{member_greeting(m)}"
 			text += f"<p>This is a friendly reminder that your {SOCIETY_NAME} membership expiration \
-date is/was {m.Paiddate.strftime("%x")}. Please renew by <a href={WEB_URL}/my_account> logging in</a> \
+date is/was {m.Paiddate.strftime("%x")}. Please renew by <a href={base_url}/my_account> logging in</a> \
 and selecting join/renew from the menu of choices, \
 or cancel membership to receive no futher reminders.</p><p>\
 We are very grateful for your membership support and hope that you will renew!</p>\
@@ -73,7 +76,7 @@ If you have any questions, please contact {SUPPORT_EMAIL}"
 			if not ALLOWED_EMAILS:
 				text = f"{member_greeting(m)}"
 				text += f"<p>We have been unable to process your auto-renewal and as a result your membership has been cancelled. </p><p>\
-We hope you will <a href={WEB_URL}/my_account> reinstate your membership</a>, \
+We hope you will <a href={base_url}/my_account> reinstate your membership</a>, \
 but in any case we are grateful for your past support!</p>\
 If you have any questions, please contact {SUPPORT_EMAIL}"
 				db.commit()

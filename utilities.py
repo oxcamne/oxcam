@@ -4,7 +4,7 @@ This file contains functions shared by multiple controllers
 from py4web import URL, request
 from .common import db
 from .settings import TIME_ZONE, SUPPORT_EMAIL, LETTERHEAD, GRACE_PERIOD,\
-	WEB_URL, SOCIETY_SHORT_NAME, MEMBERSHIPS, SMTP_TRANS, PAGE_BANNER
+	SOCIETY_SHORT_NAME, MEMBERSHIPS, SMTP_TRANS, PAGE_BANNER
 from .models import primary_email, event_cost, member_name, res_selection,\
 	res_unitcost, event_revenue, page_name
 from .website import about_content, history_content, upcoming_events	#called to construct page content
@@ -68,7 +68,7 @@ def email_sender(
 		message['List-Unsubscribe'] = list_unsubscribe
 	if list_unsubscribe_post:
 		message['List-Unsubscribe-Post'] = list_unsubscribe_post
-	message.set_content(HTML(XML(LETTERHEAD+body)).__str__(), subtype='html')
+	message.set_content(HTML(XML(LETTERHEAD.replace("base_url", get_context('base_url'))+body)).__str__(), subtype='html')
 	if attachment:
 		message.add_attachment(attachment, maintype='application', subtype='octet-stream', filename=attachment_filename)
 	server.send_message(message)
@@ -171,7 +171,7 @@ def template_expand(text, context={}):
 		elif func=='member':
 			result = member_profile(db.Members[member_id])
 		elif func=='reservation':
-			result = event_confirm(context.get('row').get('Reservations.Event'), member_id, context=context)
+			result = event_confirm(context.get('row').get('Reservations.Event'), member_id)
 		elif func.startswith('upcoming_events'):
 			result = upcoming_events()
 		elif func.startswith('history_content'):
@@ -184,9 +184,9 @@ def template_expand(text, context={}):
 			if not event_id:
 				raise Exception(f"[[{func}]] can't be used in this context")
 			if func=='registration_link':
-				result = f"{context.get('base_url')}registration/{event_id}" if context.get('base_url') else URL(f'registration/{event_id}', scheme=True)
+				result = f"{get_context('base_url')}/registration/{event_id}"
 			else:
-				result = f"{context.get('base_url')}add_to_calendar/{event_id}" if context.get('base_url') else URL(f'add_to_calendar/{event_id}', scheme=True)
+				result = f"{get_context('base_url')}/add_to_calendar/{event_id}"
 		else:
 			raise Exception(f"unknown content [[{func}]]")
 		return str(result)
@@ -233,7 +233,7 @@ def msg_send(member,subject, message):
 	email_sender(to=email, sender=SUPPORT_EMAIL, bcc=SUPPORT_EMAIL, subject=subject, body=message)
 	
 #create confirmation of event
-def event_confirm(event_id, member_id=None, dues=0, event_only=False, context={}):
+def event_confirm(event_id, member_id=None, dues=0, event_only=False):
 	event = db.Events[event_id]
 	rows=[TR(TH('Event:', _style="text-align:left"), TD(event.Description or ''))]
 	rows.append(TR(TH('Venue:', _style="text-align:left"), TD(event.Venue or '')))
@@ -276,10 +276,10 @@ def event_confirm(event_id, member_id=None, dues=0, event_only=False, context={}
 	if host_reservation.Notes:
 		body += f"<b>Notes:</b> {host_reservation.Notes}<br>"
 	if tbc + dues_unpaid>0:
-		body += f"To pay online please visit {WEB_URL}/registration/{event_id}<br>"
+		body += f"To pay online please visit {get_context('base_url')}/registration/{event_id}<br>"
 						#scheme=True doesn't pick up the domain in the email_daemon!
 	else:
-		calendar_url = f'{context.get('base_url')}add_to_calendar/{event.id}' if context.get('base_url') else URL(f'add_to_calendar/{event.id}', scheme=True)
+		calendar_url = f'{get_context('base_url')}/add_to_calendar/{event.id}'
 		body += f'<a href="{calendar_url}">Add to calendar</a>'
 		if event.Notes and not resvtns[0].Waitlist and not resvtns[0].Provisional:
 			body += markdown.markdown(event.Notes)
@@ -335,3 +335,15 @@ def encode_url(url):
 #decode encoded something, usually URL, from a referrer parameter
 def decode_url(code):
 	return base64.b16decode(code.encode("utf8")).decode("utf8")
+
+def store_context(name, value):
+	c = db(db.context.name==name).select().first()
+	if c:
+		c.update_record(value=value)
+	else:
+		db.context.insert(name=name, value=value)
+	db.commit()
+
+def get_context(name):
+	c = db(db.context.name==name).select().first()
+	return c.value if c else None

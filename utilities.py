@@ -351,5 +351,5 @@ def get_context(name):
 def start_daemon():
 	daemon = get_context('daemon')
 	if not daemon or not psutil.pid_exists(int(daemon)):
-		p = subprocess.Popen(['python', 'py4web.py', 'call', 'apps', 'oxcam.email_daemon.email_daemon'])
+		p = subprocess.Popen(['python', 'py4web', 'call', 'apps', 'oxcam.email_daemon.email_daemon'])
 		set_context('daemon', str(p.pid))

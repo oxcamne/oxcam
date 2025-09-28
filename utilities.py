@@ -9,7 +9,7 @@ from .models import primary_email, event_cost, member_name, res_selection,\
 	res_unitcost, event_revenue, page_name
 from .website import about_content, history_content, upcoming_events	#called to construct page content
 from yatl.helpers import A, TABLE, TH, THEAD, H6, TR, TD, CAT, HTML, XML
-import datetime, re, smtplib, markdown, base64, decimal, locale
+import datetime, re, smtplib, markdown, base64, decimal, locale, subprocess, psutil
 from email.message import EmailMessage
 
 #check if member is in good standing at a particular date
@@ -336,7 +336,7 @@ def encode_url(url):
 def decode_url(code):
 	return base64.b16decode(code.encode("utf8")).decode("utf8")
 
-def store_context(name, value):
+def set_context(name, value):
 	c = db(db.context.name==name).select().first()
 	if c:
 		c.update_record(value=value)
@@ -347,3 +347,9 @@ def store_context(name, value):
 def get_context(name):
 	c = db(db.context.name==name).select().first()
 	return c.value if c else None
+
+def start_daemon():
+	daemon = get_context('daemon')
+	if not daemon or not psutil.pid_exists(int(daemon)):
+		p = subprocess.Popen(['python', 'py4web.py', 'call', 'apps', 'oxcam.email_daemon.email_daemon'])
+		set_context('daemon', str(p.pid))

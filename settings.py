@@ -185,12 +185,6 @@ PAGE_BANNER = f'<h4><span style="color: blue"><em>{SOCIETY_NAME}</em>\
 LETTERHEAD = f'<h2><span style="color: blue"><em>{SOCIETY_NAME}</em>\
 <img src="base_url/static/{SOCIETY_LOGO}" alt="logo" style="float:left;width:100px" /></span></h2><br><br>'
 
-# if True, run email daemon & daily maintenance in server threads
-THREAD_SUPPORT = False
-# Note, PythonAnywhere doesn't support threads, must run
-# these processes as scheduled tasks. Set True if your
-# environment supports threads, e.g. in development environment.
-
 # access levels for group administrators DO NOT CHANGE, used in @checkaccess(None|any)
 ACCESS_LEVELS = ['read', 'write', 'accounting', 'admin']
 

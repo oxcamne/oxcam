@@ -101,28 +101,18 @@ In the dashboard 'Installed Applications' section, click on the 'oxcam' app. The
 
 This is a Python file, and the Dashboard's editor is python aware, so it will flag any syntax errors. The file is self documented, go through it carefully to make the necessary customizations.
 
-### Scheduled Tasks
+### Subproceses
 
-Oxcam uses two additional tasks that run separately from the web server.
-If your environment supports threads, and you configure 'THREAD_SUPPORT = True',
-nothing more is needed:
+Oxcam uses two additional subprocesses that run separately from the web server.
+You should not need to pay attention, these are started automatically as subprocesses by the web server.
 
-- the email daemon runs all the time in its own thread. It's role is to spool
+- the email daemon runs all the time in its own subprocess. It's role is to spool
 out notices to a mailing list or other selection of members. These emails may
 be customized with a greeting or other information, such as registration details.
 
 - the daily maintenance task is triggered at midnight local time each day. It's
 role is to send out any necessary membership renewal reminders, and to generate
 a database backup .csv file. It retains on the local drive the last month's daily files, and files from the 1st of each month for a year.
-
-In the PythonAnywhere enviroment, the email daemon is configured as a 'run forever'
-task, and the daily maintenance job is scheduled at a fixed UTC time daily. The commands to use are:
-
-```bash
-py4web/py4web.py call py4web/apps oxcam.email_daemon.email_daemon
-
-py4web/py4web.py call py4web/apps oxcam.daily_maintenance.daily_maintenance
-```
 
 ### How to update the oxcam app when a newer version is released
 

@@ -1,35 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-FOR Pythonanywhere THIS RUNS AS AN ALWAYS ON TASK
-In development, it can be run using this configuration in launch.json:
+This runs in it's own thread as a subprocess, started by __init__.py
 
-        {
-            "name": "Python: email",
-            "type": "python",
-            "request": "launch",
-            "program": "py4web.py",
-            "args": [
-                "call", "apps", "oxcam.email_daemon.email_daemon"
-            ],
-            "console": "integratedTerminal",
-            "justMyCode": false
-        }
-  
-IDEALLY:
-This runs in it's own thread as a daemon, started by __init__.py
-
-It also spawns the daily maintenance and backup thread at midnight local time,
-in a separate thread
-
-NOTE PythonAnywhere doesn't support threading so this runs instead
-	as a scheduled daily task, which requires a paid account
+It also spawns the daily maintenance and backup subprocess at midnight local time,
+as a separate subprocess.
 """
+import subprocess
 import time, os, random, pickle, datetime, re, smtplib, markdown, locale
 from pathlib import Path
 from .common import db, logger
-from .settings import VISIT_WEBSITE_INSTRUCTIONS, TIME_ZONE, THREAD_SUPPORT,\
-	ALLOWED_EMAILS, SUPPORT_EMAIL, SMTP_BULK
+from .settings import VISIT_WEBSITE_INSTRUCTIONS, TIME_ZONE, ALLOWED_EMAILS, SUPPORT_EMAIL, SMTP_BULK
 from .utilities import generate_hash, email_sender, template_expand, get_context
 from .models import primary_email
 from .daily_maintenance import daily_maintenance
@@ -106,11 +87,9 @@ def email_daemon():
 			break	#exit this thread if reloaded
 		now = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)
 
-		if THREAD_SUPPORT:
-			if old_now and now.date()!=old_now.date():
-				from threading import Thread
-				daily_maintenance_thread = Thread(target=daily_maintenance, daemon=True)
-				daily_maintenance_thread.start()
+		# spawn daily maintenance at midnight
+		if old_now and now.date()!=old_now.date():
+			subprocess.Popen(['python', 'py4web.py', 'call', 'apps', 'oxcam.daily_maintenance.daily_maintenance'])
 	
 		notice = db(db.Email_Queue.id > 0).select().first()
 		#logger.info(f"queue {db(db.Email_Queue.id > 0).count()}")

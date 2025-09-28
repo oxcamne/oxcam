@@ -6,14 +6,16 @@ from .common import db, session, flash, logger, auth
 from .settings import SUPPORT_EMAIL, TIME_ZONE, SOCIETY_SHORT_NAME, PAGE_BANNER,\
 		RECAPTCHA_KEY, RECAPTCHA_SECRET, VERIFY_TIMEOUT, SMTP_TRANS
 from .models import ACCESS_LEVELS, member_name, CAT
-from .utilities import email_sender, store_context
+from .utilities import email_sender, set_context, start_daemon, get_context
 from yatl.helpers import A, H6, XML, P, DIV, INPUT
 from py4web.utils.form import Form, FormStyleBulma
 from pydal.validators import IS_IN_SET, IS_EMAIL, ANY_OF
 from py4web.utils.factories import Inject
-import datetime, random, requests, locale
+import datetime, random, requests, locale, psutil
 
 preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER))
+
+startup_done = False
 
 """
 decorator for validating login & access permission using a one-time code
@@ -26,6 +28,18 @@ for an explanation see the blog article from which I cribbed
 def checkaccess(requiredaccess):
 	def wrap(f):
 		def wrapped_f(*args, **kwds):
+			global startup_done
+			if not startup_done:
+				daemon = get_context('daemon')
+				if daemon:
+					try:
+						p = psutil.Process(int(daemon))
+						p.terminate()
+					except Exception:
+						pass
+				start_daemon()	#ensure email daemon is running
+				startup_done = True
+
 			if not SMTP_TRANS:	#settings_private.py not yet set up
 				redirect(URL('setup_settings_private'))
 			if not db(db.Colleges.id>0).count() and not session.logged_in:	#database not loaded yet
@@ -58,8 +72,8 @@ def login():
 	challenge = RECAPTCHA_KEY and request.query.get('challenge')
 
 	#store base_url and locale in context table
-	store_context('base_url', request.url[:request.url.find('/login')])
-	store_context('locale', locale.getlocale()[0]+'.'+locale.getlocale()[1])
+	set_context('base_url', request.url[:request.url.find('/login')])
+	set_context('locale', locale.getlocale()[0]+'.'+locale.getlocale()[1])
 
 	def verify_captcha(captchaData=None):
 		if captchaData is None:

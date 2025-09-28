@@ -135,12 +135,6 @@ DB_URI = f"mysql://{SOCIETY_SHORT_NAME}:<--- database password here --->@{SOCIET
 DB_POOL_SIZE = 10
 """
 
-# if True, run email daemon & daily maintenance in server threads
-THREAD_SUPPORT = False
-# Note, PythonAnywhere doesn't support threads, must run
-# these processes as scheduled tasks. Set True if your
-# environment supports threads, e.g. in development environment.
-
 GRACE_PERIOD = 45
 """
 Renewal within this number of days after expiration extends membership

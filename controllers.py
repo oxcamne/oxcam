@@ -49,13 +49,14 @@ from pydal.validators import IS_LIST_OF_EMAILS, IS_EMPTY_OR, IS_IN_DB, IS_IN_SET
 from .utilities import email_sender, member_good_standing, ageband, newpaiddate,\
 	tdnum, get_banks, financial_content, event_confirm, msg_header, msg_send,\
 	notification, notify_support, member_profile, generate_hash,\
-	encode_url, pages_menu, template_expand
+	encode_url, pages_menu, template_expand, start_daemon
 from .session import checkaccess
 from .website import society_emails, about_content, history_content, upcoming_events
 from py4web.utils.factories import Inject
 import datetime, re, csv, decimal, pickle, markdown, dateutil, locale
 from io import StringIO
 from ics import Calendar, Event
+import subprocess, psutil
 
 preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER))
 preferred_public = action.uses("gridform_public.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER))
@@ -2520,6 +2521,8 @@ def composemail():
 
 		if body_expanded:
 			if query:
+				start_daemon()		# first check daemon is running, start if not
+
 				db.Email_Queue.insert(Subject=form2.vars['subject'], Body=form2.vars['body'], Sender=sender,
 			 		Attachment=pickle.dumps(attachment), Attachment_Filename=attachment_filename,
 					Bcc=str(bcc), Query=query, Left=left, Qdesc=qdesc)

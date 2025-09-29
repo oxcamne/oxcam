@@ -119,9 +119,9 @@ In the PythonAnywhere enviroment, the email daemon is configured as a 'run forev
 task, and the daily maintenance job is scheduled at a fixed UTC time daily. The commands to use are:
 
 ```bash
-py4web/py4web.py call py4web/apps oxcam.email_daemon.email_daemon
+py4web call py4web/apps oxcam.email_daemon.email_daemon
 
-py4web/py4web.py call py4web/apps oxcam.daily_maintenance.daily_maintenance
+py4web call py4web/apps oxcam.daily_maintenance.daily_maintenance
 ```
 
 ### How to update the oxcam app when a newer version is released

@@ -1,5 +1,5 @@
 # check compatibility
-import py4web, threading
+import py4web
 
 assert py4web.check_compatible("0.1.20190709.1")
 
@@ -10,6 +10,6 @@ from .models import db
 from . import pay_processors, daily_maintenance, email_daemon, session, tools, website, controllers
 
 # optional parameters
-__version__ = "0.0.0"
+__version__ = "1.1.6"
 __author__ = "dgmanns@gmail.com"
 __license__ = "BSDv3"

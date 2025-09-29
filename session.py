@@ -4,14 +4,14 @@ This file contains controllers used to manage the user's session
 from py4web import URL, request, redirect, action, Field, HTTP
 from .common import db, session, flash, logger, auth
 from .settings import SUPPORT_EMAIL, TIME_ZONE, SOCIETY_SHORT_NAME, PAGE_BANNER,\
-		RECAPTCHA_KEY, RECAPTCHA_SECRET, VERIFY_TIMEOUT, SMTP_TRANS
+		RECAPTCHA_KEY, RECAPTCHA_SECRET, VERIFY_TIMEOUT, SMTP_TRANS, THREAD_SUPPORT
 from .models import ACCESS_LEVELS, member_name, CAT
 from .utilities import email_sender, store_context
 from yatl.helpers import A, H6, XML, P, DIV, INPUT
 from py4web.utils.form import Form, FormStyleBulma
 from pydal.validators import IS_IN_SET, IS_EMAIL, ANY_OF
 from py4web.utils.factories import Inject
-import datetime, random, requests, locale
+import datetime, random, requests, locale, threading
 
 preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER))
 
@@ -23,13 +23,27 @@ for an explanation see the blog article from which I cribbed
 	https://www.artima.com/weblogs/viewpost.jsp?thread=240845#decorator-functions-with-decorator-arguments
 
 """
+
+startup_done = False
+database_loaded = False
+
 def checkaccess(requiredaccess):
 	def wrap(f):
 		def wrapped_f(*args, **kwds):
-			if not SMTP_TRANS:	#settings_private.py not yet set up
-				redirect(URL('setup_settings_private'))
-			if not db(db.Colleges.id>0).count() and not session.logged_in:	#database not loaded yet
-				redirect(URL('login', vars=dict(url=URL('db_restore'))))
+			global startup_done, database_loaded
+			if not startup_done:	#run once at first call
+				if not SMTP_TRANS:	#settings_private.py not yet set up
+					redirect(URL('setup_settings_private'))
+				startup_done = True
+				if THREAD_SUPPORT:      #run the email daemon in it's own thread 
+					# NOTE Pythonanywhere doesn't support threading
+					from .email_daemon import email_daemon
+					thread = threading.Thread(target=email_daemon, daemon=True)
+					thread.start()
+			if not database_loaded:
+				if not db(db.Colleges.id>0).count() and not session.logged_in:	#database not loaded yet
+					redirect(URL('login', vars=dict(url=URL('db_restore'))))
+				database_loaded = True
 			member_id = session.member_id
 			if member_id:
 				member = db(db.Members.id == member_id).select(db.Members.Access).first()

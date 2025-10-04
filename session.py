@@ -25,7 +25,6 @@ for an explanation see the blog article from which I cribbed
 """
 
 startup_done = False
-database_loaded = False
 
 def checkaccess(requiredaccess):
 	def wrap(f):
@@ -40,10 +39,8 @@ def checkaccess(requiredaccess):
 					from .email_daemon import email_daemon
 					thread = threading.Thread(target=email_daemon, daemon=True)
 					thread.start()
-			if not database_loaded:
-				if not db(db.Colleges.id>0).count() and not session.logged_in:	#database not loaded yet
-					redirect(URL('login', vars=dict(url=URL('db_restore'))))
-				database_loaded = True
+			if not db(db.Colleges.id>0).count():	#database not loaded yet
+				redirect(URL('login', vars=dict(url=URL('db_restore'))))
 			member_id = session.member_id
 			if member_id:
 				member = db(db.Members.id == member_id).select(db.Members.Access).first()

@@ -39,7 +39,7 @@ def checkaccess(requiredaccess):
 					from .email_daemon import email_daemon
 					thread = threading.Thread(target=email_daemon, daemon=True)
 					thread.start()
-			if not db(db.Colleges.id>0).count():	#database not loaded yet
+			if not db(db.Colleges.id>0).count() and not session.logged_in:	#database not loaded yet
 				redirect(URL('login', vars=dict(url=URL('db_restore'))))
 			member_id = session.member_id
 			if member_id:
@@ -175,7 +175,7 @@ def validate(id, token):
 	
 	session['logged_in'] = True
 	session.email = user.email
-	session.access = None
+	session.access = 'admin' if db(db.Members.id>0).count() == 0 else None
 	session.member_id = None
 	session.pay_source = None
 	if member_id:

@@ -116,7 +116,7 @@ you no longer have access to your old email, please contact {A(SUPPORT_EMAIL, _h
 				redirect(URL('login', vars=dict(challenge=True, url=request.query.url)))	#not trusted email/IP, challenge with recaptcha
 			if user:
 				user.update_record(remote_addr = request.remote_addr, trusted = False, email_sent = False)
-				if datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > user.when_issued + datetime.timedelta(minutes = 15):
+				if user.when_issued and datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > user.when_issued + datetime.timedelta(minutes = 15):
 					user.update_record(tokens=None)	#clear old expired tokens
 			else:
 				user = db.users[db.users.insert(email=form.vars.get('email'), remote_addr = request.remote_addr)]

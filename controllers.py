@@ -1647,7 +1647,7 @@ def calendar_export(event_id):
 	event_details.begin = event.DateTime.astimezone(dateutil.tz.UTC)
 	event_details.end = event.EndTime.astimezone(dateutil.tz.UTC) if event.EndTime else (event_details.begin + datetime.timedelta(hours=1))
 	event_details.location = event.Venue or ''
-	event_details.description = f"for details and to register please visit {URL(f'event_page/{event.id}', scheme=True)}"
+	event_details.description = f'{URL("web/home", scheme=True)}'
 	calendar.events.add(event_details)
 	stream.write(str(calendar))
 	flash.set("A calendar .ics file has been downloaded. Opening the file may add the event to your calendar, or you may need to open your calendar and import the file.")

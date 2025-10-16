@@ -49,7 +49,7 @@ from pydal.validators import IS_LIST_OF_EMAILS, IS_EMPTY_OR, IS_IN_DB, IS_IN_SET
 from .utilities import email_sender, member_good_standing, ageband, newpaiddate,\
 	tdnum, get_banks, financial_content, event_confirm, msg_header, msg_send,\
 	notification, notify_support, member_profile, generate_hash,\
-	encode_url, pages_menu, template_expand
+	encode_url, pages_menu, template_expand, get_context
 from .session import checkaccess
 from .website import society_emails, about_content, history_content, upcoming_events
 from py4web.utils.factories import Inject
@@ -1172,7 +1172,7 @@ def assign_tables(event_id):
 
 	#display table counts before assignment form and detailed assignment grid
 	tablecount = db.Reservations.Table.count()
-	db(eval(query)).select(db.Reservations.Table, tablecount, orderby=db.Reservations.Table, groupby=db.Reservations.Table,)
+	db(eval(query+'&(db.Reservations.Table!="")')).select(db.Reservations.Table, tablecount, orderby=db.Reservations.Table, groupby=db.Reservations.Table,)
 	form = Grid(eval(query), orderby=db.Reservations.Table, groupby=db.Reservations.Table,
 			 columns=[db.Reservations.Table,
 					Column('Count', lambda row: row[tablecount] or '', required_fields=[tablecount])],
@@ -1183,7 +1183,7 @@ def assign_tables(event_id):
 		Field('assign', 'string', requires=IS_NOT_EMPTY(), default=request.query.get('assign')),
 		Field('host', 'reference Members', requires=IS_IN_DB(db(
 			(db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)&(db.Reservations.Host==True)),
-			db.Reservations.Member, '%(Lastname)s, %(Firstname)s', zero='host member?')),],
+			db.Reservations.Member, '%(Lastname)s, %(Firstname)s %(Table)s', zero='host member?')),],
 		formstyle=FormStyleBulma, submit_value='Submit')
 	search_form.structure.find("#no_table_assign")[0]["_placeholder"] = "table?"
 
@@ -1203,9 +1203,11 @@ def assign_tables(event_id):
 									_href=URL(f"manage_reservation/{row.Reservations.Member}/{event_id}",
 									vars=dict(back=back)), _style='white-space: normal')),
 					required_fields=[db.Reservations.Host, db.Reservations.Lastname, db.Reservations.Firstname, db.Reservations.Member]),
-				db.Members.Membership, db.Reservations.Affiliation,
+				Column('Membership', lambda r: r['Members']['Membership'] or '', required_fields=[db.Members.Membership]),
+				Column('Affiliation', lambda r: db.Colleges[r.Reservations.Affiliation].Name if r.Reservations.Affiliation else '', required_fields=[db.Reservations.Affiliation]),
 				Column('Matr', lambda row: primary_matriculation(row.Reservations.Member) if row.Reservations.Host else ''),
-				db.Reservations.Notes, db.Reservations.Table,
+				Column('Notes', lambda row: row.Reservations.Notes or '', required_fields=[db.Reservations.Notes]),
+				db.Reservations.Table,
 			],
 			details=False, editable=False, create=False,
 			deletable=False, search_form=search_form,
@@ -1637,6 +1639,7 @@ def doorlist_export(event_id):
 @action('calendar_export/<event_id:int>', method=['GET'])
 @action.uses("download.html", db, session, flash, Inject(response=response))
 def calendar_export(event_id):
+	base_url = get_context('base_url')
 	event = db.Events[event_id]
 	stream = StringIO()
 	content_type = "text/calendar"
@@ -1644,12 +1647,12 @@ def calendar_export(event_id):
 	calendar = Calendar()
 	event_details = Event()
 	event_details.name = f"{SOCIETY_SHORT_NAME}: {event.Description}"
-	event_details.begin = event.DateTime.astimezone(dateutil.tz.UTC)
-	event_details.end = event.EndTime.astimezone(dateutil.tz.UTC) if event.EndTime else (event_details.begin + datetime.timedelta(hours=1))
+	event_details.begin = event.DateTime.replace(tzinfo=TIME_ZONE)
+	event_details.end = event.EndTime.replace(tzinfo=TIME_ZONE) if event.EndTime else (event_details.begin + datetime.timedelta(hours=1))
 	event_details.location = event.Venue or ''
-	event_details.description = f'{URL("web/home", scheme=True)}'
+	event_details.description = f'<a href="{base_url}/web/home">visit website for details/registration</a>'
 	calendar.events.add(event_details)
-	stream.write(str(calendar))
+	stream.write(calendar.serialize())
 	flash.set("A calendar .ics file has been downloaded. Opening the file may add the event to your calendar, or you may need to open your calendar and import the file.")
 	return locals()
 

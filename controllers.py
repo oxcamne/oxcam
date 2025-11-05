@@ -1179,19 +1179,19 @@ def assign_tables(event_id):
 			grid_class_style=grid_style, rows_per_page=100, formstyle=form_style)
 
 	search_form = Form([
-		Field('assign', 'string', requires=IS_NOT_EMPTY(), default=request.query.get('assign')),
+		Field('assign', 'string', default=request.query.get('assign')),
 		Field('host', 'reference Members', requires=IS_IN_DB(db(
 			(db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)&(db.Reservations.Host==True)),
-			db.Reservations.Member, '%(Lastname)s, %(Firstname)s %(Table)s', zero='host member?')),],
+			db.Reservations.Member, '%(Lastname)s, %(Firstname)s %(Table)s', zero='host member?')),
+			],
 		formstyle=FormStyleBulma, submit_value='Submit')
 	search_form.structure.find("#no_table_assign")[0]["_placeholder"] = "table?"
 
 	if search_form.accepted:	#Assign button clicked
 		select_vars = {}
-		if search_form.vars.get('assign'):
-			select_vars['assign'] = search_form.vars.get('assign')
-			if search_form.vars.get('host'):
-				db(eval(query+"&(db.Reservations.Member==search_form.vars.get('host'))")).update(Table=search_form.vars.get('assign'))
+		select_vars['assign'] = search_form.vars.get('assign')
+		if search_form.vars.get('host'):
+			db(eval(query+"&(db.Reservations.Member==search_form.vars.get('host'))")).update(Table=(search_form.vars.get('assign') or ''))
 		redirect(URL(f"assign_tables/{event_id}", vars=select_vars))
 
 	grid = Grid(eval(query), left = db.Members.on(db.Members.id==db.Reservations.Member),
@@ -1329,9 +1329,6 @@ Deleting or moving member on/off waitlist will also affect all guests."))
 			flash.set("Error(s) in form, please check")
 			return
 		if (form.vars.get('id') and (int(form.vars.get('id')) == host_reservation.id)):
-			if form.vars.get('Table') != host_reservation.Table:
-				for row in all_guests:
-					row.update_record(Table = form.vars.get('Table'))
 			if form.vars.get('Waitlist') != host_reservation.Waitlist or form.vars.get('Provisional') != host_reservation.Provisional:
 				for row in all_guests:
 					if row.id != host_reservation.id and (not row.Provisional or host_reservation.Provisional):

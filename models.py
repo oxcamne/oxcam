@@ -334,7 +334,7 @@ db.define_table('Reservations',
 	Field('Checked_in', 'boolean', default=False, writable=False),
 	
 	#following fields meaningfull only on the member's own reservation (Host==True)
-	Field('Table', 'string', default=''),	#table assignment (same for all party members, edit host only)
+	Field('Table', 'string', default='', comment="use Table Assignment Tool", writable=False),	#table assignment
 	Field('Survey_', 'reference Event_Survey', writable=False), #survey response (host only)
 	Field('Comment', 'string', writable=False),	#answer to open ended question (host only)
 	Field('Charged', 'decimal(6,2)', writable=False),	#payment made, not yet downloaded from Stripe

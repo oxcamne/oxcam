@@ -897,7 +897,8 @@ def survey(event_id):
 
 	event=db.Events[event_id]
 	db.Event_Survey.Event.default=event_id
-	modifiable = write and db((db.Reservations.Event==event_id)&(db.Reservations.Survey_!=None)).count()==0
+	question = db((db.Event_Survey.Event==event_id)).select(orderby=db.Event_Survey.id).first()
+	maydelete = write and db((db.Reservations.Event==event_id)&(db.Reservations.Survey_!=None)).count()==0
 
 	header = CAT(A('back', _href=back),
 		  		H5('Event Survey'),
@@ -923,7 +924,7 @@ def survey(event_id):
 				Column('chosen', lambda t: count(t.id))],
 			details=False, create=write,
 			editable=lambda t: write and db(db.Reservations.Survey_==t.id).count()==0,
-			deletable=lambda t: write and db(db.Reservations.Survey_==t.id).count()==0,
+			deletable=lambda t: write and db(db.Reservations.Survey_==t.id).count()==0 and (t.id!=question.id or maydelete),
 			validation=validation, search_queries=[],
 			grid_class_style=grid_style,
 			formstyle=form_style, show_id=True
@@ -1168,11 +1169,9 @@ def assign_tables(event_id):
 		
 	back = request.url
 
-	query = f"(db.Reservations.Event=={event_id})&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)"
-
 	#display table counts before assignment form and detailed assignment grid
+	query = f"(db.Reservations.Event=={event_id})&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)"
 	tablecount = db.Reservations.Table.count()
-	db(eval(query+'&(db.Reservations.Table!="")')).select(db.Reservations.Table, tablecount, orderby=db.Reservations.Table, groupby=db.Reservations.Table,)
 	form = Grid(eval(query), orderby=db.Reservations.Table, groupby=db.Reservations.Table,
 			 columns=[db.Reservations.Table,
 					Column('Count', lambda row: row[tablecount] or '', required_fields=[tablecount])],
@@ -1308,6 +1307,7 @@ Deleting or moving member on/off waitlist will also affect all guests."))
 			db.Reservations.Survey_.readable=False
 			db.Reservations.Checkout.readable=False
 			db.Reservations.Comment.readable=False
+			db.Reservations.Table.default = host_reservation.Table
 		else:
 			#creating or revising the host reservation
 			db.Reservations.Title.default = member.Title
@@ -1519,6 +1519,7 @@ def reservation():
 			db.Reservations.Lastname.writable=True
 			db.Reservations.Provisional.default=not host_reservation.Waitlist
 			db.Reservations.Waitlist.default=host_reservation.Waitlist
+			db.Reservations.Table.default=host_reservation.Table
 		else:
 			#creating or revising the host reservation
 			db.Reservations.Title.default = member.Title

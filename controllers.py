@@ -1182,7 +1182,7 @@ def assign_tables(event_id):
 		Field('assign', 'string', default=request.query.get('assign')),
 		Field('host', 'reference Members', requires=IS_IN_DB(db(
 			(db.Reservations.Event==event_id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)&(db.Reservations.Host==True)),
-			db.Reservations.Member, '%(Lastname)s, %(Firstname)s %(Table)s', zero='host member?')),
+			db.Reservations.Member, '%(Table)s %(Lastname)s, %(Firstname)s', zero='host member?')),
 			],
 		formstyle=FormStyleBulma, submit_value='Submit')
 	search_form.structure.find("#no_table_assign")[0]["_placeholder"] = "table?"
@@ -1302,7 +1302,7 @@ Deleting or moving member on/off waitlist will also affect all guests."))
 			db.Reservations.Lastname.writable=True
 			db.Reservations.Provisional.default=not host_reservation.Waitlist
 			db.Reservations.Waitlist.default=host_reservation.Waitlist
-			db.Reservations.Table.readable=db.Reservations.Table.writable=False
+			db.Reservations.Table.readable=False
 			db.Reservations.Charged.readable=False
 			db.Reservations.Survey_.readable=False
 			db.Reservations.Checkout.readable=False
@@ -1473,7 +1473,6 @@ def reservation():
 		db.Reservations.Waitlist.readable = False
 		db.Reservations.Checked_in.readable = False
 		db.Reservations.Table.readable = False
-		db.Reservations.Table.writable = False
 
 		if host_reservation:
 			#update member's name from member record in case corrected
@@ -1753,9 +1752,7 @@ def pages():
 			parent = db.Pages[form.vars.get('Parent')]
 			if parent.Parent:
 				form.errors['Parent']="Only 2 levels of nesting are allowed"
-			if form.vars.get('Parent')==form.vars.get('Root'):
-				form.errors['Parent']="Parent should not be the same as Root"
-			if parent.Root != int(form.vars.get('Root')):
+			if parent.Root != int(form.vars.get('Root')) and form.vars.get('Root')!=form.vars.get('Parent'):
 				form.errors['Parent']="Parent should be in the same tree as Root"
 		
 		if len(form.errors)>0:

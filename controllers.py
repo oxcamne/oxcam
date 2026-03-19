@@ -54,8 +54,8 @@ from .session import checkaccess
 from .website import society_emails, about_content, history_content, upcoming_events
 from py4web.utils.factories import Inject
 import datetime, re, csv, decimal, pickle, markdown, dateutil, locale
-from io import StringIO
-from ics import Calendar, Event
+from io import StringIO, BytesIO
+from icalendar import Calendar, Event  # Updated import
 
 preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER))
 preferred_public = action.uses("gridform_public.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER))
@@ -131,7 +131,7 @@ def members():
 			requires=IS_EMPTY_OR(IS_IN_DB(db, 'Email_Lists', '%(Listname)s', zero="mailing?"))),
 		Field('event', 'reference Events',  default=request.query.get('event'),
 			requires=IS_EMPTY_OR(IS_IN_DB(db, 'Events',
-			lambda r: f"{r.DateTime.strftime("%x")} {r.Description[:25]}",
+			lambda r: f"{r.DateTime.strftime('%x')} {r.Description[:25]}",
 			orderby=~db.Events.DateTime, zero="event?")),
 			comment="exclude/select confirmed event registrants (with/without mailing list selection) "),
 		Field('field', 'string', default=request.query.get('field'),
@@ -432,7 +432,7 @@ def add_member_reservation(member_id):
 				)
 
 	form=Form([Field('event', 'reference db.Events',
-		  requires=IS_IN_DB(db, 'Events', lambda r: f"{r.DateTime.strftime("%x")} {r.Description[:25]}",
+		  requires=IS_IN_DB(db, 'Events', lambda r: f"{r.DateTime.strftime('%x')} {r.Description[:25]}",
 						orderby = ~db.Events.DateTime,
 			  			zero='Please select event for new reservation from dropdown.'))],
 		formstyle=FormStyleBulma)
@@ -1315,8 +1315,6 @@ Deleting or moving member on/off waitlist will also affect all guests."))
 			db.Reservations.Lastname.default = member.Lastname
 			db.Reservations.Firstname.readable=db.Reservations.Lastname.readable=False
 			db.Reservations.Suffix.default = member.Suffix
-			db.Reservations.Charged.writable=True
-			db.Reservations.Checkout.writable=True
 
 			affinity = db(db.Affiliations.Member==member_id).select(orderby=db.Affiliations.Modified).first()
 			if affinity:
@@ -1638,18 +1636,18 @@ def doorlist_export(event_id):
 def calendar_export(event_id):
 	base_url = get_context('base_url')
 	event = db.Events[event_id]
-	stream = StringIO()
+	stream = BytesIO()
 	content_type = "text/calendar"
 	filename = 'calendar.ics'
-	calendar = Calendar()
+	cal = Calendar()
 	event_details = Event()
-	event_details.name = f"{SOCIETY_SHORT_NAME}: {event.Description}"
-	event_details.begin = event.DateTime.replace(tzinfo=TIME_ZONE)
-	event_details.end = event.EndTime.replace(tzinfo=TIME_ZONE) if event.EndTime else (event_details.begin + datetime.timedelta(hours=1))
-	event_details.location = event.Venue or ''
-	event_details.description = f'<a href="{base_url}/web/home">visit website for details/registration</a>'
-	calendar.events.add(event_details)
-	stream.write(calendar.serialize())
+	event_details.add('summary', f"{SOCIETY_SHORT_NAME}: {event.Description}")
+	event_details.add('dtstart', event.DateTime.replace(tzinfo=TIME_ZONE))
+	event_details.add('dtend', event.EndTime.replace(tzinfo=TIME_ZONE) if event.EndTime else (event.DateTime.replace(tzinfo=TIME_ZONE) + datetime.timedelta(hours=1)))
+	event_details.add('location', event.Venue or '')
+	event_details.add('description', f'<a href="{base_url}/web/home">visit website for details/registration</a>')
+	cal.add_component(event_details)
+	stream.write(cal.to_ical())
 	flash.set("A calendar .ics file has been downloaded. Opening the file may add the event to your calendar, or you may need to open your calendar and import the file.")
 	return locals()
 
@@ -1947,7 +1945,8 @@ def financial_statement(start, end):
 				rev += a[sumamt]
 			else:
 				exp += a[sumamt]
-			exp += a[sumfee] or 0
+			exp += (a[sumfee] or 0)
+
 		rows.append(TR(TD(A(name, _href=URL(f'financial_detail/{e.AccTrans.Event or 0}', 
 						vars=dict(title=title, query=query, left=left, back=request.url)),
 						_style='white-space: normal')), 
@@ -2256,7 +2255,8 @@ def bank_file(bank_id):
 			db.AccTrans.insert(Bank = bank.id, Account = account, Amount = amount,
 					Fee = fee if fee!=0 else None, Timestamp = timestamp,
 					CheckNumber = checknumber, Reference = reference, Accrual = False, Notes = notes)
-			if account==unalloc.id: unmatched += 1
+			if account==unalloc.id: 
+				unmatched += 1
 
 		flash.set(f'{stored} new transactions processed, {unmatched} to allocate, new balance = {locale.currency(bank.Balance)}')
 	except Exception as e:
@@ -2281,6 +2281,8 @@ def transactions():
 	db.AccTrans.Membership.writable = False
 	acdues = db(db.CoA.Name.ilike("Membership Dues")).select().first().id
 	actkts = db(db.CoA.Name.ilike("Ticket sales")).select().first().id
+	unalloc = db(db.CoA.Name.ilike("Unallocated")).select().first().id
+
 	query = request.query.query or '(db.AccTrans.id>0)'
 	if request.query.get('account'):
 		query += f"&(db.AccTrans.Account=={request.query.get('account')})"
@@ -2301,7 +2303,7 @@ def transactions():
 				orderby = db.Members.Lastname|db.Members.Firstname, zero="member?"))),
 		Field('event', 'reference Events', default=request.query.get('event'),
 				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Events',
-				lambda r: f"{r.DateTime.strftime("%x")} {r.Description[:25]}",
+				lambda r: f"{r.DateTime.strftime('%x')} {r.Description[:25]}",
 				orderby = ~db.Events.DateTime, zero="event?"))),
 		Field('notes', 'string'),
 		Field('reference', 'string')],
@@ -2389,11 +2391,11 @@ def transactions():
 			if fee:
 				fee = (fee*new_amount/transaction.Amount).quantize(decimal.Decimal('0.01'))
 			db.AccTrans.insert(Timestamp=transaction.Timestamp, Bank=transaction.Bank,
-								Account=transaction.Account, Event=transaction.Event, Member=transaction.Member,
+								Account=unalloc, Event=transaction.Event, Member=transaction.Member,
 								Amount=transaction.Amount-new_amount, Fee=transaction.Fee - fee if fee else None,
 								CheckNumber=transaction.CheckNumber, Accrual=transaction.Accrual,
-								 Reference=transaction.Reference,Notes=form.vars.get('Notes'))	#the residual piece
-			db.AccTrans[form.vars.get('id')].update_record(Fee=fee)
+								Reference=transaction.Reference, Notes=form.vars.get('Notes'))	#the residual piece
+			db.AccTrans[form.vars.get('id')].update_record(Fee=fee)	#update the original with the new amount and fee and move to unallocated if split
 	
 	grid = Grid(eval(query), left=eval(request.query.get('left')) if request.query.get('left') else None,
 			orderby=~db.AccTrans.Timestamp,
@@ -2770,7 +2772,7 @@ Please login with the email you used before{f'<em>, possibly {suggest}, </em>' i
 	form = Form(fields, validation=validate, formstyle=FormStyleBulma, keep_values=True)
 		
 	if form.accepted:
-		notes = f"{datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).strftime("%x")} {form.vars.get('notes')}" if form.vars.get('notes') else ''
+		notes = f"{datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).strftime('%x')} {form.vars.get('notes')}" if form.vars.get('notes') else ''
 		if member:
 
 			if member.Notes:
@@ -2848,9 +2850,9 @@ def profile():
 	header = H5('Profile Information')
 	if member.Paiddate:
 		header = CAT(header,
-		   XML(f"Your membership {'expired' if member.Paiddate < datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date() else 'expires'} on {member.Paiddate.strftime("%x")}"))
+		   XML(f"Your membership {'expired' if member.Paiddate < datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date() else 'expires'} on {member.Paiddate.strftime('%x')}"))
 	if member.Pay_next:
-		header = CAT(header, XML(f" Renewal payment will be charged on {member.Pay_next.strftime("%x")}."))
+		header = CAT(header, XML(f" Renewal payment will be charged on {member.Pay_next.strftime('%x')}."))
 	header = CAT(header,
 		  XML(f"{'<br><br>' if member.Paiddate else ''}The information on this form, except as noted, is included \
 in our online Member Directory which is available through our home page to \

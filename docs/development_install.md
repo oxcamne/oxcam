@@ -171,6 +171,7 @@ Using a system terminal (or the Vscode terminal) at the py4web directory, use gi
 
 ```bash
 git pull
+pip install -e . --upgrade
 make assets
 make test
 py4web setup apps

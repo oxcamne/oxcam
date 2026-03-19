@@ -97,7 +97,7 @@ def email_daemon():
 	if email_list:
 		email_list.update_record(Daemon = start_time)
 	db.commit()
-	print(f"{str(path)} email_daemon {start_time.strftime("%x"+' %H:%M')} running")
+	print(f"{str(path)} email_daemon {start_time.strftime('%x'+' %H:%M')} running")
 
 	while True:
 		db.get_connection_from_pool_or_new()
@@ -121,4 +121,4 @@ def email_daemon():
 			continue    #until queue empty
 		old_now = now
 		time.sleep(5)
-	print(f"{str(path)} email_daemon {start_time.strftime("%x"+' %H:%M')} exiting")
+	print(f"{str(path)} email_daemon {start_time.strftime('%x'+' %H:%M')} exiting")

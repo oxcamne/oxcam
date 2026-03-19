@@ -215,7 +215,7 @@ def member_profile(member):
 
 #Create the header for a member message, such as a confirmation
 def msg_header(member, subject):
-	body = f"\n\n<p>{datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).strftime("%x")}<br>"
+	body = f"\n\n<p>{datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).strftime('%x')}<br>"
 	body += f"{(member.Title or '')+' '}{member.Firstname} {member.Lastname} {member.Suffix or ''}<br>"
 	if member.Address1:
 		body += f"{member.Address1}<br>"
@@ -279,7 +279,7 @@ def event_confirm(event_id, member_id=None, dues=0, event_only=False):
 		body += f"To pay online please visit {get_context('base_url')}/registration/{event_id}<br>"
 						#scheme=True doesn't pick up the domain in the email_daemon!
 	else:
-		calendar_url = f'{get_context('base_url')}/add_to_calendar/{event.id}'
+		calendar_url = f"{get_context('base_url')}/add_to_calendar/{event.id}"
 		body += f'<a href="{calendar_url}">Add to calendar</a>'
 		if event.Notes and not resvtns[0].Waitlist and not resvtns[0].Provisional:
 			body += markdown.markdown(event.Notes)

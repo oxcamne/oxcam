@@ -61,7 +61,7 @@ def daily_maintenance():
 		if (m.Paiddate - datetime.date.today()).days % interval == 0:
 			text = f"{member_greeting(m)}"
 			text += f"<p>This is a friendly reminder that your {SOCIETY_NAME} membership expiration \
-date is/was {m.Paiddate.strftime("%x")}. Please renew by <a href={base_url}/my_account> logging in</a> \
+date is/was {m.Paiddate.strftime('%x')}. Please renew by <a href={base_url}/my_account> logging in</a> \
 and selecting join/renew from the menu of choices, \
 or cancel membership to receive no futher reminders.</p><p>\
 We are very grateful for your membership support and hope that you will renew!</p>\

@@ -85,7 +85,7 @@ def login():
 		return False
 
 	def validate_user_form(form):
-		if not challenge or verify_captcha(form.vars['g-recaptcha-response']):
+		if not challenge or verify_captcha(request.POST.get("g-recaptcha-response")):
 			return
 		if not form.errors.get('email'):
 			form.errors['email'] ="Please verify you are not a robot"	

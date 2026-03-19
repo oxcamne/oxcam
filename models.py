@@ -214,7 +214,7 @@ db.define_table('Events',
 	Field('Comment', 'string', comment="open ended question at Checkout."),
 	Field('Modified', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None),
        			update=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False),
-	singular="Event", plural="Events", format=lambda r: f"{r.DateTime.strftime("%x")} {r.Description[:25]}")
+	singular="Event", plural="Events", format=lambda r: f"{r.DateTime.strftime('%x')} {r.Description[:25]}")
 
 def tickets_sold(ticket_id):
 	return db((db.Reservations.Ticket_==ticket_id)&(db.Reservations.Provisional==False)&(db.Reservations.Waitlist==False)).count()
@@ -410,7 +410,7 @@ db.define_table('AccTrans',
 				requires=IS_IN_DB(db, 'Bank_Accounts.id', '%(Name)s')),	#e.g. PayPal, Cambridge Trust, ...
 	Field('Account', 'reference CoA', requires=IS_IN_DB(db, 'CoA.id', '%(Name)s')),
 	Field('Event', 'reference Events',
-				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Events.id', lambda r: f"{r.DateTime.strftime("%x")} {r.Description[:25]}",
+				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Events.id', lambda r: f"{r.DateTime.strftime('%x')} {r.Description[:25]}",
 				orderby=~db.Events.DateTime)), comment='leave blank if not applicable'),
 	Field('Member', 'reference Members',
 				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Members.id', lambda r: f"{r.Lastname}, {r.Firstname}",

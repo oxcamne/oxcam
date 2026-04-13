@@ -401,7 +401,8 @@ db.define_table('bank_rules',
 	Field('csv_column', 'string', comment='select column to test'),
 	Field('pattern', 'string', comment='string to match within column content'),
 	Field('account', 'reference CoA', comment='select account to assign',
-	   			requires=IS_IN_DB(db, 'CoA.id', '%(Name)s'))
+	   			requires=IS_IN_DB(db, 'CoA.id', '%(Name)s')),
+	Field('ignore', 'boolean', default=False, comment="don't record transactions matching this rule")
 )
 
 db.define_table('AccTrans',

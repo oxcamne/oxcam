@@ -1402,14 +1402,14 @@ def reservation():
 						if tickets_available[ticket.id] == 0:
 							flash.set(f"There are no further {ticket.Ticket} tickets for additional guests.")
 						elif tickets_available[ticket.id] < 0:
-							flash.set(f"Insufficient {ticket.Ticket} tickets available: please Edit to select a different ticket type or Checkout to add unconfirmed guests to the waitlist.")
+							flash.set(f"Insufficient {ticket.Ticket} tickets available: please Edit to select a different ticket type or Checkout to put reservation on the waitlist.")
 							waitlist = True
 		if datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.Booking_Closed:
 			waitlist = True
 			flash.set("Registration is closed, please use +New and Checkout to add new guests to the waitlist.")
 		elif event.Capacity and (attend+adding>event.Capacity or event.Waiting):
 			waitlist = True
-			flash.set("Event is full: please use +New and Checkout to add new guests to the waitlist.")
+			flash.set("Event is full: please use +New to add your guest(s) and then Checkout to join the waitlist.")
 		elif event.Capacity and attend+adding==event.Capacity:
 			flash.set(f"Please note, this fills the event; if you add another guest all unconfirmed guests will be waitlisted.")
 		dues_tbc = f" (including {locale.currency(decimal.Decimal(session['dues']))} membership dues)" if session.get('dues') else ''
@@ -1426,7 +1426,7 @@ def reservation():
 		if payment>0 and payment>int(session.get('dues') or 0):
 			header = CAT(header, XML(f"Your registration will be confirmed when your payment of {locale.currency(payment)}{dues_tbc} is received.<br>"))
 		elif session.get('dues'):
-			header = CAT(header, XML(f"Checkout to pay your {locale.currency(decimal.Decimal(session['dues']))} membership dues, or wait to see if a space becomes available."))
+			header = CAT(header, XML(f"You may choose to pay your {locale.currency(decimal.Decimal(session['dues']))} membership dues, or wait until later."))
 
 		host_reservation.update_record(Checkout=str(dict(membership=session.get('membership'),
 						dues=session.get('dues'))).replace('Decimal','decimal.Decimal'),
@@ -2107,7 +2107,7 @@ def bank_rules(bank_id):
 			return
 
 	grid = Grid(db.bank_rules.bank==bank_id,
-			columns=[db.bank_rules.csv_column, db.bank_rules.pattern, db.bank_rules.account],
+			columns=[db.bank_rules.csv_column, db.bank_rules.pattern, db.bank_rules.account, db.bank_rules.ignore],
 			details=not write, editable=write, create=write, deletable=write,
 			validation=rules_validated, search_queries=[],
 			grid_class_style=grid_style,
@@ -2145,6 +2145,7 @@ def bank_file(bank_id):
 
 	stored = 0
 	unmatched = 0
+	ignored = 0
 	overlap = bkrecent==None
 	row = None
 	isok = True
@@ -2216,10 +2217,16 @@ def bank_file(bank_id):
 			account=unalloc.id
 
 			#process the special rules for this processor
+			ignore = False
 			for r in rules:
 				value = row[r.csv_column]
 				if value and r.pattern in value:	#rule applies
+					if r.ignore:
+						ignore = True
 					account = r.account
+			if ignore:
+				ignored += 1
+				continue
 			
 			stored = stored + 1
 			bank.update_record(Balance = (bank.Balance or 0) + amount + fee)
@@ -2258,7 +2265,8 @@ def bank_file(bank_id):
 			if account==unalloc.id: 
 				unmatched += 1
 
-		flash.set(f'{stored} new transactions processed, {unmatched} to allocate, new balance = {locale.currency(bank.Balance)}')
+		flash.set(f'{stored} new transactions processed, {unmatched} to allocate, {ignored} ignored, \
+new balance = {locale.currency(bank.Balance)}')
 	except Exception as e:
 		flash.set(f"{str(row)}: {str(e)}")
 		isok = False

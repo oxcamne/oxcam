@@ -92,7 +92,7 @@ def my_account():
 	if MEMBERSHIPS and member and member.Pay_subs!='Cancelled' and member_good_standing(member, (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)-datetime.timedelta(days=GRACE_PERIOD)).date()):
 		#the GRACE_PERIOD check means that a member without a subscription can cancel after expiration to turn of the nagging reminders.
 		if member.Pay_subs:
-			header = CAT(header, A("View membership subscription/Update credit card", _href=URL(f'{member.Pay_source}_view_card')), XML('<br>'))
+			header = CAT(header, A("View membership subscription/Update credit card", _href=URL('view_card')), XML('<br>'))
 		header = CAT(header, A("Cancel your membership",
 						 _href=URL(f'cancel_subscription/{member.id}', vars=dict(back=request.url))), XML('<br>'))
 
@@ -105,9 +105,9 @@ def my_account():
 @preferred
 @checkaccess(None)
 def view_card():
-	if not session.Pay_source:
+	if not session.pay_source:
 		redirect(URL('my_account'))
-	paymentprocessor().view_card
+	redirect(paymentprocessor().view_card())
 
 @action('members', method=['POST', 'GET'])
 @preferred
@@ -557,7 +557,7 @@ def emails(ismember, member_id):
 		header = CAT(header, XML("Note, the most recently edited (topmost) email is used for messages \
 directed to the individual member, and appears in the Members Directory. Notices \
 are sent as specified in the Mailings Column.<br>To switch to a new email address, use <b>+New</b> button.<br>\
-To change your mailing list subscritions, use the <b>Edit</b> button."))
+To change your mailing list subscriptions, use the <b>Edit</b> button."))
 	if parsed['mode']=="new":
 		if ismember=='Y':
 			flash.set("When you submit your new email address, you will be sent an email at the new address containing a confirmation link.")
@@ -725,8 +725,6 @@ def events():
 	if not MEMBERSHIPS:
 		db.Events.Members_only.readable=db.Events.Members_only.writable=False
 		db.Events.Members_only.default=False
-		db.Events.Allow_join.readable=db.Events.Allow_join.writable=False
-		db.Events.Allow_join.default=False
 
 	if not db(db.Colleges.Oxbridge==False).count():
 		db.Events.Sponsors.readable=db.Events.Sponsors.writable=False
@@ -1326,6 +1324,8 @@ Deleting or moving member on/off waitlist will also affect all guests."))
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
+		if form.vars.get('Notes') is None:
+			form.vars['Notes'] = ''
 		if (form.vars.get('id') and (int(form.vars.get('id')) == host_reservation.id)):
 			if form.vars.get('Waitlist') != host_reservation.Waitlist or form.vars.get('Provisional') != host_reservation.Provisional:
 				for row in all_guests:
@@ -1542,7 +1542,10 @@ def reservation():
 		if form.vars.get('Ticket_') and int(form.vars.get('Ticket_')) != db.Reservations.Ticket_.default:
 			ticket = tickets.find(lambda t: t.id == int(form.vars.get('Ticket_', '0'))).first()
 			if ticket.Qualify and (not form.vars.get('Notes') or form.vars.get('Notes').strip()==''):
-				form.errors['Notes']=ticket.Qualify	#documentation required
+				form.errors['Notes']=ticket.Qualify	#documentation required for ticket type
+		if form.vars.get('Notes') is None:
+			form.vars['Notes'] = ''
+		
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
@@ -1670,8 +1673,8 @@ def event_copy(event_id):
 	selections = db(db.Event_Selections.Event==event_id).select()
 	survey = db(db.Event_Survey.Event==event_id).select()
 	new_event_id = db.Events.insert(Page=event.Page, Description='Copy of '+event.Description, DateTime=event.DateTime,
-				Booking_Closed=event.Booking_Closed, Details=event.Details, Members_only=event.Members_only, Hidden=event.Hidden,
-				Allow_join=event.Allow_join, Guest=event.Guests, Sponsors=event.Sponsors, Venue=event.Venue,
+				Booking_Closed=event.Booking_Closed, Details=event.Details, Members_only=event.Members_only,
+				Hidden=event.Hidden, Guest=event.Guests, Sponsors=event.Sponsors, Venue=event.Venue,
 				Capacity=event.Capacity, Speaker=event.Speaker, Notes=event.Notes, Comment=event.Comment)
 	for t in tickets:
 		db.Event_Tickets.insert(Event=new_event_id, Ticket=t.Ticket, Price=t.Price, Count=t.Count,
@@ -2158,6 +2161,7 @@ def bank_file(bank_id):
 			if s != '': s += separator
 			s += row[c]
 		return s
+	
 	def getdecimal(col):
 		if not col: return 0
 		sign = 1
@@ -2179,8 +2183,7 @@ def bank_file(bank_id):
 	try:
 		f = StringIO(form.vars.get('downloaded_file').file.read().decode(encoding='utf-8'))
 		reader = csv.DictReader(f)
-		headers = bank.Csvheaders.split(',')
-		if headers != reader.fieldnames:
+		if not ','.join(reader.fieldnames).startswith(bank.Csvheaders):
 			raise Exception('File does not match expected column names')
 		
 		for row in reader:
@@ -2674,11 +2677,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 						session['membership'] = checkout.get('membership')
 						session['dues'] = str(checkout.get('dues')) if checkout.get('dues') else None
 				redirect(URL('reservation'))	#go add guests and/or checkout
-			if sponsor or (affinity and affinity.Matr or member.Membership and not affinity) and \
-			   		(good_standing or not event.Members_only and not event.Allow_join):
-				#members of sponsor organizations, or membership eligible and member in good standing, or 
-				#event open to all alums and not offering join option, then no need to gather member information
-				#ALSO collect Matr if missing from affinity, and allow approved unaffiliated members
+			if sponsor or good_standing:
 				redirect(URL('reservation', vars=dict(mode='new')))	#go create this member's reservation
 
 		elif request.query.get('mail_lists'):
@@ -2721,11 +2720,9 @@ XML(f"This event is open to \
 				comment='If Oxford or Cambridge alum, please enter your matriculation year'))
 
 	if event:
-		mustjoin = event.Members_only and not event.Sponsors
-		if MEMBERSHIPS and (event.Members_only or event.Allow_join) and not good_standing:
-			fields.append(Field('join_or_renew', 'boolean', default=mustjoin,
-				comment=' this event is restricted to OxCamNE members' if mustjoin else \
-					' tick if you are an Oxbridge alum and also wish to join OxCamNE or renew your membership'))
+		if MEMBERSHIPS and not (sponsor or good_standing):
+			fields.append(Field('join_or_renew', 'boolean', default=False,
+				comment='tick if you are a non-member Oxbridge alum to join/renew OxCamNE membership'))
 	elif not request.query.get('mail_lists') and MEMBERSHIPS:
 		fields.append(Field('membership', 'string',
 						default=member.Membership if member and member.Membership else '',

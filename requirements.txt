@@ -1,4 +1,4 @@
 python-dateutil >= 2.8.2
-stripe >= 7.4.0
+stripe >= 15.0.1
 markdown >= 3.6
 icalendar >= 7.0.3

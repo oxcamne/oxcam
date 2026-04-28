@@ -97,6 +97,8 @@ db.define_table('Members',
 	   		readable=MEMBERSHIPS!=[], writable=MEMBERSHIPS!=[]),
 	Field('Pay_next', 'date',	#Next subscription payment date
 	   		readable=MEMBERSHIPS!=[], writable=MEMBERSHIPS!=[]),
+	Field('Pay_modern', 'boolean',	#date  modern SCA compliant
+	   		readable=MEMBERSHIPS!=[], writable=MEMBERSHIPS!=[], default=False),
 	Field('Charged', 'decimal(6,2)',	#initial payment made, not yet downloaded from Stripe
 	   		readable=MEMBERSHIPS!=[], writable=MEMBERSHIPS!=[]),
 	Field('Privacy', 'boolean', default=False, comment=' Exclude email address from member directory'),

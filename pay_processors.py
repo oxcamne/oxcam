@@ -295,11 +295,13 @@ class StripeProcessor(PaymentProcessor):
 		if member.Pay_cust:
 			stripe_client.v1.customers.update(
 				member.Pay_cust,
-				params={"email": primary_email(member.id)}
+				params={"email": primary_email(member.id), "name": f'{member.Firstname} {member.Lastname}',
+						"phone": member.Cellphone}
 			)
 		else:
 			customer = stripe_client.v1.customers.create(
-				params={"email": primary_email(member.id)}
+				params={"email": primary_email(member.id), "name": f'{member.Firstname} {member.Lastname}',
+						"phone": member.Cellphone}
 			)
 			member.update_record(Pay_cust=customer['id'], Pay_source='stripe')
 
@@ -423,6 +425,33 @@ def stripe_view_card():
 		"Then click 'Pay without Link' to enter your new card details. ")
 	return locals()
 
+#upgrade legacy subscription to modern SCA-compliant subscription with new card details
+def upgrade_subscription(member, payment_method_id):
+	if payment_method_id and member.Pay_subs and member.Pay_subs != 'Cancelled' and not member.Pay_modern:
+		try:
+			old_subscription = stripe_client.v1.subscriptions.retrieve(member.Pay_subs)
+			
+			legacy_period_end = get_subscription_period_end(old_subscription)
+			modern_price_id = old_subscription.items.data[0].price.id
+			
+			new_subscription = stripe_client.v1.subscriptions.create(
+				params={
+					"customer": member.Pay_cust,
+					"default_payment_method": payment_method_id,
+					"billing_cycle_anchor": legacy_period_end,
+					"proration_behavior": "none",
+					"collection_method": "charge_automatically",
+					"items": [{"price": modern_price_id}],
+				}
+			)
+			
+			member.update_record(Pay_subs=new_subscription.id, Pay_modern=True)
+					
+		# Cancel the old subscription to avoid double billing
+			stripe_client.v1.subscriptions.cancel(old_subscription.id)
+		except Exception as e:
+			notify_support(member.id, 'Subscription Upgrade Failed', f'Failed to upgrade subscription: {str(e)}')
+		member.update_record(Pay_subs=new_subscription.id, Pay_modern=True)
 
 # new card successfully registered using checkout (SCA-compliant with Payment Methods)
 @action('stripe_switched_card', method=['GET'])
@@ -446,24 +475,48 @@ def stripe_switched_card():
 		flash.set('Error: No payment method was set up.')
 		redirect(URL('my_account'))
 
-	payment_method = stripe_client.v1.payment_methods.retrieve(payment_method_id)
-
 	# Update customer and subscription with the new payment method
 	stripe_client.v1.customers.update(
 		member.Pay_cust,
-		params={"invoice_settings": {"default_payment_method": payment_method['id']}}
+		params={"invoice_settings": {"default_payment_method": payment_method_id}}
 	)
 	stripe_client.v1.subscriptions.update(
 		member.Pay_subs,
-		params={"default_payment_method": payment_method['id']}
+		params={"default_payment_method": payment_method_id}
 	)
 
 	flash.set('Thank you for updating your credit card information!')
 	notify_support(member.id, 'Credit Card Update', 'Credit card updated.')
 
 	session['stripe_session_id'] = None
-
+	session['checkout_mode'] = None
 	redirect(URL('stripe_view_card'))
+
+@action('stripe_check_upgrade', method=['GET', 'POST'])
+@preferred
+@checkaccess(None)
+def stripe_view_card():
+	access = session.access  # for layout.html
+
+	if not session.member_id:
+		redirect(URL('my_account'))
+	member = db.Members[session.member_id]
+
+	header = CAT(H5("Update to our new billing system"),
+		XML("We’ve updated how subscriptions are billed. <br>Because you just added a new payment method, \
+we can move your subscription to the new more secure system now.<br>\Your price and renewal date will stay the same.<br><br>"),
+"By continuing, you agree to update your subscription to our new billing system using your saved payment method.")
+
+	form = Form([], submit_value='Continue')
+
+	if form.accepted:
+		upgrade_subscription(member, request.query.get('payment_method_id'))
+		if request.query.get('flash'):
+			flash.set(request.query.get('flash'))
+		redirect(request.query.get('url'))
+
+	return locals()
+
 
 @action('stripe_checkout_success', method=['GET'])
 @preferred
@@ -479,6 +532,16 @@ def stripe_checkout_success():
 			f"member {member.id}, event {session.get('event_id')}"
 		)
 
+	# Retrieve the checkout session to get the payment_intent
+	checkout_session = stripe_client.v1.checkout.sessions.retrieve(
+		session.get('stripe_session_id'),
+		params={"expand": ["payment_intent", "subscription"]}
+	)
+	payment_method_id = None
+	pi = stripe.PaymentIntent.retrieve(session.payment_intent.id)
+	if pi.status == 'succeeded' and pi.payment_method.startswith('pm_') and pi.customer == member.Pay_cust:
+		payment_method_id = pi.payment_method
+
 	checkout_mode = session.get('checkout_mode', 'payment')
 
 	subject = (
@@ -492,11 +555,6 @@ def stripe_checkout_success():
 	)
 
 	if dues > 0:
-		checkout_session = stripe_client.v1.checkout.sessions.retrieve(
-			session.get('stripe_session_id'),
-			params={"expand": ["subscription"]}
-		)
-
 		if getattr(checkout_session, "payment_method", None):
 			stripe_client.v1.customers.update(
 				member.Pay_cust,
@@ -559,16 +617,17 @@ def stripe_checkout_success():
 	session['stripe_session_id'] = None
 	session['checkout_mode'] = None
 
+	url = URL('my_account')
+	flash = ''
 	if dues:
-		flash.set(
-			'Confirmation has been sent by email. '
-			'Please review your mailing list subscriptions.'
-		)
-		redirect(URL(f"emails/Y/{member.id}", vars=dict(back=URL('my_account'))))
+		flash = "confirmation has been sent by email. Please review your mailing list subscriptions."
+		url = URL(f"emails/Y/{member.id}", vars=dict(back=URL('my_account')))
 
-	redirect(URL('my_account'))
-
-
+	if payment_method_id and member.Pay_subs and member.Pay_subs != 'Cancelled' and not member.Pay_modern:
+		redirect(URL('stripe_check_upgrade', vars=dict(payment_method_id=payment_method_id, url=url, flash=flash)))
+	if flash:
+		flash.set(flash)
+	redirect(url)
 """
 install implementation in base class
 NOTE this creates a local list containing the implementing subclass instances,

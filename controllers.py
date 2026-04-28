@@ -235,10 +235,10 @@ def members():
 					query.append(f"(db.Members.{field}{operator}'{date.strftime('%Y-%m-%d')}')")
 					qdesc += f' {field} {operator} {value}.'
 			elif fieldtype == 'boolean':
-				if value != 'T' and value != 'F':
-					errors = 'please use T or F for boolean field'
+				if value != 'True' and value != 'False':
+					errors = 'please use True or False for boolean field'
 				else:
-					query.append(f'(db.Members.{field}=={value}')
+					query.append(f'(db.Members.{field}=={value})')
 					qdesc += f' {field} {value}'
 			elif fieldtype.startswith('decimal'):
 				if not value.isdigit():

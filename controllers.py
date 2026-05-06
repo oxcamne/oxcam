@@ -2655,6 +2655,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 	session['dues'] = None
 			
 	affinity = None
+	sponsor = False
 	good_standing = False
 	clist = collegelist(event.Sponsors if event_id and event.Sponsors else [])
 	

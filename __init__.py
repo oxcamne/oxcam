@@ -10,6 +10,6 @@ from .models import db
 from . import pay_processors, daily_maintenance, email_daemon, session, tools, website, controllers
 
 # optional parameters
-__version__ = "v1.1.14"
+__version__ = "v1.2.1"
 __author__ = "dgmanns@gmail.com"
 __license__ = "BSDv3"

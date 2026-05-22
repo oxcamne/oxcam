@@ -1375,7 +1375,13 @@ def reservation():
 	sponsor = affinity and not affinity.College.Oxbridge
 
 	tickets = db(db.Event_Tickets.Event==session.event_id).select()
-	tickets_available = {t.id: t.Count - tickets_sold(t.id) if not t.Waiting else 0 for t in tickets if t.Count}
+	tickets_available = {}
+	for t in tickets:
+		if t.Count:
+			available = t.Count - tickets_sold(t.id)
+			tickets_available[t.id] = available if available>0 else 0
+			if available <= 0 and not t.Waiting:
+				t.update_record(Waiting=True)
 
 	header = CAT(H5('Event Registration'), H6(member_name(session.member_id)),
 			XML(event_confirm(event.id, member.id, event_only=True)))
@@ -1388,6 +1394,8 @@ def reservation():
 		
 		#pre-checkout checks on capacity, payment status, etc.
 		attend = event_attend(session.event_id) or 0
+		if event.Capacity and not event.Waiting and attend>=event.Capacity:
+			event.update_record(Waiting=True)
 		provisional_ticket_cost = 0
 		adding = 0
 		waitlist = event.Waiting
@@ -1573,17 +1581,10 @@ def reservation():
 			host_reservation.update_record(Survey_=form2.vars.get('survey'), Comment=form2.vars.get('comment'))
 			for row in all_guests:
 				if row.Provisional==True:
-					if row.Ticket_:
-						ticket = db.Event_Tickets[row.Ticket_]
-						if ticket.id in tickets_available and tickets_available[ticket.id] <= 0:
-							ticket.update_record(Waiting=True)
 					row.update_record(Provisional=False, Waitlist=waitlist)
 
 			if waitlist:
 				flash.set(f"{'You' if host_reservation.Waitlist==True else 'Your additional guest(s)'} have been added to the waitlist.")
-
-			if event.Capacity and attend+adding>=event.Capacity:
-				event.update_record(Waiting=True)
 		
 			if payment<=0:	#free event or payment already covered, confirm booking
 				if not waitlist:

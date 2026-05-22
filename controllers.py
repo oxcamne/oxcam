@@ -821,11 +821,11 @@ def tickets(event_id):
 
 	def validation(form):
 		if not form.vars.get('id'):	#new ticket type
-			if db((db.Event_Tickets.Event==event_id)&(db.Event_Tickets.Ticket==form.vars.get('ticket'))).count()>0:
-				form.errors['ticket']="ticket type already exists"
-			if db((db.Event_Tickets.Event==event_id)&\
-		 		(db.Event_Tickets.Short_name==form.vars.get('short_name'))).count()>0:
-				form.errors['short_name']="short_name already exists"
+			if db((db.Event_Tickets.Event==event_id)&(db.Event_Tickets.Ticket==form.vars.get('Ticket'))).count()>0:
+				form.errors['Ticket']="ticket type already exists"
+			if (form.vars.get('Short_name')!=None) and db((db.Event_Tickets.Event==event_id)&\
+		 		(db.Event_Tickets.Short_name==form.vars.get('Short_name'))).count()>0:
+				form.errors['Short_name']="short_name already exists"
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
@@ -863,11 +863,11 @@ def selections(event_id):
 	def validation(form):
 		if not form.vars.get('id'):	#new selection
 			if db((db.Event_Selections.Event==event_id)&\
-		 		(db.Event_Selections.Selection==form.vars.get('selection'))).count()>0:
-				form.errors['selection']="selection already exists"
+		 		(db.Event_Selections.Selection==form.vars.get('Selection'))).count()>0:
+				form.errors['Selection']="selection already exists"
 			if db((db.Event_Selections.Event==event_id)&\
-		 		(db.Event_Selections.Short_name==form.vars.get('short_name'))).count()>0:
-				form.errors['short_name']="short_name already exists"
+		 		(db.Event_Selections.Short_name==form.vars.get('Short_name'))).count()>0:
+				form.errors['Short_name']="short_name already exists"
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
@@ -907,8 +907,8 @@ def survey(event_id):
 	def validation(form):
 		if not form.vars.get('id'):	#new selection
 			if db((db.Event_Survey.Event==event_id)&\
-		 		(db.Event_Survey.Item==form.vars.get('item'))).count()>0:
-				form.errors['item']="survey item already exists"
+		 		(db.Event_Survey.Item==form.vars.get('Item'))).count()>0:
+				form.errors['Item']="survey item already exists"
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
@@ -1392,7 +1392,7 @@ def reservation():
 		adding = 0
 		waitlist = event.Waiting
 		for row in all_guests:
-			if (not tickets or row.Ticket_) and row.Provisional:
+			if row.Provisional:
 				ticket = tickets.find(lambda t: t.id==row.Ticket_).first()
 				adding += 1
 				if ticket:
@@ -1400,18 +1400,18 @@ def reservation():
 					if ticket.id in tickets_available:
 						tickets_available[ticket.id] -= 1
 						if tickets_available[ticket.id] == 0:
-							flash.set(f"There are no further {ticket.Ticket} tickets for additional guests.")
+							flash.set(f"This is the last {ticket.Ticket} ticket available, Checkout to take it.")
 						elif tickets_available[ticket.id] < 0:
-							flash.set(f"Insufficient {ticket.Ticket} tickets available: please Edit to select a different ticket type or Checkout to put reservation on the waitlist.")
+							flash.set(f"Insufficient {ticket.Ticket} tickets available, Checkout to join the waitlist.")
 							waitlist = True
 		if datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.Booking_Closed:
 			waitlist = True
-			flash.set("Registration is closed, please use +New and Checkout to add new guests to the waitlist.")
-		elif event.Capacity and (attend+adding>event.Capacity or event.Waiting):
+			flash.set("Registration is closed, Checkout to join the waitlist.")
+		elif adding>0 and event.Capacity and attend+adding==event.Capacity:
+			flash.set("This will fill the event, Checkout to take the last available space.")
+		elif event.Capacity and attend+adding>event.Capacity:
 			waitlist = True
-			flash.set("Event is full: please use +New to add your guest(s) and then Checkout to join the waitlist.")
-		elif event.Capacity and attend+adding==event.Capacity:
-			flash.set(f"Please note, this fills the event; if you add another guest all unconfirmed guests will be waitlisted.")
+			flash.set("Event is full, Checkout to join the waitlist.")
 		dues_tbc = f" (including {locale.currency(decimal.Decimal(session['dues']))} membership dues)" if session.get('dues') else ''
 		payment = (int(session.get('dues') or 0)) + event_unpaid(session.event_id, session.member_id)
 		if not waitlist:
@@ -1575,14 +1575,15 @@ def reservation():
 				if row.Provisional==True:
 					if row.Ticket_:
 						ticket = db.Event_Tickets[row.Ticket_]
-						if ticket.id in tickets_available and tickets_available[ticket.id] < 0:
+						if ticket.id in tickets_available and tickets_available[ticket.id] <= 0:
 							ticket.update_record(Waiting=True)
 					row.update_record(Provisional=False, Waitlist=waitlist)
 
 			if waitlist:
 				flash.set(f"{'You' if host_reservation.Waitlist==True else 'Your additional guest(s)'} have been added to the waitlist.")
-				if event.Capacity and attend+adding>event.Capacity:
-					event.update_record(Waiting=True)
+
+			if event.Capacity and attend+adding>=event.Capacity:
+				event.update_record(Waiting=True)
 		
 			if payment<=0:	#free event or payment already covered, confirm booking
 				if not waitlist:

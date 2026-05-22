@@ -117,7 +117,7 @@ def upcoming_events():
 		else:
 			url = URL(f"registration/{event.id}")
 			line+= f" register **[here]({url})**"
-			if event.Capacity and (attend or 0) >= event.Capacity:
+			if event.Capacity and ((attend or 0) >= event.Capacity or event.Waiting):
 				line +=' *Sold Out, waitlisting*'
 		header = CAT(header, XML(markdown.markdown(line)[3:-4]+'<br>'))
 	return header

@@ -428,30 +428,37 @@ def stripe_view_card():
 
 #upgrade legacy subscription to modern SCA-compliant subscription with new card details
 def upgrade_subscription(member, payment_method_id):
-	if payment_method_id and member.Pay_subs and member.Pay_subs != 'Cancelled' and not member.Pay_modern:
+	if not (payment_method_id and member.Pay_subs and member.Pay_subs != 'Cancelled' and not member.Pay_modern):
+		return
+
+	try:
+		old_subscription = stripe_client.v1.subscriptions.retrieve(member.Pay_subs)
+
+		legacy_period_end = get_subscription_period_end(old_subscription)
+		modern_price_id = old_subscription.items.data[0].price.id
+		idempotency_key = f"upgrade_subscription:{old_subscription.id}:{payment_method_id}"
+
+		new_subscription = stripe_client.v1.subscriptions.create(
+			params={
+				"customer": member.Pay_cust,
+				"default_payment_method": payment_method_id,
+				"billing_cycle_anchor": legacy_period_end,
+				"proration_behavior": "none",
+				"collection_method": "charge_automatically",
+				"items": [{"price": modern_price_id}],
+			},
+			options={"idempotency_key": idempotency_key}
+		)
+
+		member.update_record(Pay_subs=new_subscription.id, Pay_modern=True)
+
 		try:
-			old_subscription = stripe_client.v1.subscriptions.retrieve(member.Pay_subs)
-			
-			legacy_period_end = get_subscription_period_end(old_subscription)
-			modern_price_id = old_subscription.items.data[0].price.id
-			
-			new_subscription = stripe_client.v1.subscriptions.create(
-				params={
-					"customer": member.Pay_cust,
-					"default_payment_method": payment_method_id,
-					"billing_cycle_anchor": legacy_period_end,
-					"proration_behavior": "none",
-					"collection_method": "charge_automatically",
-					"items": [{"price": modern_price_id}],
-				}
-			)
-			
-			member.update_record(Pay_subs=new_subscription.id, Pay_modern=True)
-					
-		# Cancel the old subscription to avoid double billing
 			stripe_client.v1.subscriptions.cancel(old_subscription.id)
-		except Exception as e:
-			notify_support(member.id, 'Subscription Upgrade Failed', f'Failed to upgrade subscription: {str(e)}')
+		except Exception:
+			# Ignore cancellation failures caused by duplicate POSTs or already-cancelled subscriptions.
+			pass
+	except Exception as e:
+		notify_support(member.id, 'Subscription Upgrade Failed', f'Failed to upgrade subscription: {str(e)}')
 
 # new card successfully registered using checkout (SCA-compliant with Payment Methods)
 @action('stripe_switched_card', method=['GET'])
@@ -495,7 +502,7 @@ def stripe_switched_card():
 @action('stripe_check_upgrade', method=['GET', 'POST'])
 @preferred
 @checkaccess(None)
-def stripe_view_card():
+def stripe_check_upgrade():
 	access = session.access  # for layout.html
 
 	if not session.member_id:

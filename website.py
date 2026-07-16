@@ -33,7 +33,7 @@ def history_content():
 							TD(A(event.Description, _href=URL(f"event_page/{event.id}") \
 								if event.Details else event.Page, _target='booking'))))
 		if event.Speaker:
-			table_rows.append(TR(TD(''), TD(event.Speaker)))
+			table_rows.append(TR(TD('Speaker:', _style='text-align: right;'), TD(event.Speaker)))
 	message = TABLE(*table_rows)
 	return message
 

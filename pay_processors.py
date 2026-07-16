@@ -236,7 +236,31 @@ class StripeProcessor(PaymentProcessor):
 				except Exception as e:
 					# Could not process event reservation
 					return (amount, f"Failed to process event reservation: {str(e)}")
-
+				
+		if dict_csv['Type'] == 'refund':
+			charges = db((db.AccTrans.Bank == bank.id) & db.AccTrans.Notes.startswith(source_id)).select(
+						orderby=~db.AccTrans.id
+			)	#charge may be split between dues and event, refund event first
+			for charge in charges:
+				try:
+					db.AccTrans.insert(
+						Bank=bank.id,
+						Account=charge.Account,
+						Member=charge.Member,
+						Amount=-min(charge.Amount, -amount),
+						Fee=fee,
+						Timestamp=timestamp,
+						Event=charge.Event,
+						Reference=reference,
+						Accrual=False,
+						Notes=f"Refund of {source_id}"
+					)
+				except Exception as e:
+					return (amount, f"Failed to record refund transaction: {str(e)}")
+				amount += min(charge.Amount, -amount)
+				if amount == 0:
+					break		# refund accounted for
+		
 		return (amount, notes)
 
 	def cancel_subscription(self, member):

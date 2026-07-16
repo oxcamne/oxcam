@@ -2192,7 +2192,7 @@ def bank_file(bank_id):
 			try:
 				timestamp = datetime.datetime.strptime(getfields(bank.Date), bank.Datefmt)
 			except:
-				continue #special case, Cambridge Trust. Deposits made on the day the transactions are downloaded
+				continue #special case, Eastern Bank. Deposits made on the day the transactions are downloaded
 				#are sent with date and time, but no reference. These early reports fail this timestamp conversion
 
 			reference = getfields(bank.Reference)
@@ -2411,7 +2411,7 @@ def transactions():
 			db.AccTrans[form.vars.get('id')].update_record(Fee=fee)	#update the original with the new amount and fee and move to unallocated if split
 	
 	grid = Grid(eval(query), left=eval(request.query.get('left')) if request.query.get('left') else None,
-			orderby=~db.AccTrans.Timestamp,
+			orderby=~db.AccTrans.id,
 			columns=[db.AccTrans.Timestamp, db.AccTrans.Account, db.AccTrans.Event,
 					Column('member', lambda row: A(member_name(row.Member), _href=URL('members',
 											vars=dict(referrer=encode_url(request.url), mode='details'if access=='read' else 'edit', id=row.Member)),

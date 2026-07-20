@@ -14,12 +14,13 @@ interface using MODERN Stripe APIs:
 """
 import locale
 from py4web import action, redirect, Field, request, URL
+from py4web.utils import form
 from .common import db, session, flash
 from .models import primary_email, event_unpaid
 from .session import checkaccess
 from .utilities import notify_support, newpaiddate, msg_header, msg_send, event_confirm
 from py4web.utils.form import Form
-from .settings import PaymentProcessor, PAYMENTPROCESSORS, PAGE_BANNER
+from .settings import TIME_ZONE, PaymentProcessor, PAYMENTPROCESSORS, PAGE_BANNER
 from yatl.helpers import H5, BEAUTIFY, CAT, XML
 from py4web.utils.factories import Inject
 import stripe, decimal, datetime, random
@@ -230,7 +231,32 @@ class StripeProcessor(PaymentProcessor):
 								Notes=notes
 							)
 							resvtn.update_record(Charged=resvtn.Charged - amount, Checkout=None)
-							amount = 0
+
+							if not member.Membership and not member.Paiddate:
+								# If this is a non-member paying for an event, check if ticket includes free membership
+								ticket = db.Event_Tickets[resvtn.Ticket_]
+								if ticket.New_member:
+									#record dummy dues payment to include this member in the new members list
+									db.AccTrans.insert(
+										Bank=bank.id,
+										Account=acdues.id,
+										Amount=0,
+										Member=member.id,
+										Paiddate=None,
+										Membership=ticket.Short_name,
+										Fee=0,
+										Accrual=False,
+										Timestamp=timestamp,
+										Reference=reference,
+										Notes=notes
+									)
+									notes = f"{datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).strftime('%x')} {resvtn.Notes}" if resvtn.Notes else ''
+									member.update_record(
+										Membership=ticket.Short_name, 
+										Paiddate=newpaiddate(resvtn.Created.date()),
+										Notes=notes
+									)
+								amount = 0
 						except Exception as e:
 							return (amount, f"Failed to record event transaction: {str(e)}")
 				except Exception as e:

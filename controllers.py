@@ -615,7 +615,7 @@ def new_members():
 	access = session.access	#for layout.html
 	acdues = db(db.CoA.Name.ilike("Membership Dues")).select().first().id
 
-	rows = db((db.AccTrans.Account==acdues) & (db.AccTrans.Member!=None) & (db.AccTrans.Amount>0)).select(orderby=~db.AccTrans.Timestamp)
+	rows = db((db.AccTrans.Account==acdues) & (db.AccTrans.Member!=None) & (db.AccTrans.Amount>=0)).select(orderby=~db.AccTrans.Timestamp)
 
 	def classify(transaction):
 		if not transaction.Paiddate:
@@ -1365,6 +1365,7 @@ def reservation():
 	member = db.Members[session.member_id]
 	affinity = db((db.Affiliations.Member==session.member_id)&db.Affiliations.College.belongs([c[0] for c in clist])).select(
 						orderby=db.Affiliations.Modified).first()
+	this_year = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).year
 	all_guests = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)).select(orderby=~db.Reservations.Host)
 	host_reservation = all_guests.first()
 	if member_good_standing(member, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()):
@@ -1503,12 +1504,16 @@ def reservation():
 		else:
 			non_member_ticket = tickets.find(lambda t: t.Ticket.lower().startswith('non-member'))
 			if non_member_ticket:
-				tickets = non_member_ticket
+				tickets = [non_member_ticket]
+		if affinity and affinity.Matr==this_year and not is_guest_reservation:
+			tickets = tickets.find(lambda t:  t.Fresher==True)
+		else:
+			tickets = tickets.find(lambda t:  t.Fresher!=True)
 		event_tickets = [(t.id, f"{t.Ticket}{' (waitlisting)' if tickets_available.get(t.id, 1)<=0 else ''}") for t in tickets]
 		if tickets:
 			db.Reservations.Ticket_.requires=IS_IN_SET(event_tickets, zero='please select the appropriate ticket')
 			db.Reservations.Ticket_.default = event_tickets[0][0] if len(event_tickets)==1 else None
-			if is_guest_reservation:
+			if is_guest_reservation and db.Event_Tickets[host_reservation.Ticket_].Allow_as_guest:
 				if tickets.find(lambda t: t.id==host_reservation.Ticket_):
 					db.Reservations.Ticket_.default = host_reservation.Ticket_
 		else:
@@ -1534,7 +1539,8 @@ def reservation():
 				db.Reservations.Affiliation.default = affinity.College
 				db.Reservations.Affiliation.writable = False
 
-			if parsed['mode']=='new' and not selections and len(event_tickets)<=1:
+			if parsed['mode']=='new' and not selections and \
+					(event_tickets ==[] or (len(event_tickets)==1 and not db.Event_Tickets[event_tickets[0][0]].Qualify)):
 				#no choices needed, create the Host reservation and display checkout screen
 				db.Reservations.insert(Member=session.member_id, Event=session.event_id, Host=True,
 			   		Firstname=member.Firstname, Lastname=member.Lastname, Affiliation=affinity.College if affinity else None,
@@ -2648,6 +2654,8 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 			redirect(URL('my_account'))
 		if datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.Booking_Closed:
 			flash.set('Booking is closed, but you may join the wait list.')
+		new_members = db((db.Event_Tickets.Event==event_id) & (db.Event_Tickets.New_member==True)).count() > 0
+		freshers = db((db.Event_Tickets.Event==event_id) & (db.Event_Tickets.Fresher==True)).count() > 0
 		session['event_id'] = event_id
 	else:
 		event = None
@@ -2694,15 +2702,18 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 	else:
 		member = None
 		
+	this_year = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).year
 	header = H5('Event Registration: Your Information' if event 
 				else 'Mailing List Registration' if request.query.get('mail_lists')
 				else 'Membership Application/Renewal: Your Information')
 	if event:
 		header = CAT(header, XML(f"Event: {event.Description}<br>When: {event.DateTime.strftime('%A %B %d, %Y %I:%M%p')}<br>Where: {event.Venue}<br><br>"),
 XML(f"This event is open to \
-{'all alumni of Oxford & Cambridge' if not event.Members_only else f'members of {SOCIETY_SHORT_NAME}'}\
-{' and members of sponsoring organizations (list at the top of the Affiliations dropdown)' if event.Sponsors else ''}\
-{' and their guests' if not event.Guests or event.Guests>1 else ''}.<br>"))
+{f'members of {SOCIETY_SHORT_NAME}' if event.Members_only else 'all alumni of Oxford & Cambridge'}\
+{f', Freshers (Matr {this_year})' if freshers else ''}\
+{f', alumni new to {SOCIETY_SHORT_NAME}' if new_members else ''}\
+{', members of sponsoring organizations (list at the top of the Affiliations dropdown)' if event.Sponsors else ''}\
+{', and their guests' if not event.Guests or event.Guests>1 else ''}.<br>"))
 	elif MEMBERSHIPS and not request.query.get('mail_lists'):
 		header = CAT(header, XML('<br>'.join([f"<b>{m.category} Membership</b> is open to {m.description.replace('<dues>', 	locale.currency(paymentprocessor(name=None).get_dues(m.category)))}" for m in MEMBERSHIPS])))
 
@@ -2719,11 +2730,12 @@ XML(f"This event is open to \
 								'Please select your College' if not member or not member.Membership else ''))))
 	if not affinity or not affinity.Matr:
 		fields.append(Field('matr', 'integer', default = affinity.Matr if affinity else None,
-				requires=IS_EMPTY_OR(IS_INT_IN_RANGE(datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).year-100,datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).year+1)),
-				comment='If Oxford or Cambridge alum, please enter your matriculation year'))
+				requires=IS_EMPTY_OR(IS_INT_IN_RANGE(this_year-100,this_year+1, error_message='please enter a valid matriculation year')),
+				comment='Please enter your matriculation year if you are an Oxford or Cambridge alum'))
 
 	if event:
-		if MEMBERSHIPS and not (sponsor or good_standing):
+		if MEMBERSHIPS and not (sponsor or good_standing or ((not member or member.Paiddate == None) and \
+				db((db.Event_Tickets.Event==event_id) & (db.Event_Tickets.New_member==True)).count()>0)):
 			fields.append(Field('join_or_renew', 'boolean', default=False,
 				comment='tick if you are a non-member Oxbridge alum to join/renew OxCamNE membership'))
 	elif not request.query.get('mail_lists') and MEMBERSHIPS:
@@ -2753,6 +2765,9 @@ XML(f"This event is open to \
 			form.errors['affiliation']='please select your affiliation from the dropdown, or contact '+SUPPORT_EMAIL
 		if form.vars.get('affiliation') and (not affinity or not affinity.Matr) and not form.vars.get('matr'):
 			form.errors['matr'] = 'please enter your matriculation year'
+		if form.vars.get('matr') == this_year:
+			if not freshers:
+				form.errors['matr'] = 'This event is not open to freshers, please contact '+SUPPORT_EMAIL
 		if event and event.Members_only and form.vars.get('join_or_renew')==False:
 			form.errors['join_or_renew'] = 'This event is for members only, please join/renew to attend'
 		if form.vars.get('membership'):
@@ -2832,9 +2847,12 @@ Please login with the email you used before{f'<em>, possibly {suggest}, </em>' i
 			email.update_record(Mailings=mailings)
 		
 		if event:
+			if not member.City and event.Members_only and not (sponsor or good_standing):
+				flash.set("Next, please review/complete your directory profile")
+				redirect(URL('profile')) #gather profile info
 			redirect(URL('reservation', vars=dict(mode='new')))	#go create this member's reservation
 		else:	#joining or renewing
-			if not member.Paiddate or member.Paiddate < (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)-datetime.timedelta(GRACE_PERIOD)).date():
+			if not member.Paiddate or not member.City or member.Paiddate < (datetime.datetime.now(TIME_ZONE).replace(tzinfo=None)-datetime.timedelta(GRACE_PERIOD)).date():
 				#new/reinstated member, gather additional profile information
 				flash.set("Next, please review/complete your directory profile")
 				redirect(URL('profile')) #gather profile info
@@ -2879,7 +2897,9 @@ reached by using the join/renew link on our home page).<br>\
 	db.Members.Access.writable = db.Members.Committees.writable = db.Members.President.writable = False
 	db.Members.Notes.writable = db.Members.Created.writable = db.Members.Modified.writable = False
 	db.Members.Pay_source.writable = db.Members.Pay_source.readable = False
-
+	db.Members.Pay_modern.writable = db.Members.Pay_modern.readable = False
+	db.Members.Source.writable = db.Members.Source.readable = False
+	
 	db.Members.City.requires = IS_NOT_EMPTY(error_message='please enter your city/town')
 	db.Members.State.requires = IS_MATCH('^[A-Z][A-Z]$', error_message='please enter 2 letter state code')
 	db.Members.Zip.requires = IS_NOT_EMPTY(error_message='please enter your postal zip')
@@ -2893,10 +2913,10 @@ reached by using the join/renew link on our home page).<br>\
 		 			validation=validate, formstyle=FormStyleBulma, keep_values=True)
 					
 	if form.accepted:
+		if session.get('event_id'):
+			redirect(URL('reservation', vars=dict(mode='new')))	#go create this member's reservation
 		#ready to checkout
 		if session.get('dues'):
-			if session.get('event_id'):
-				redirect(URL('reservation', vars=dict(mode='new')))	#go create this member's reservation
 			paymentprocessor().checkout(request.url)
 		flash.set('Thank you for updating your profile information.')
 		notify_support(member.id, 'Member Profile Updated', member_profile(member))

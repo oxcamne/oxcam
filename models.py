@@ -249,8 +249,12 @@ db.define_table('Event_Selections',
 db.define_table('Event_Survey',
 	Field('Event', 'reference Events', writable=False),
 	Field('Item', 'string', requires=IS_NOT_EMPTY(),
-	   comment="first is question, remainder answer choices"),
+	   comment="each string is an answer choices"),
 	Field('Short_name', 'string', requires=IS_NOT_EMPTY(), comment="for doorlist"),
+	Field('New_member', 'boolean', default=False,
+	   comment="option for new members joining through this event"),
+	Field('Fresher', 'boolean', default=False,
+	   comment="option for freshers only, e.g. for Freshers' Event"),
 	format='%(Short_name)s'
 )
 

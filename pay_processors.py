@@ -264,16 +264,25 @@ class StripeProcessor(PaymentProcessor):
 					return (amount, f"Failed to process event reservation: {str(e)}")
 				
 		if dict_csv['Type'] == 'refund':
-			charges = db((db.AccTrans.Bank == bank.id) & db.AccTrans.Notes.startswith(source_id)).select(
+			charges = db((db.AccTrans.Bank == bank.id) & db.AccTrans.Notes.startswith(source_id) & db.AccTrans.Amount != 0).select(
 						orderby=~db.AccTrans.id
-			)	#charge may be split between dues and event, refund event first
+			)	#charge may be split between dues and event, refund event first. ignore dummy dues payment for free membership
+			already_refunded = 0	#the amount of earlier refunds to be accounted for
 			for charge in charges:
+				if charge.Amount < 0:
+					already_refunded -= charge.Amount
+					continue
+				charge_left = charge.Amount - already_refunded
+				if charge_left <= 0:
+					already_refunded -= charge.Amount
+					continue
+				refund_amount = min(charge_left, -amount)
 				try:
 					db.AccTrans.insert(
 						Bank=bank.id,
 						Account=charge.Account,
 						Member=charge.Member,
-						Amount=-min(charge.Amount, -amount),
+						Amount= -refund_amount,
 						Fee=fee,
 						Timestamp=timestamp,
 						Event=charge.Event,
@@ -283,7 +292,7 @@ class StripeProcessor(PaymentProcessor):
 					)
 				except Exception as e:
 					return (amount, f"Failed to record refund transaction: {str(e)}")
-				amount += min(charge.Amount, -amount)
+				amount += refund_amount
 				if amount == 0:
 					break		# refund accounted for
 		

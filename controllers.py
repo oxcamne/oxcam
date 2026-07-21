@@ -1373,7 +1373,9 @@ def reservation():
 	else:
 		membership = session.get('membership')	#if joining with event registration
 	#membership ==> current member in good standing
-	sponsor = affinity and not affinity.College.Oxbridge
+	sponsor = not affinity.College.Oxbridge
+	fresher = affinity.Matr and affinity.Matr >= this_year
+	new_member = not member.Membership and not fresher
 
 	tickets = db(db.Event_Tickets.Event==session.event_id).select()
 	tickets_available = {}
@@ -1444,9 +1446,14 @@ def reservation():
 		fields = []
 		#add questions to checkout (form2) as applicable
 		survey = db(db.Event_Survey.Event==session.event_id).select()
+		if fresher:
+			survey = survey.find(lambda s: s.Fresher==True)
+		elif new_member:
+			survey = survey.find(lambda s: s.New_member==True)
 		if len(survey)>0:
-			event_survey = [(s.id, s.Item) for s in survey[1:]]
-			fields.append(Field('survey', requires=IS_IN_SET(event_survey, zero=survey[0].Item,
+			event_survey = [(s.id, s.Item) for s in survey]
+			fields.append(Field('survey', requires=IS_IN_SET(event_survey,
+								zero='Please select the appropriate item',
 								error_message='Please make a selection'),
 								default = host_reservation.Survey_))
 		if event.Comment:
@@ -1504,7 +1511,7 @@ def reservation():
 		else:
 			non_member_ticket = tickets.find(lambda t: t.Ticket.lower().startswith('non-member'))
 			if non_member_ticket:
-				tickets = [non_member_ticket]
+				tickets = non_member_ticket
 		if affinity and affinity.Matr==this_year and not is_guest_reservation:
 			tickets = tickets.find(lambda t:  t.Fresher==True)
 		else:
@@ -1686,11 +1693,13 @@ def event_copy(event_id):
 				Capacity=event.Capacity, Speaker=event.Speaker, Notes=event.Notes, Comment=event.Comment)
 	for t in tickets:
 		db.Event_Tickets.insert(Event=new_event_id, Ticket=t.Ticket, Price=t.Price, Count=t.Count,
-					Qualify=t.Qualify, Allow_as_guest=t.Allow_as_guest, Short_name=t.Short_name)
+					Qualify=t.Qualify, Allow_as_guest=t.Allow_as_guest, Short_name=t.Short_name,
+					New_member=t.New_member, Fresher=t.Fresher)
 	for s in selections:
 		db.Event_Selections.insert(Event=new_event_id, Selection=s.Selection, Short_name=s.Short_name)
 	for s in survey:
-		db.Event_Survey.insert(Event=new_event_id, Item=s.Item)
+		db.Event_Survey.insert(Event=new_event_id, Item=s.Item, Short_name=t.Short_name,
+					New_member=t.New_member, Fresher=t.Fresher)
 
 	flash.set("Please customize the new event.")
 	redirect(URL('events', vars=dict(referrer=request.query.referrer, mode='edit', id=new_event_id)))
@@ -2731,10 +2740,10 @@ XML(f"This event is open to \
 	if not affinity or not affinity.Matr:
 		fields.append(Field('matr', 'integer', default = affinity.Matr if affinity else None,
 				requires=IS_EMPTY_OR(IS_INT_IN_RANGE(this_year-100,this_year+1, error_message='please enter a valid matriculation year')),
-				comment='Please enter your matriculation year if you are an Oxford or Cambridge alum'))
+				comment='Please enter your matriculation year if you are an Oxford or Cambridge alum/fresher'))
 
 	if event:
-		if MEMBERSHIPS and not (sponsor or good_standing or ((not member or member.Paiddate == None) and \
+		if MEMBERSHIPS and not (sponsor or good_standing or ((not member or not member.Membership) and \
 				db((db.Event_Tickets.Event==event_id) & (db.Event_Tickets.New_member==True)).count()>0)):
 			fields.append(Field('join_or_renew', 'boolean', default=False,
 				comment='tick if you are a non-member Oxbridge alum to join/renew OxCamNE membership'))

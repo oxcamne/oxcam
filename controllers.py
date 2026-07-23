@@ -1446,10 +1446,8 @@ def reservation():
 		fields = []
 		#add questions to checkout (form2) as applicable
 		survey = db(db.Event_Survey.Event==session.event_id).select()
-		if fresher:
-			survey = survey.find(lambda s: s.Fresher==True)
-		elif new_member:
-			survey = survey.find(lambda s: s.New_member==True)
+		survey = survey.find(lambda s: s.Fresher==fresher)
+		survey = survey.find(lambda s: s.New_member==new_member)
 		if len(survey)>0:
 			event_survey = [(s.id, s.Item) for s in survey]
 			fields.append(Field('survey', requires=IS_IN_SET(event_survey,
@@ -2737,14 +2735,12 @@ XML(f"This event is open to \
 			requires=IS_IN_SET(clist, zero=None) if affinity else IS_EMPTY_OR(IS_IN_SET(clist,
 						zero = 'Please select your sponsoring organization or College/University' if event and event.Sponsors else \
 								'Please select your College' if not member or not member.Membership else ''))))
-	if not affinity or not affinity.Matr:
-		fields.append(Field('matr', 'integer', default = affinity.Matr if affinity else None,
-				requires=IS_EMPTY_OR(IS_INT_IN_RANGE(this_year-100,this_year+1, error_message='please enter a valid matriculation year')),
-				comment='Please enter your matriculation year if you are an Oxford or Cambridge alum/fresher'))
+	fields.append(Field('matr', 'integer', default = affinity.Matr if affinity else None,
+			requires=IS_EMPTY_OR(IS_INT_IN_RANGE(this_year-100,this_year+1, error_message='please enter a valid matriculation year')),
+			comment='Please enter your matriculation year if you are an Oxford or Cambridge alum/fresher'))
 
 	if event:
-		if MEMBERSHIPS and not (sponsor or good_standing or ((not member or not member.Membership) and \
-				db((db.Event_Tickets.Event==event_id) & (db.Event_Tickets.New_member==True)).count()>0)):
+		if MEMBERSHIPS and not (sponsor or good_standing or (new_members and (not member or not member.Membership))):
 			fields.append(Field('join_or_renew', 'boolean', default=False,
 				comment='tick if you are a non-member Oxbridge alum to join/renew OxCamNE membership'))
 	elif not request.query.get('mail_lists') and MEMBERSHIPS:
@@ -2856,7 +2852,7 @@ Please login with the email you used before{f'<em>, possibly {suggest}, </em>' i
 			email.update_record(Mailings=mailings)
 		
 		if event:
-			if not member.City and event.Members_only and not (sponsor or good_standing):
+			if new_members and form.vars.get('matr')!=this_year and not member.City and event.Members_only and not (sponsor or good_standing):
 				flash.set("Next, please review/complete your directory profile")
 				redirect(URL('profile')) #gather profile info
 			redirect(URL('reservation', vars=dict(mode='new')))	#go create this member's reservation

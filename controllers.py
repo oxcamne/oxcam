@@ -1373,8 +1373,8 @@ def reservation():
 	else:
 		membership = session.get('membership')	#if joining with event registration
 	#membership ==> current member in good standing
-	sponsor = not affinity.College.Oxbridge
-	fresher = affinity.Matr and affinity.Matr >= this_year
+	sponsor = affinity and not affinity.College.Oxbridge
+	fresher = affinity and affinity.Matr and affinity.Matr >= this_year
 	new_member = not member.Membership and not fresher
 
 	tickets = db(db.Event_Tickets.Event==session.event_id).select()

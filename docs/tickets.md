@@ -30,3 +30,7 @@ that any of these tickets that become available are allocated manually through t
 **Short Name** (optional) replaces the ticket name in the exported .csv doorlist file for convenience.
 
 If **Allow as Guest** is unchecked, the ticket cannot be selected for additional guests, for example Freshers attending the Freshers' event must register separately.
+
+If **New Member** is checked and the guest is host, the system will check that the guest has no existing or previous membership history. This event ticket will register the guest as a member and provide the first year of membership free of dues.
+
+If **Fresher** is checked and the guest is host, the system will check that the guest is a fresher (matriculation year is the current year).

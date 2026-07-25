@@ -1375,7 +1375,7 @@ def reservation():
 	#membership ==> current member in good standing
 	sponsor = affinity and not affinity.College.Oxbridge
 	fresher = affinity and affinity.Matr and affinity.Matr >= this_year
-	new_member = not member.Membership and not fresher
+	new_member = not member.Paiddate and not member.Membership and not fresher
 
 	tickets = db(db.Event_Tickets.Event==session.event_id).select()
 	tickets_available = {}

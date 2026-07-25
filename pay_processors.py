@@ -231,6 +231,7 @@ class StripeProcessor(PaymentProcessor):
 								Notes=notes
 							)
 							resvtn.update_record(Charged=resvtn.Charged - amount, Checkout=None)
+							amount = 0
 
 							if not member.Membership and not member.Paiddate:
 								# If this is a non-member paying for an event, check if ticket includes free membership
@@ -256,7 +257,6 @@ class StripeProcessor(PaymentProcessor):
 										Paiddate=newpaiddate(resvtn.Created.date()),
 										Notes=notes
 									)
-								amount = 0
 						except Exception as e:
 							return (amount, f"Failed to record event transaction: {str(e)}")
 				except Exception as e:

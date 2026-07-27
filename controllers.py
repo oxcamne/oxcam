@@ -1003,7 +1003,7 @@ def event_reservations(event_id):
 			Field('selection', 'reference Event_Selections', default = request.query.get('selection'),
 					requires=IS_EMPTY_OR(IS_IN_DB(db(db.Event_Selections.Event==event_id), db.Event_Selections.id,
 								'%(Short_name)s', zero="selection?"))))
-	event_survey = [(s.id, s.Short_name) for s in db(db.Event_Survey.Event==event_id).select()[1:]]
+	event_survey = [(s.id, s.Short_name) for s in db(db.Event_Survey.Event==event_id).select()]
 	if event_survey:
 		search_fields.append(Field('survey', requires=IS_EMPTY_OR(IS_IN_SET(event_survey, zero="survey?",
 			error_message='Please make a selection')), default = request.query.get('survey')))
@@ -1558,7 +1558,7 @@ def reservation():
 	def validate(form):
 		if form.vars.get('Waitlist') and form.vars.get('Provisional'):
 			form.errors['Waitlist'] = "Waitlist and Provisional should not both be set"
-		if form.vars.get('Ticket_') and int(form.vars.get('Ticket_')) != db.Reservations.Ticket_.default:
+		if form.vars.get('Ticket_') and (int(form.vars.get('Ticket_')) != db.Reservations.Ticket_.default or not is_guest_reservation):
 			ticket = tickets.find(lambda t: t.id == int(form.vars.get('Ticket_', '0'))).first()
 			if ticket.Qualify and (not form.vars.get('Notes') or form.vars.get('Notes').strip()==''):
 				form.errors['Notes']=ticket.Qualify	#documentation required for ticket type

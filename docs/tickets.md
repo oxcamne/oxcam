@@ -31,6 +31,6 @@ that any of these tickets that become available are allocated manually through t
 
 If **Allow as Guest** is unchecked, the ticket cannot be selected for additional guests, for example Freshers attending the Freshers' event must register separately.
 
-If **New Member** is checked and the guest is host, the system will check that the guest has no existing or previous membership history. This event ticket will register the guest as a member and provide the first year of membership free of dues.
+If **New Member** is checked and the person registering (host) selects this ticket type, the system will check whether they have no existing or previous membership history. If there is no membership history, the ticket provides a free year of membership commencing with the date the ticket is paid for. The free membership does not apply to current or lapsed members or to alumni brought as guests of a member. With this ticket type non-member alums can register even for member-only events.
 
-If **Fresher** is checked and the guest is host, the system will check that the guest is a fresher (matriculation year is the current year).
+If **Fresher** is checked and the person registering (host) selects this ticket type the system will check that they are a fresher (matriculation year is the current year). Is not allowed as guest.

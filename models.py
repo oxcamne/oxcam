@@ -233,7 +233,7 @@ db.define_table('Event_Tickets',
 	Field('Allow_as_guest', 'boolean', default=True,
 	   comment="clear if ticket can't apply to a guest"),
 	Field('New_member', 'boolean', default=False,
-	   comment="set to give new members free first year membership"),
+	   comment="set to give new member hosts free first year membership"),
 	Field('Fresher', 'boolean', default=False,
 	   comment="ticket for freshers only, e.g. for Freshers' Event"),
 	format='%(Short_name)s'

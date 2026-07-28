@@ -826,6 +826,12 @@ def tickets(event_id):
 			if (form.vars.get('Short_name')!=None) and db((db.Event_Tickets.Event==event_id)&\
 		 		(db.Event_Tickets.Short_name==form.vars.get('Short_name'))).count()>0:
 				form.errors['Short_name']="short_name already exists"
+			if form.vars.get('Fresher'):
+				if db((db.Event_Tickets.Event==event_id)&(db.Event_Tickets.Freshers==True)).count()>0:
+					form.errors['Freshers']="freshers ticket already exists"
+		if form.vars.get('Fresher') and (form.vars.get('Allow_as_guest') or form.vars.get('Allow_as_guest')):
+			form.errors['Fresher']="freshers ticket should not be New Member or guest"
+			
 		if len(form.errors)>0:
 			flash.set("Error(s) in form, please check")
 			return
@@ -901,7 +907,7 @@ def survey(event_id):
 	header = CAT(A('back', _href=back),
 		  		H5('Event Survey'),
 		  		H6(event.Description),
-				"The first row is a multiple choice survey question, the rest are the possible answers.", XML('<br>'),
+				"The rows are the possible answers to be selected from at Checkout.", XML('<br>'),
 				"Note, survey elements cannot be modified once chosen")
 
 	def validation(form):

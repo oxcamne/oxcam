@@ -347,3 +347,12 @@ def store_context(name, value):
 def get_context(name):
 	c = db(db.context.name==name).select().first()
 	return c.value if c else None
+
+def set_default_mailing_lists(member):
+	#ensure the default mailing list subscriptions are in place in the primary email
+	email = db(db.Emails.Member==member.id).select(orderby=~db.Emails.Modified).first()
+	mailings = email.Mailings or []
+	for list in db(db.Email_Lists.Member==True).select():
+		if list.id not in mailings:
+			mailings.append(list.id)
+	email.update_record(Mailings=mailings)

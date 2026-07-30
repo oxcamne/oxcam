@@ -49,7 +49,7 @@ from pydal.validators import IS_LIST_OF_EMAILS, IS_EMPTY_OR, IS_IN_DB, IS_IN_SET
 from .utilities import email_sender, member_good_standing, ageband, newpaiddate,\
 	tdnum, get_banks, financial_content, event_confirm, msg_header, msg_send,\
 	notification, notify_support, member_profile, generate_hash,\
-	encode_url, pages_menu, template_expand, get_context
+	encode_url, pages_menu, template_expand, get_context, set_default_mailing_lists
 from .session import checkaccess
 from .website import society_emails, about_content, history_content, upcoming_events
 from py4web.utils.factories import Inject
@@ -2326,6 +2326,8 @@ def transactions():
 		query += f"&(db.AccTrans.Notes.ilike('%{request.query.get('notes')}%'))"
 	if request.query.get('reference'):
 		query += f"&(db.AccTrans.Reference.ilike('%{request.query.get('reference')}%'))"
+	if request.query.get('amount'):
+		query += f"&(db.AccTrans.Amount=={decimal.Decimal(request.query.get('amount'))})"
 			
 	search_form=Form([
 		Field('account', 'reference CoA', default=request.query.get('account'),
@@ -2337,12 +2339,13 @@ def transactions():
 				requires=IS_EMPTY_OR(IS_IN_DB(db, 'Events',
 				lambda r: f"{r.DateTime.strftime('%x')} {r.Description[:25]}",
 				orderby = ~db.Events.DateTime, zero="event?"))),
+		Field('amount', 'string', default=request.query.get('amount')),
 		Field('notes', 'string'),
 		Field('reference', 'string')],
 		keep_values=True, formstyle=FormStyleBulma)
+	search_form.structure.find("#no_table_amount")[0]["_placeholder"] = "amount?"
 	search_form.structure.find("#no_table_notes")[0]["_placeholder"] = "notes?"
 	search_form.structure.find("#no_table_reference")[0]["_placeholder"] = "ref?"
-
 	if parsed['mode'] == 'select':	#viewing transactions
 		bank_id_match=re.match('db.AccTrans.Bank==([0-9]+)$', query)
 		session['bank_id'] = int(bank_id_match.group(1)) if bank_id_match else None
@@ -2354,6 +2357,8 @@ def transactions():
 				select_vars['member'] = search_form.vars.get('member')
 			if search_form.vars.get('event'):
 				select_vars['event'] = search_form.vars.get('event')
+			if search_form.vars.get('amount'):
+				select_vars['amount'] = search_form.vars.get('amount')
 			if search_form.vars.get('notes'):
 				select_vars['notes'] = search_form.vars.get('notes')
 			if search_form.vars.get('reference'):
@@ -2850,12 +2855,7 @@ Please login with the email you used before{f'<em>, possibly {suggest}, </em>' i
 				session['dues'] = str(paymentprocessor(member.Pay_source).get_dues(form.vars.get('membership')))
 				session['membership'] = form.vars.get('membership')
 			#ensure the default mailing list subscriptions are in place in the primary email
-			email = db(db.Emails.Member==member.id).select(orderby=~db.Emails.Modified).first()
-			mailings = email.Mailings or []
-			for list in db(db.Email_Lists.Member==True).select():
-				if list.id not in mailings:
-					mailings.append(list.id)
-			email.update_record(Mailings=mailings)
+			set_default_mailing_lists(member)
 		
 		if event:
 			if new_members and form.vars.get('matr')!=this_year and not member.City and event.Members_only and not (sponsor or good_standing):

@@ -18,7 +18,7 @@ from py4web.utils import form
 from .common import db, session, flash
 from .models import primary_email, event_unpaid
 from .session import checkaccess
-from .utilities import notify_support, newpaiddate, msg_header, msg_send, event_confirm
+from .utilities import notify_support, newpaiddate, msg_header, msg_send, event_confirm, set_default_mailing_lists
 from py4web.utils.form import Form
 from .settings import TIME_ZONE, PaymentProcessor, PAYMENTPROCESSORS, PAGE_BANNER
 from yatl.helpers import H5, BEAUTIFY, CAT, XML
@@ -257,6 +257,8 @@ class StripeProcessor(PaymentProcessor):
 										Paiddate=newpaiddate(resvtn.Created.date()),
 										Notes=notes
 									)
+									#ensure the default mailing list subscriptions are in place in the primary email
+									set_default_mailing_lists(member)
 						except Exception as e:
 							return (amount, f"Failed to record event transaction: {str(e)}")
 				except Exception as e:

@@ -1294,7 +1294,7 @@ Deleting or moving member on/off waitlist will also affect all guests."))
 	
 	survey = db(db.Event_Survey.Event==event_id).select()
 	if len(survey)>0:
-		event_survey = [(s.id, s.Short_name) for s in survey[1:]]
+		event_survey = [(s.id, s.Short_name) for s in survey]
 		db.Reservations.Survey_.writable=True
 		db.Reservations.Survey_.requires=IS_EMPTY_OR(IS_IN_SET(event_survey))
 

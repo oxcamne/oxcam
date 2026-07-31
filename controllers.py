@@ -1453,13 +1453,14 @@ def reservation():
 		#add questions to checkout (form2) as applicable
 		survey = db(db.Event_Survey.Event==session.event_id).select()
 		survey = survey.find(lambda s: s.Fresher==fresher)
-		survey = survey.find(lambda s: s.New_member==new_member)
+		if new_member:
+			survey = survey.find(lambda s: s.New_member==True)
 		if len(survey)>0:
 			event_survey = [(s.id, s.Item) for s in survey]
 			fields.append(Field('survey', requires=IS_IN_SET(event_survey,
 								zero='Please select the appropriate item',
 								error_message='Please make a selection'),
-								default = host_reservation.Survey_))
+								default = host_reservation.Survey_ if len(survey)>1 else survey.first().id))
 		if event.Comment:
 			fields.append(Field('comment', 'string', comment=event.Comment,
 								default = host_reservation.Comment))
@@ -2327,8 +2328,11 @@ def transactions():
 	if request.query.get('reference'):
 		query += f"&(db.AccTrans.Reference.ilike('%{request.query.get('reference')}%'))"
 	if request.query.get('amount'):
-		query += f"&(db.AccTrans.Amount=={decimal.Decimal(request.query.get('amount'))})"
-			
+		try:
+			query += f"&(db.AccTrans.Amount=={decimal.Decimal(request.query.get('amount'))})"
+		except:
+			flash.set("amount must be a number")
+
 	search_form=Form([
 		Field('account', 'reference CoA', default=request.query.get('account'),
 				requires=IS_EMPTY_OR(IS_IN_DB(db, 'CoA', '%(Name)s', zero="account?"))),

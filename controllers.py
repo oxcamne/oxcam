@@ -2237,6 +2237,10 @@ def bank_file(bank_id):
 			if checknumber and not checknumber.strip().isdigit():
 				checknumber = None
 			amount = getdecimal(bank.Amount)
+			try:
+				amount -= getdecimal(bank.Debit)	#some banks e.g. Axon report debits as a separate column
+			except:
+				pass
 			fee = getdecimal(bank.Fee)
 			notes = getfields(bank.Notes, ' ')
 			account=unalloc.id

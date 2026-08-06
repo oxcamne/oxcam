@@ -274,6 +274,7 @@ using an optional operator (=, !=, <, >, <=, >=) together with a value."))
 		if MEMBERSHIPS:
 			footer = CAT(footer, XML('<br>'),
 				A("View Recent New Members", _href=URL('new_members', vars={'back': request.url})), XML('<br>'),
+				A("View Recent Lapsed Members", _href=URL('lapsed_members', vars={'back': request.url})), XML('<br>'),
 				A("Export Membership Analytics", _href=URL('member_analytics')), XML('<br>'))
 
 	def member_deletable(id): #deletable if not member, never paid dues or attended recorded event, or on mailing list
@@ -642,6 +643,40 @@ def new_members():
 					Column('Date', lambda row: row.Timestamp.strftime("%x")),
 					Column('Previous', lambda row: classify(db.AccTrans[row.id])),
 					Column("Source", lambda row: db.Members[row.Member].Source)],
+			deletable=False, details=False, editable=False, create=False,
+			grid_class_style=grid_style, search_queries=[],
+			formstyle=form_style,
+	)
+	return locals()
+	
+@action('lapsed_members', method=['GET'])
+@preferred
+@checkaccess('read')
+def lapsed_members():
+	access = session.access	#for layout.html
+	acdues = db(db.CoA.Name.ilike("Membership Dues")).select().first().id
+
+	today = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()	#remove timezone info for comparison with Paiddate
+	query = (db.Members.Paiddate < today) & ((db.Members.Pay_subs == None) | (db.Members.Pay_subs == '') | (db.Members.Pay_subs == 'Cancelled'))
+
+	header = CAT(A('back', _href=request.query.back),
+			H5('Lapsed Members'))
+
+	grid = Grid(query, orderby=~db.Members.Paiddate,
+			columns=[Column("Name", lambda row: A(member_name(row.id), _href=URL('members',
+						vars=dict(referrer=encode_url(request.url),
+						mode='details' if access=='read' else 'edit',
+						id=row.id)),
+						_style="white-space: normal")),
+				Column("College", lambda row: primary_affiliation(row.id)),
+				Column("Matr", lambda row: primary_matriculation(row.id)),
+				db.Members.Membership,
+				Column("Lapsed", lambda row: A(row.Paiddate, _href=URL('transactions',
+									vars=dict(query=f"(db.AccTrans.Member=={row.id})&(db.AccTrans.Account=={acdues})", back=request.url))),
+									required_fields=[db.Members.Paiddate]),
+				Column("Attended", lambda row: A(db((db.Reservations.Member==row.id) & (db.Reservations.Host==True)).count(),
+									 _href=URL(f'member_reservations/{row.id}', 
+									vars=dict(member_id=row.id, back=request.url))))],
 			deletable=False, details=False, editable=False, create=False,
 			grid_class_style=grid_style, search_queries=[],
 			formstyle=form_style,

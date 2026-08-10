@@ -2825,8 +2825,11 @@ XML(f"This event is open to \
 		if form.vars.get('affiliation') and (not affinity or not affinity.Matr) and not form.vars.get('matr'):
 			form.errors['matr'] = 'please enter your matriculation year'
 		if form.vars.get('matr') == this_year:
-			if not freshers:
-				form.errors['matr'] = 'This event is not open to freshers, please contact '+SUPPORT_EMAIL
+			if event:
+				if not freshers:
+					form.errors['matr'] = 'This event is not open to freshers, please contact '+SUPPORT_EMAIL
+			else:
+				form.errors['matr'] = 'Freshers are not eligible for membership, please contact '+SUPPORT_EMAIL	
 		if event and event.Members_only and form.vars.get('join_or_renew')==False:
 			form.errors['join_or_renew'] = 'This event is for members only, please join/renew to attend'
 		if form.vars.get('membership'):

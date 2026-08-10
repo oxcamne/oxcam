@@ -100,7 +100,7 @@ def get_banks(startdatetime, enddatetime):
 	for r in rows:
 		d = [(bank_balance(r.id, startdatetime, balance=r.Balance), None, None),
 				(bank_balance(r.id, enddatetime, balance=r.Balance), None, None),
-				r.Name + f'{r.Name} balance']
+				f'{r.Name} balance']
 		assets[r.Name] = d
 	return assets
 

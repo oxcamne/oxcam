@@ -52,6 +52,12 @@ the database.
 
 *View Recent New Members* displays a grid of recent new/reinstated members in reverse chronological order, without regard for the member filter. This is based on dues payments recorded in accounts,so does not include a member until their dues payment has been uploaded into accounts. This information normally finds its way into the Membership Secretary's report to which it will be copy/pasted.
 
+On-screen, the name column entries are links to the member record.
+
+*View Recent Lapsed Members* displays a grid of recently lapsed members in reverse chronological order of their membership expiration, either by failure to renew manually, or by direct cancellation of subscription and without regard for the member filter. Note that expiration always occurs at the end of the pre-paid period, we don't refund membership dues. This information normally finds its way into the Membership Secretary's report to which it will be copy/pasted.
+
+On-screen, the name, lapsed, and attended columns are short cut links to the member record, list of dues payments, and list of events attended, respectively.
+
 *Export Membership Analytics* is used by the Membership Secretary to analyze year to year membership demographics; it is also exported in raw .csv format.
 
 *Export Selected Records* exports a .csv file including all member records, or those selected by the filter if a filter is used.

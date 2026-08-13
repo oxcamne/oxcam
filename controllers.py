@@ -225,14 +225,17 @@ def members():
 					query.append(f'(db.Members.{field}{operator}"{value}")')
 					qdesc += f' {field} {operator} {value}.'
 			elif fieldtype == 'date' or fieldtype == 'datetime':
-				try:
-					date = datetime.datetime.strptime(value, "%x").date()
-				except:
-					errors = f'please use {"%x"} format for dates'
+				if not operator or operator == '=':
+					operator = '=='
+				if value != 'None':
+					try:
+						value = "'" + datetime.datetime.strptime(value, "%x").date().strftime('%Y-%m-%d') + "'"
+					except:
+						errors = "please use local date format, e.g. mm/dd/yyyy in USA, or None"
+				elif operator != '==' and operator != '!=':
+					errors = "please use None only with operator =, ==, or !="
 				if not errors:
-					if not operator or operator == '=':
-						operator = '=='
-					query.append(f"(db.Members.{field}{operator}'{date.strftime('%Y-%m-%d')}')")
+					query.append(f"(db.Members.{field}{operator}{value})")
 					qdesc += f' {field} {operator} {value}.'
 			elif fieldtype == 'boolean':
 				if value != 'True' and value != 'False':
@@ -2999,9 +3002,18 @@ def cancel_subscription(member_id=None):
 	header = CAT(A('back', _href=request.query.back), XML('<br>'),
 			H5('Membership Cancellation'),
 			H6(member_name(member.id)),
-			XML(f"{'Provided the member has requested cancellation' if member_id!=session.member_id else 'We are very sorry to lose you as a member. If you must leave'}, please click the button to confirm!.<br><br>"))
+			XML(f"{'Provided the member has requested cancellation' if member_id!=session.member_id else 'We are very sorry to lose you as a member. If you must leave'}, please tell us why!.<br><br>"))
 	
-	form = Form([], submit_value='Cancel Subscription')
+	form = Form([
+		Field('reason', requires=[IS_NOT_EMPTY(), IS_IN_SET([
+			'I am moving out of the area',
+			"I don't find events that interest me",
+			"I can't easily reach the events",
+			'Events are too expensive',
+			'Other (please specify in the suggestions box below)'
+		])]),
+		Field('suggestions', 'text', label='Please provide any specific suggestions')
+	], submit_value='Cancel Subscription')
 	
 	if form.accepted:
 		if member.Pay_subs and member.Pay_subs != 'Cancelled':
@@ -3010,6 +3022,13 @@ def cancel_subscription(member_id=None):
 		#if we simply cleared Pay_subs then the daily backup daemon might issue membership reminders!
 		if not member.Paiddate:	#just joined but changed their mind?
 			member.update_record(Membership=None, Charged=None)
+
+		# Add cancellation reason and suggestions to Notes
+		today = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date().strftime("%x")
+		suggestions_text = f' "{form.vars["suggestions"]}"' if form.vars.get('suggestions') else ''
+		cancellation_note = f"{today}: Membership cancelled. Reason: {form.vars['reason']}.{suggestions_text}"
+		updated_notes = (member.Notes + '\n' + cancellation_note) if member.Notes else cancellation_note
+		member.update_record(Notes=updated_notes)
 
 		effective = max(member.Paiddate or datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date(), datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()).strftime("%x")
 		notification(member, 'Membership Cancelled', f'Your membership is cancelled effective {effective}.<br>Thank you for your past support of the Society.')

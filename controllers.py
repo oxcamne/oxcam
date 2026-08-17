@@ -677,7 +677,7 @@ def lapsed_members():
 				Column("Lapsed", lambda row: A(row.Paiddate, _href=URL('transactions',
 									vars=dict(query=f"(db.AccTrans.Member=={row.id})&(db.AccTrans.Account=={acdues})", back=request.url))),
 									required_fields=[db.Members.Paiddate]),
-				Column("Attended", lambda row: A(db((db.Reservations.Member==row.id) & (db.Reservations.Host==True)).count(),
+				Column("Attended", lambda row: A(db((db.Reservations.Member==row.id) & (db.Reservations.Host==True) & (db.Reservations.Provisional!=True)).count(),
 									 _href=URL(f'member_reservations/{row.id}', 
 									vars=dict(member_id=row.id, back=request.url))))],
 			deletable=False, details=False, editable=False, create=False,

@@ -266,7 +266,7 @@ class StripeProcessor(PaymentProcessor):
 					return (amount, f"Failed to process event reservation: {str(e)}")
 				
 		if dict_csv['Type'] == 'refund':
-			charges = db((db.AccTrans.Bank == bank.id) & db.AccTrans.Notes.startswith(source_id) & db.AccTrans.Amount != 0).select(
+			charges = db((db.AccTrans.Bank == bank.id) & db.AccTrans.Notes.startswith(source_id) & (db.AccTrans.Amount != 0)).select(
 						orderby=~db.AccTrans.id
 			)	#charge may be split between dues and event, refund event first. ignore dummy dues payment for free membership
 			already_refunded = 0	#the amount of earlier refunds to be accounted for

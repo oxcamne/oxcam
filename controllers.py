@@ -2864,7 +2864,7 @@ Please login with the email you used before{f'<em>, possibly {suggest}, </em>' i
 		if member:
 
 			if member.Notes:
-				notes = member.Notes+'\n'+notes
+				notes = notes + '\n' + (member.Notes or '')
 				
 			member.update_record(Firstname = form.vars['firstname'], Notes=notes,
 							Lastname = form.vars['lastname'])
@@ -3027,7 +3027,7 @@ def cancel_subscription(member_id=None):
 		today = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date().strftime("%x")
 		suggestions_text = f' "{form.vars["suggestions"]}"' if form.vars.get('suggestions') else ''
 		cancellation_note = f"{today}: Membership cancelled. Reason: {form.vars['reason']}.{suggestions_text}"
-		updated_notes = (member.Notes + '\n' + cancellation_note) if member.Notes else cancellation_note
+		updated_notes = cancellation_note + '\n' + (member.Notes or '')
 		member.update_record(Notes=updated_notes)
 
 		effective = max(member.Paiddate or datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date(), datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()).strftime("%x")

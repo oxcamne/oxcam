@@ -158,7 +158,7 @@ class StripeProcessor(PaymentProcessor):
 						customer = stripe_client.v1.customers.retrieve(customer_id, params={"expand": ["subscriptions"]})
 
 						subs = customer.subscriptions.data
-						active_subs = [s for s in subs if s.status == "active"]
+						active_subs = [s for s in subs if s.status == "active" or s.status == "trialing"]
 						if not active_subs:
 							# No active subscriptions found - this shouldn't happen for a subscription payment
 							return (amount, f"No active subscription found for customer {customer_id}")
@@ -378,7 +378,8 @@ class StripeProcessor(PaymentProcessor):
 
 			if price['recurring']:
 				mode = 'subscription'
-			items.append(dict(price=product['default_price'], quantity=1))
+			if session.get('dues') or mode == 'subscription':
+				items.append(dict(price=product['default_price'], quantity=1))
 
 		if session.get('event_id'):
 			# Event registration
@@ -417,8 +418,21 @@ class StripeProcessor(PaymentProcessor):
 			checkout_params["payment_intent_data"] = {
 				"setup_future_usage": "off_session"
 			}
-		elif mode == 'subscription':
-			pass
+		elif mode == 'subscription' and not session.get('dues'):
+			# Defer the first charge to the end of the first billing cycle by giving the
+			# subscription a full free trial. Stripe then bills on the next renewal date.
+			recurring = price['recurring']
+			interval = recurring['interval']
+			interval_days = {
+				'day': 1,
+				'week': 7,
+				'month': 30,
+				'year': 365,
+			}.get(interval, 0)
+			if interval_days:
+				checkout_params["subscription_data"] = {
+					"trial_period_days": int(recurring['interval_count']) * interval_days
+				}
 
 		stripe_session = stripe_client.v1.checkout.sessions.create(params=checkout_params)
 

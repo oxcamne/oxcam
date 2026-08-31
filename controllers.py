@@ -1412,6 +1412,7 @@ def reservation():
 	this_year = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).year
 	all_guests = db((db.Reservations.Member==member.id)&(db.Reservations.Event==event.id)).select(orderby=~db.Reservations.Host)
 	host_reservation = all_guests.first()
+	host_ticket = db.Event_Tickets[host_reservation.Ticket_] if host_reservation and host_reservation.Ticket_ else None
 	if member_good_standing(member, datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).date()):
 		membership = member.Membership
 	else:
@@ -1641,6 +1642,10 @@ def reservation():
 
 			if waitlist:
 				flash.set(f"{'You' if host_reservation.Waitlist==True else 'Your additional guest(s)'} have been added to the waitlist.")
+			elif new_member and host_ticket and host_ticket.New_member:
+				#new member registration, set membership and dues in session for payment processing
+				session['membership'] = host_ticket.Short_name
+				session['dues'] = None
 		
 			if payment<=0:	#free event or payment already covered, confirm booking
 				if not waitlist:

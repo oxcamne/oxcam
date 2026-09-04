@@ -50,6 +50,9 @@ def email_sender(
 	list_unsubscribe = None,
 	list_unsubscribe_post = None
 ):
+	if not to or not subject or not body:
+		return	#e.g. member with no working email address left in the system
+	
 	if not connection:
 		server = smtplib.SMTP(host.server, host.port)
 		server.starttls()

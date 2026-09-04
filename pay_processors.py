@@ -13,7 +13,7 @@ interface using MODERN Stripe APIs:
 - No legacy Charges API or Sources - fully migrated to PaymentMethods
 """
 import locale
-from py4web import action, redirect, Field, request, URL
+from py4web import action, redirect, Field, request, URL, HTTP
 from py4web.utils import form
 from .common import db, session, flash
 from .models import primary_email, event_unpaid
@@ -413,6 +413,7 @@ class StripeProcessor(PaymentProcessor):
 			"success_url": URL('stripe_checkout_success', vars=params, scheme=True),
 			"cancel_url": back
 		}
+		checkout_params["metadata"] = {key: str(value) for key, value in params.items()}
 
 		if mode == 'payment':
 			checkout_params["payment_intent_data"] = {
@@ -441,6 +442,7 @@ class StripeProcessor(PaymentProcessor):
 
 		redirect(stripe_session['url'])
 
+
 	# display Stripe Checkout form to enter new card credentials (SCA-compliant)
 	def update_card(self, member):
 		token = str(random.randint(10000, 999999))
@@ -460,6 +462,94 @@ class StripeProcessor(PaymentProcessor):
 
 	def view_card(self):
 		return URL('stripe_view_card')
+
+@action('stripe_webhook', method=['POST'])
+@action.uses(db)
+def stripe_webhook():
+	with open('.env.secret') as f:
+		endpoint_secret = f.read().strip()
+	if not endpoint_secret:
+		raise HTTP(500, "Stripe webhook secret is not configured")
+
+	payload = request.body.read()
+	signature = request.headers.get('Stripe-Signature')
+	try:
+		event = stripe.Webhook.construct_event(payload, signature, endpoint_secret)
+	except (ValueError, stripe.error.SignatureVerificationError):
+		raise HTTP(400, "Invalid Stripe webhook")
+
+	if event['type'] != 'checkout.session.completed':
+		return dict(received=True)
+
+	checkout_session = event['data']['object']
+	if checkout_session.mode not in ('payment', 'subscription'):
+		return dict(received=True)
+	if checkout_session.payment_status not in ('paid', 'no_payment_required'):
+		return dict(received=True)
+
+	checkout_id = checkout_session['id']
+	if db(db.Stripe_Checkout_Events.Checkout == checkout_id).count():
+		return dict(received=True)
+
+	metadata = getattr(checkout_session, 'metadata', None) or {}
+	member_id = getattr(metadata, 'member_id', None)
+	member = db.Members[member_id] if member_id else None
+	if not member or getattr(checkout_session, 'customer', None) != member.Pay_cust:
+		raise HTTP(400, "Checkout customer does not match member")
+
+	# Make the card selected during Checkout the default for future invoices.
+	payment_method_id = None
+	payment_intent_id = getattr(checkout_session, 'payment_intent', None)
+	if payment_intent_id:
+		payment_intent = stripe_client.v1.payment_intents.retrieve(payment_intent_id)
+		payment_method_id = getattr(payment_intent, 'payment_method', None)
+
+	subscription_id = getattr(checkout_session, 'subscription', None)
+	if not payment_method_id and subscription_id:
+		subscription = stripe_client.v1.subscriptions.retrieve(subscription_id)
+		payment_method_id = getattr(subscription, 'default_payment_method', None)
+
+	if hasattr(payment_method_id, 'id'):
+		payment_method_id = payment_method_id.id
+	if payment_method_id:
+		stripe_client.v1.customers.update(
+			member.Pay_cust,
+			params={"invoice_settings": {"default_payment_method": payment_method_id}}
+		)
+
+	try:
+		db.Stripe_Checkout_Events.insert(Checkout=checkout_id, Event=event['id'])
+	except Exception:
+		if db(db.Stripe_Checkout_Events.Checkout == checkout_id).count():
+			return dict(received=True)
+		raise
+
+	dues = decimal.Decimal(getattr(metadata, 'dues', 0) or 0)
+	tickets_tbc = decimal.Decimal(getattr(metadata, 'tickets_tbc', 0) or 0)
+	if dues:
+		member.update_record(Membership=getattr(metadata, 'membership', None), Charged=dues)
+		if checkout_session.mode == 'subscription' and subscription_id:
+			subscription = stripe_client.v1.subscriptions.retrieve(subscription_id)
+			period_end = get_subscription_period_end(subscription)
+			next_date = datetime.datetime.fromtimestamp(period_end).date() if period_end else None
+			member.update_record(Pay_subs=subscription.id, Pay_next=next_date, Pay_modern=True)
+
+	if tickets_tbc:
+		host_reservation = db(
+			(db.Reservations.Event == getattr(metadata, 'event_id', None)) &
+			(db.Reservations.Member == member.id) &
+			(db.Reservations.Host == True)
+		).select().first()
+		if not host_reservation:
+			raise HTTP(400, "Checkout reservation was not found")
+		host_reservation.update_record(Charged=(host_reservation.Charged or 0) + tickets_tbc, Checkout=None)
+
+	subject = 'Registration Confirmation' if tickets_tbc else 'Thank you for your membership payment'
+	message = f"{msg_header(member, subject)}<b>Received: {locale.currency(dues + tickets_tbc)}</b><br>"
+	if tickets_tbc:
+		message += event_confirm(getattr(metadata, 'event_id', None), member.id, dues)
+	msg_send(member, subject, message)
+	return dict(received=True)
 
 @action('stripe_view_card', method=['GET', 'POST'])
 @preferred
@@ -606,14 +696,12 @@ we can move your subscription to the new more secure system now.<br>Your price a
 def stripe_checkout_success():
 	member = db.Members[session.member_id]
 	dues = decimal.Decimal(request.query.get('dues', 0))
-	tickets_tbc = decimal.Decimal(request.query.get('tickets_tbc', 0))
 
 	if not request.query.token or request.query.token != session.token:
 		raise Exception(
 			f"Unexpected checkout_success callback received from Stripe, "
 			f"member {member.id}, event {session.get('event_id')}"
 		)
-
 	# Retrieve the checkout session to get the payment_intent
 	checkout_session = stripe_client.v1.checkout.sessions.retrieve(
 		session.get('stripe_session_id'),
@@ -627,76 +715,15 @@ def stripe_checkout_success():
 
 	if pi and getattr(pi, 'status', None) == 'succeeded' and getattr(pi, 'payment_method', '').startswith('pm_') and getattr(pi, 'customer', None) == member.Pay_cust:
 		payment_method_id = pi.payment_method
-
-	checkout_mode = session.get('checkout_mode', 'payment')
-
-	subject = (
-		'Registration Confirmation'
-		if tickets_tbc > 0
-		else 'Thank you for your membership payment'
+	
+	processed = bool(session.get('stripe_session_id') and db(
+		 db.Stripe_Checkout_Events.Checkout == session['stripe_session_id']
+	).count())
+	flash_text = (
+		'Thank you for your payment. Confirmation has been sent by email!'
+		if processed
+		else 'Your payment is being processed. Confirmation will be sent by email.'
 	)
-	message = (
-		f"{msg_header(member, subject)}"
-		f"<b>Received: {locale.currency(dues + tickets_tbc)}</b><br>"
-	)
-
-	if dues > 0:
-		if getattr(checkout_session, "payment_method", None):
-			stripe_client.v1.customers.update(
-				member.Pay_cust,
-				params={
-					"invoice_settings": {
-						"default_payment_method": checkout_session.payment_method
-					}
-				}
-			)
-
-		if checkout_mode == 'subscription':
-
-			subscription = checkout_session.subscription
-			next_date = None
-
-			if subscription:
-				period_end = get_subscription_period_end(subscription)
-				if period_end:
-					next_date = datetime.datetime.fromtimestamp(period_end).date()
-
-				member.update_record(
-					Pay_subs=subscription.id,
-					Pay_next=next_date,
-					Pay_modern=True
-				)
-
-		member.update_record(
-			Membership=request.query.get('membership'),
-			Charged=dues
-		)
-
-		message += 'Thank you, your membership is now current.</b><br>'
-
-	if tickets_tbc > 0:
-		host_reservation = db(
-			(db.Reservations.Event == request.query.get('event_id')) &
-			(db.Reservations.Member == member.id) &
-			(db.Reservations.Host == True)
-		).select().first()
-
-		message += '<br><b>Your registration is now confirmed:</b><br>'
-
-		host_reservation.update_record(
-			Charged=(host_reservation.Charged or 0) + tickets_tbc,
-			Checkout=None
-		)
-
-		message += event_confirm(
-			request.query.get('event_id'),
-			member.id,
-			dues
-		)
-
-	msg_send(member, subject, message)
-
-	flash_text = 'Thank you for your payment. Confirmation has been sent by email!'
 
 	session['membership'] = None
 	session['dues'] = None
@@ -705,14 +732,12 @@ def stripe_checkout_success():
 	session['checkout_mode'] = None
 
 	url = URL('my_account')
-	if dues:
-		flash_text = "confirmation has been sent by email. Please review your mailing list subscriptions."
+	if processed and dues:
+		flash_text = "Confirmation has been sent by email. Please review your mailing list subscriptions."
 		url = URL(f"emails/Y/{member.id}", vars=dict(back=URL('my_account')))
-
-	if payment_method_id and member.Pay_subs and member.Pay_subs != 'Cancelled' and not member.Pay_modern:
+	elif payment_method_id and member.Pay_subs and member.Pay_subs != 'Cancelled' and not member.Pay_modern:
 		redirect(URL('stripe_check_upgrade', vars=dict(payment_method_id=payment_method_id, url=url, flash=flash_text)))
-	if flash_text:
-		flash.set(flash_text)
+	flash.set(flash_text)
 	redirect(url)
 """
 install implementation in base class

@@ -437,4 +437,9 @@ db.define_table('AccTrans',
 	singular='Transaction', plural='Transaction_List')
 db.AccTrans.CheckNumber.requires=IS_EMPTY_OR(IS_NOT_IN_DB(db, 'AccTrans.CheckNumber'))
 
+db.define_table('Stripe_Checkout_Events',
+	Field('Checkout', 'string', unique=True, writable=False),
+	Field('Event', 'string', unique=True, writable=False),
+	Field('Processed', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE), writable=False))
+
 db.commit()

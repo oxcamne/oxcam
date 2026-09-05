@@ -1492,8 +1492,7 @@ def reservation():
 		#add questions to checkout (form2) as applicable
 		survey = db(db.Event_Survey.Event==session.event_id).select()
 		survey = survey.find(lambda s: s.Fresher==fresher)
-		if new_member:
-			survey = survey.find(lambda s: s.New_member==True)
+		survey = survey.find(lambda s: s.New_member==new_member)
 		if len(survey)>0:
 			event_survey = [(s.id, s.Item) for s in survey]
 			fields.append(Field('survey', requires=IS_IN_SET(event_survey,
@@ -2723,7 +2722,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 			redirect(URL('my_account'))
 		if datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) > event.Booking_Closed:
 			flash.set('Booking is closed, but you may join the wait list.')
-		new_members = db((db.Event_Tickets.Event==event_id) & (db.Event_Tickets.New_member==True)).count() > 0
+		new_member_tickets = db((db.Event_Tickets.Event==event_id) & (db.Event_Tickets.New_member==True)).count() > 0
 		freshers = db((db.Event_Tickets.Event==event_id) & (db.Event_Tickets.Fresher==True)).count() > 0
 		session['event_id'] = event_id
 	else:
@@ -2770,6 +2769,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 				member.update_record(Pay_subs = None, Pay_next = None)
 	else:
 		member = None
+	is_new_member = not (member and (member.Membership or member.Paiddate))
 		
 	this_year = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None).year
 	header = H5('Event Registration: Your Information' if event 
@@ -2780,7 +2780,7 @@ def registration(event_id=None):	#deal with eligibility, set up member record an
 XML(f"This event is open to \
 {f'members of {SOCIETY_SHORT_NAME}' if event.Members_only else 'all alumni of Oxford & Cambridge'}\
 {f', Freshers (Matr {this_year})' if freshers else ''}\
-{f', alumni new to {SOCIETY_SHORT_NAME}' if new_members else ''}\
+{f', alumni new to {SOCIETY_SHORT_NAME}' if new_member_tickets else ''}\
 {', members of sponsoring organizations (list at the top of the Affiliations dropdown)' if event.Sponsors else ''}\
 {', and their guests' if not event.Guests or event.Guests>1 else ''}.<br>"))
 	elif MEMBERSHIPS and not request.query.get('mail_lists'):
@@ -2802,7 +2802,7 @@ XML(f"This event is open to \
 			comment='Please enter your matriculation year if you are an Oxford or Cambridge alum/fresher'))
 
 	if event:
-		if MEMBERSHIPS and not (sponsor or good_standing or (new_members and (not member or not member.Membership))):
+		if MEMBERSHIPS and not (sponsor or good_standing or (new_member_tickets and is_new_member)):
 			fields.append(Field('join_or_renew', 'boolean', default=False,
 				comment='tick if you are a non-member Oxbridge alum to join/renew OxCamNE membership'))
 	elif not request.query.get('mail_lists') and MEMBERSHIPS:
@@ -2912,7 +2912,7 @@ Please login with the email you used before{f'<em>, possibly {suggest}, </em>' i
 			set_default_mailing_lists(member)
 		
 		if event:
-			if new_members and form.vars.get('matr')!=this_year and not member.City and event.Members_only and not (sponsor or good_standing):
+			if new_member_tickets and form.vars.get('matr')!=this_year and not member.City and event.Members_only and not (sponsor or good_standing):
 				flash.set("Next, please review/complete your directory profile")
 				redirect(URL('profile')) #gather profile info
 			redirect(URL('reservation', vars=dict(mode='new')))	#go create this member's reservation

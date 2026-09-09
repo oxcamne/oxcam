@@ -16,7 +16,7 @@ from email.message import EmailMessage
 #if no paid membership categories always return False
 def member_good_standing(member, date):
 	return member and (MEMBERSHIPS and (member.Membership and ((not member.Paiddate or member.Paiddate>=date)\
-			or member.Charged or (member.Pay_subs and member.Pay_subs != 'Cancelled'))))
+			or member.Charged!=None or (member.Pay_subs and member.Pay_subs != 'Cancelled'))))
 
 def ageband(year, matr):
 	if matr:

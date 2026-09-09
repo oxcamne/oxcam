@@ -1310,6 +1310,7 @@ Deleting or moving member on/off waitlist will also affect all guests."))
 	db.Reservations.Affiliation.requires=IS_EMPTY_OR(IS_IN_SET(clist))
 	db.Reservations.Event.readable=False
 	db.Reservations.Provisional.writable = True
+	db.Reservations.Pending.writable = True
 	db.Reservations.Waitlist.writable = True
 	db.Reservations.Checked_in.writable = True
 	db.Reservations.Member.readable = False
@@ -1344,6 +1345,7 @@ Deleting or moving member on/off waitlist will also affect all guests."))
 			db.Reservations.Lastname.writable=True
 			db.Reservations.Provisional.default=not host_reservation.Waitlist
 			db.Reservations.Waitlist.default=host_reservation.Waitlist
+			db.Reservations.Pending.readable=False
 			db.Reservations.Table.readable=False
 			db.Reservations.Charged.readable=False
 			db.Reservations.Survey_.readable=False
@@ -1420,7 +1422,7 @@ def reservation():
 	#membership ==> current member in good standing
 	sponsor = affinity and not affinity.College.Oxbridge
 	fresher = affinity and affinity.Matr and affinity.Matr >= this_year
-	new_member = not member.Paiddate and not member.Membership and not fresher
+	new_member = not member.Paiddate and not member.Membership and not fresher and not sponsor
 
 	tickets = db(db.Event_Tickets.Event==session.event_id).select()
 	tickets_available = {}
@@ -1469,7 +1471,7 @@ def reservation():
 			waitlist = True
 			flash.set("Event is full, Checkout to join the waitlist.")
 		dues_tbc = f" (including {locale.currency(decimal.Decimal(session['dues']))} membership dues)" if session.get('dues') else ''
-		payment = (int(session.get('dues') or 0)) + event_unpaid(session.event_id, session.member_id)
+		payment = (decimal.Decimal(session.get('dues') or 0)) + event_unpaid(session.event_id, session.member_id)
 		if not waitlist:
 			payment += (provisional_ticket_cost or 0)
 		if not event.Guests or len(all_guests)<event.Guests:
@@ -1479,7 +1481,7 @@ def reservation():
 				header = CAT(header,  XML(f"Please click 'Checkout' to join the waitlist.<br>"))
 			else:
 				header = CAT(header,  XML(f"Your place(s) are not allocated until you click the 'Checkout' button.<br>"))
-		if payment>0 and payment>int(session.get('dues') or 0):
+		if payment>0 and payment>decimal.Decimal(session.get('dues') or 0):
 			header = CAT(header, XML(f"Your registration will be confirmed when your payment of {locale.currency(payment)}{dues_tbc} is received.<br>"))
 		elif session.get('dues'):
 			header = CAT(header, XML(f"You may choose to pay your {locale.currency(decimal.Decimal(session['dues']))} membership dues, or wait until later."))
@@ -1491,9 +1493,10 @@ def reservation():
 		fields = []
 		#add questions to checkout (form2) as applicable
 		survey = db(db.Event_Survey.Event==session.event_id).select()
-		survey = survey.find(lambda s: s.Fresher==fresher)
-		if new_member:
-			survey = survey.find(lambda s: s.New_member==True)
+		if len(survey.find(lambda s: s.Fresher==True))>0:
+			survey = survey.find(lambda s: s.Fresher==fresher)
+		if len(survey.find(lambda s: s.New_member==True))>0:
+			survey = survey.find(lambda s: s.New_member==new_member)
 		if len(survey)>0:
 			event_survey = [(s.id, s.Item) for s in survey]
 			fields.append(Field('survey', requires=IS_IN_SET(event_survey,
@@ -1524,6 +1527,7 @@ def reservation():
 		db.Reservations.Checkout.readable = False
 		db.Reservations.Created.readable = False
 		db.Reservations.Provisional.readable = False
+		db.Reservations.Pending.readable = False
 		db.Reservations.Modified.readable = False
 		db.Reservations.Comment.readable = False
 		db.Reservations.Survey_.readable = False
@@ -1638,14 +1642,15 @@ def reservation():
 			host_reservation.update_record(Survey_=form2.vars.get('survey'), Comment=form2.vars.get('comment'))
 			for row in all_guests:
 				if row.Provisional==True:
-					row.update_record(Provisional=False, Waitlist=waitlist)
+					row.update_record(Provisional=False, Waitlist=waitlist,
+					                Pending = True if payment>0 and not waitlist else False)
 
 			if waitlist:
 				flash.set(f"{'You' if host_reservation.Waitlist==True else 'Your additional guest(s)'} have been added to the waitlist.")
 			elif new_member and host_ticket and host_ticket.New_member:
 				#new member registration, set membership and dues in session for payment processing
 				session['membership'] = host_ticket.Short_name
-				session['dues'] = None
+				session['dues'] = '0.00'
 		
 			if payment<=0:	#free event or payment already covered, confirm booking
 				if not waitlist:
@@ -2240,7 +2245,7 @@ def bank_file(bank_id):
 		s = ('-' if m.group(1)!='' else '')+m.group(2).replace(',', '')
 		return decimal.Decimal(s)*sign
 
-#in the file, transactions may be in chronological order or the reverse (Stripe), so store them all in memory
+#in the file, we assume transactions are in reverse chronological order, so store them all in memory
 #before processing. We first read from the file, to determine that there is overlap with previously processed files
 #(at least one previously stored transaction in the file). 
 	file_transactions = []
@@ -2261,6 +2266,7 @@ def bank_file(bank_id):
 			reference = getfields(bank.Reference)
 			if db(db.AccTrans.Reference==reference).count() > 0:
 				overlap = True
+				break	#we have found a previously stored transaction, so we can stop reading the file
 			else:
 				file_transactions.insert(0,row) #reverse order so we process chronologically
 			
@@ -2912,7 +2918,8 @@ Please login with the email you used before{f'<em>, possibly {suggest}, </em>' i
 			set_default_mailing_lists(member)
 		
 		if event:
-			if new_members and form.vars.get('matr')!=this_year and not member.City and event.Members_only and not (sponsor or good_standing):
+			if (new_members or request.query.get('join_or_renew')) and \
+					form.vars.get('matr')!=this_year and not member.City and event.Members_only and not (sponsor or good_standing):
 				flash.set("Next, please review/complete your directory profile")
 				redirect(URL('profile')) #gather profile info
 			redirect(URL('reservation', vars=dict(mode='new')))	#go create this member's reservation

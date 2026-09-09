@@ -337,7 +337,9 @@ db.define_table('Reservations',
 	Field('Selection_', 'reference Event_Selections'),
 	Field('Notes', 'string', default=''),	#host name specified, or justifying ticket selection
 	Field('Provisional', 'boolean', default=False, writable=False),
-													#incomplete reservation: checkout not started, places not allocated
+						#incomplete reservation: checkout not started, places not allocated
+	Field('Pending', 'boolean', default=False, writable=False),
+						#space allocated, checkout payment in progress
 	Field('Waitlist', 'boolean', default=False, writable=False),	#now meaningfull in each individual reservation
 	Field('Checked_in', 'boolean', default=False, writable=False),
 	
@@ -439,7 +441,6 @@ db.AccTrans.CheckNumber.requires=IS_EMPTY_OR(IS_NOT_IN_DB(db, 'AccTrans.CheckNum
 
 db.define_table('Stripe_Checkout_Events',
 	Field('Checkout', 'string', unique=True, writable=False),
-	Field('Event', 'string', unique=True, writable=False),
-	Field('Processed', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE), writable=False))
+	Field('Processed', 'datetime', default=lambda: datetime.datetime.now(TIME_ZONE).replace(tzinfo=None), writable=False))
 
 db.commit()

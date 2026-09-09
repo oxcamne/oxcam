@@ -101,6 +101,20 @@ In the dashboard 'Installed Applications' section, click on the 'oxcam' app. The
 
 This is a Python file, and the Dashboard's editor is python aware, so it will flag any syntax errors. The file is self documented, go through it carefully to make the necessary customizations.
 
+If you are using Stripe payment processing, you need to register the Stripe webhook using the Stripe account dashboard:
+
+- Log in to the Stripe Dashboard (button at lower left)
+- Go to Developers → Webhooks.
+- Click Add endpoint.
+- Set the endpoint URL to <your_py4web_url>/oxcam/stripe_webhook
+- Select the event types Stripe should send:
+  - checkout.session.completed
+  - checkout.session.expired
+- Save the endpoint.
+- Copy the signing secret (from panel at right of displayed webhook).
+- Create the file .env.secret in the py4web root folder containing the endpoint’s signing secret as a single line using bash command at the py4web directory of your server (e.g. in your pythonanywhere console):  
+echo 'whsec_your_secret_here' > .env.secret
+
 ### Scheduled Tasks
 
 Oxcam uses two additional tasks that run separately from the web server.

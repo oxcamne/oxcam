@@ -259,14 +259,18 @@ def event_confirm(event_id, member_id=None, dues=0, event_only=False):
 	dues += dues_unpaid
 	tbc = cost - paid							#tickets unpaid
 	rows=[TR(TH('Name', TH('Affiliation'), TH('Selection'), TH('Ticket Cost'), TH('')))]
+	unconfirmed = 0
 	for t in resvtns:
 		price = res_unitcost(t.id)
 		rows.append(TR(TD(f"{t.Lastname}, {t.Firstname}",
 						TD(t.Affiliation.Name if t.Affiliation else ''),
 						TD(res_selection(t.id)),
 						TD(f'{locale.currency(price, grouping=True)}', _style="text-align:right"),
-						TH(f'waitlisted' if t.Waitlist else 'no checkout' if t.Provisional else 'confirmed' if paid>=price else 'unpaid')
+						TH(f'waitlisted' if t.Waitlist else 'unconfirmed' if t.Provisional else 'confirmed' if paid>=price else 'unpaid')
 		)))
+		if t.Provisional:
+			unconfirmed += 1
+			continue
 		paid -= price
 	if dues>0:
 		rows.append(TR(TH('Membership Dues', _style="text-align:left"), TD(''), TD(''), TH(f'{locale.currency(dues, grouping=True)}', _style="text-align:right")))
@@ -279,9 +283,8 @@ def event_confirm(event_id, member_id=None, dues=0, event_only=False):
 	host_reservation = resvtns[0]
 	if host_reservation.Notes:
 		body += f"<b>Notes:</b> {host_reservation.Notes}<br>"
-	if tbc + dues_unpaid>0:
+	if tbc + dues_unpaid>0 or unconfirmed>0:
 		body += f"To pay online please visit {get_context('base_url')}/registration/{event_id}<br>"
-						#scheme=True doesn't pick up the domain in the email_daemon!
 	else:
 		calendar_url = f"{get_context('base_url')}/add_to_calendar/{event.id}"
 		body += f'<a href="{calendar_url}">Add to calendar</a>'

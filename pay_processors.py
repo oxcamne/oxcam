@@ -13,6 +13,7 @@ interface using MODERN Stripe APIs:
 - No legacy Charges API or Sources - fully migrated to PaymentMethods
 """
 import locale
+from pathlib import Path
 from py4web import action, redirect, Field, request, URL, HTTP
 from py4web.utils import form
 from .common import db, session, flash
@@ -468,7 +469,8 @@ class StripeProcessor(PaymentProcessor):
 @action('stripe_webhook', method=['POST'])
 @action.uses(db)
 def stripe_webhook():
-	with open('.env.secret') as f:
+	secret_path = Path(__file__).resolve().parents[2] / '.env.secret'
+	with open(secret_path) as f:
 		endpoint_secret = f.read().strip()
 	if not endpoint_secret:
 		raise HTTP(500, "Stripe webhook secret is not configured")
@@ -483,10 +485,24 @@ def stripe_webhook():
 	event_type = event['type']
 	checkout_session = event['data']['object']
 	metadata = getattr(checkout_session, 'metadata', None) or {}
+	if metadata:
+		member_id = getattr(metadata, 'member_id', None)
+		member = db.Members[member_id] if member_id else None
+		event_id = getattr(metadata, 'event_id', None)
+		customer_id = getattr(checkout_session, 'customer', None)
+		dues = decimal.Decimal(getattr(metadata, 'dues', 0))
+		tickets_tbc = decimal.Decimal(getattr(metadata, 'tickets_tbc', 0))
 
 	if event_type == 'checkout.session.expired':
-		for reservation in _pending_event_registrations_for_checkout(metadata):
+		reservations = _pending_event_registrations_for_checkout(metadata)
+		for reservation in reservations:
 			reservation.update_record(Pending=False, Provisional=True)
+		if len(reservations) > 0:
+			subject = 'Event Registration Failed'
+			message = f"{msg_header(member, subject)}<b>Please re-register if unconfirmed guests wish to attend this event.</b><br>"
+			if tickets_tbc:
+				message += event_confirm(event_id, member.id, dues)
+			msg_send(member, subject, message)
 		return dict(received=True)
 
 	if event_type != 'checkout.session.completed':
@@ -505,9 +521,6 @@ def stripe_webhook():
 	if db(dedup_query).count():
 		return dict(received=True)
 
-	member_id = getattr(metadata, 'member_id', None)
-	member = db.Members[member_id] if member_id else None
-	customer_id = getattr(checkout_session, 'customer', None)
 	if not member or customer_id != member.Pay_cust:
 		raise HTTP(400, "Checkout customer does not match member")
 
@@ -539,8 +552,6 @@ def stripe_webhook():
 
 	_clear_pending_event_registrations(metadata)
 
-	dues = decimal.Decimal(getattr(metadata, 'dues', 0))
-	tickets_tbc = decimal.Decimal(getattr(metadata, 'tickets_tbc', 0))
 	if dues or checkout_session.mode == 'subscription':
 		member.update_record(Membership=getattr(metadata, 'membership', None), Charged=dues)
 		if checkout_session.mode == 'subscription' and subscription_id:
@@ -551,7 +562,7 @@ def stripe_webhook():
 
 	if tickets_tbc:
 		host_reservation = db(
-			(db.Reservations.Event == getattr(metadata, 'event_id', None)) &
+			(db.Reservations.Event == event_id) &
 			(db.Reservations.Member == member.id) &
 			(db.Reservations.Host == True)
 		).select().first()
@@ -562,7 +573,7 @@ def stripe_webhook():
 	subject = 'Registration Confirmation' if tickets_tbc else 'Thank you for your membership payment'
 	message = f"{msg_header(member, subject)}<b>Received: {locale.currency(dues + tickets_tbc)}</b><br>"
 	if tickets_tbc:
-		message += event_confirm(getattr(metadata, 'event_id', None), member.id, dues)
+		message += event_confirm(event_id, member.id, dues)
 	msg_send(member, subject, message)
 	return dict(received=True)
 

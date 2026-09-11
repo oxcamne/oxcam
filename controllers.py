@@ -1479,12 +1479,8 @@ def reservation():
 		if adding!=0:
 			if waitlist:
 				header = CAT(header,  XML(f"Please click 'Checkout' to join the waitlist.<br>"))
-			else:
-				header = CAT(header,  XML(f"Your place(s) are not allocated until you click the 'Checkout' button.<br>"))
-		if payment>0 and payment>decimal.Decimal(session.get('dues') or 0):
-			header = CAT(header, XML(f"Your registration will be confirmed when your payment of {locale.currency(payment)}{dues_tbc} is received.<br>"))
-		elif session.get('dues'):
-			header = CAT(header, XML(f"You may choose to pay your {locale.currency(decimal.Decimal(session['dues']))} membership dues, or wait until later."))
+			elif payment>0:
+				header = CAT(header,  XML(f"Your place(s) are put on hold for 30 minutes when you click  'Checkout' and confirmed upon payment.<br>"))
 
 		host_reservation.update_record(Checkout=str(dict(membership=session.get('membership'),
 						dues=session.get('dues'))).replace('Decimal','decimal.Decimal'),

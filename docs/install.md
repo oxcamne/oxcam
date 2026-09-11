@@ -113,7 +113,7 @@ If you are using Stripe payment processing, you need to register the Stripe webh
 - Save the endpoint.
 - Copy the signing secret (from panel at right of displayed webhook).
 - Create the file .env.secret in the py4web root folder containing the endpoint’s signing secret as a single line using bash command at the py4web directory of your server (e.g. in your pythonanywhere console):  
-echo 'whsec_your_secret_here' > .env.secret
+echo whsec_your_secret_here > .env.secret
 
 ### Scheduled Tasks
 

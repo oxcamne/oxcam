@@ -28,7 +28,7 @@ Next create a py4web directory using the command **`mkdir py4web`** and switch t
 
 This section is optional. In general a PA account will be used solely to support a single Py4web instance, and I see little benefit in having a venv.
 
-Open a bash terminal session by clicking the blue button at bottom left. You should see a terminal prompt like:
+Using your bash terminal:
 
 Next create a virtual environment, a newly built python environment for your webapp using the commands:
 

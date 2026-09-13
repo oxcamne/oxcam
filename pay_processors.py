@@ -157,10 +157,12 @@ class StripeProcessor(PaymentProcessor):
 		notes = f"{source_id}"
 
 		if dict_csv['Type'] == 'charge':
-			# Check if this is a membership dues payment
-			if member.Membership and member.Charged is not None and amount >= member.Charged:	
+			# Check if this is a membership dues payment. Stripe subscription-update charges
+			# arrive even when member.Charged is empty.
+			subscription_charge = description and description.startswith('Subscription')
+			if member.Membership and ((member.Charged is not None and amount >= member.Charged) or subscription_charge):
 				# Dues paid, may also cover an event ticket
-				if description and description.startswith('Subscription'):
+				if subscription_charge:
 					try:
 						# This is a subscription payment - find the subscription to update the member record
 						# There should only be one active subscription for this customer
@@ -175,7 +177,7 @@ class StripeProcessor(PaymentProcessor):
 						subscription = active_subs[0] if active_subs else None
 						period_end = get_subscription_period_end(subscription)
 						member.update_record(Pay_subs=subscription.id,
-											next_date = datetime.datetime.fromtimestamp(period_end).date())
+											Pay_next = datetime.datetime.fromtimestamp(period_end).date())
 
 						notes += f" Subscription: {subscription.id}"
 					except Exception as e:
@@ -183,8 +185,8 @@ class StripeProcessor(PaymentProcessor):
 						notes += f" Subscription lookup failed: {str(e)}"
 			
 				try:
-					duesamount = member.Charged
-					duesfee = (duesamount * fee) / amount
+					duesamount = member.Charged if member.Charged is not None else amount
+					duesfee = (duesamount * fee) / amount if amount else 0
 					fee -= duesfee
 					amount -= duesamount
 					try:

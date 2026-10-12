@@ -41,6 +41,9 @@ def daily_maintenance():
 		if (i.endswith(dname) and (datetime.date.today().day != 1)) or i.endswith(yname):
 			os.remove(i)
 
+	checkout_date = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) - datetime.timedelta(days=30)
+	db(db.Stripe_Checkout_Events.Processed < checkout_date).delete()
+	
 	trusted_date = datetime.datetime.now(TIME_ZONE).replace(tzinfo=None) - datetime.timedelta(days = 90)
 	db((db.users.trusted == True) & (db.users.when_issued < trusted_date)).delete()
 		#record trusted IP's for 90 days, no reCaptcha challenge

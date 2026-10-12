@@ -13,7 +13,8 @@ interface using MODERN Stripe APIs:
 - No legacy Charges API or Sources - fully migrated to PaymentMethods
 """
 import locale
-from py4web import action, redirect, Field, request, URL
+from pathlib import Path
+from py4web import action, redirect, Field, request, URL, HTTP
 from py4web.utils import form
 from .common import db, session, flash
 from .models import primary_email, event_unpaid
@@ -23,7 +24,7 @@ from py4web.utils.form import Form
 from .settings import TIME_ZONE, PaymentProcessor, PAYMENTPROCESSORS, PAGE_BANNER
 from yatl.helpers import H5, BEAUTIFY, CAT, XML
 from py4web.utils.factories import Inject
-import stripe, decimal, datetime, random
+import stripe, decimal, datetime, random, time
 
 preferred = action.uses("gridform.html", db, session, flash, Inject(PAGE_BANNER=PAGE_BANNER))
 
@@ -63,6 +64,24 @@ def get_subscription_period_end(subscription):
 
 	# Legacy/simple: period lives on the subscription itself
 	return getattr(subscription, "current_period_end", None)
+
+
+def _pending_event_registrations_for_checkout(metadata):
+	member_id = getattr(metadata, 'member_id', None)
+	event_id = getattr(metadata, 'event_id', None)
+	if not member_id or not event_id:
+		return []
+
+	return db(
+		(db.Reservations.Member == member_id) &
+		(db.Reservations.Event == event_id) &
+		(db.Reservations.Pending == True)
+	).select()
+
+
+def _clear_pending_event_registrations(metadata):
+	for reservation in _pending_event_registrations_for_checkout(metadata):
+		reservation.update_record(Pending=False)
 
 class StripeProcessor(PaymentProcessor):
 	"""
@@ -138,20 +157,12 @@ class StripeProcessor(PaymentProcessor):
 		notes = f"{source_id}"
 
 		if dict_csv['Type'] == 'charge':
-			# Check if this is a membership dues payment
-			is_membership_payment = False
-
-			if description and description.startswith('Subscription'):
-				# This is a subscription-related payment
-				is_membership_payment = True
-			elif member.Membership and (member.Charged or 0) > 0 and amount >= member.Charged:
-				# This appears to be a membership dues payment based on amount (non-subscription membership, e.g. Student)
-				is_membership_payment = True
-
-			if is_membership_payment and member.Membership:
-
+			# Check if this is a membership dues payment. Stripe subscription-update charges
+			# arrive even when member.Charged is empty.
+			subscription_charge = description and description.startswith('Subscription')
+			if member.Membership and ((member.Charged is not None and amount >= member.Charged) or subscription_charge):
 				# Dues paid, may also cover an event ticket
-				if description and description.startswith('Subscription'):
+				if subscription_charge:
 					try:
 						# This is a subscription payment - find the subscription to update the member record
 						# There should only be one active subscription for this customer
@@ -164,26 +175,20 @@ class StripeProcessor(PaymentProcessor):
 							return (amount, f"No active subscription found for customer {customer_id}")
 
 						subscription = active_subs[0] if active_subs else None
-						member.update_record(Pay_subs=subscription.id)
-						notes += f" Subscription: {subscription.id}"
-
 						period_end = get_subscription_period_end(subscription)
-						if period_end:
-							next_date = datetime.datetime.fromtimestamp(period_end).date()
-							member.update_record(Pay_next=next_date)
+						member.update_record(Pay_subs=subscription.id,
+											Pay_next = datetime.datetime.fromtimestamp(period_end).date())
+
+						notes += f" Subscription: {subscription.id}"
 					except Exception as e:
 						# Could not retrieve or update subscription
 						notes += f" Subscription lookup failed: {str(e)}"
 			
 				try:
-					if member.Membership not in self.dues_products:
-						return (amount, f"Unknown membership type: {member.Membership}")
-
-					product = stripe_client.v1.products.retrieve(self.dues_products[member.Membership])
-					duesprice = stripe_client.v1.prices.retrieve(product['default_price'])
-					duesamount = decimal.Decimal(duesprice['unit_amount']) / 100
-					duesfee = (duesamount * fee) / amount
-					nowpaid = newpaiddate(member.Paiddate, timestamp)
+					duesamount = member.Charged if member.Charged is not None else amount
+					duesfee = (duesamount * fee) / amount if amount else 0
+					fee -= duesfee
+					amount -= duesamount
 					try:
 						db.AccTrans.insert(
 							Bank=bank.id,
@@ -198,12 +203,10 @@ class StripeProcessor(PaymentProcessor):
 							Reference=reference,
 							Notes=notes
 						)
-						member.update_record(Paiddate=nowpaid, Charged=None)
+						member.update_record(Paiddate=newpaiddate(member.Paiddate, timestamp), Charged=None)
 					except Exception as e:
 						return (amount, f"Failed to record membership dues transaction: {str(e)}")
 
-					fee -= duesfee
-					amount -= duesamount
 				except Exception as e:
 					# Could not process membership dues
 					return (amount, f"Failed to process membership dues: {str(e)}")
@@ -373,12 +376,12 @@ class StripeProcessor(PaymentProcessor):
 				stripeprocessor().dues_products[session['membership']]
 			)
 			price = stripe_client.v1.prices.retrieve(product['default_price'])
-			params['dues'] = session.get('dues')
+			params['dues'] = session.get('dues', 0)
 			params['membership'] = session.get('membership')
 
 			if price['recurring']:
 				mode = 'subscription'
-			if session.get('dues') or mode == 'subscription':
+			if decimal.Decimal(session.get('dues') or 0) or mode == 'subscription':
 				items.append(dict(price=product['default_price'], quantity=1))
 
 		if session.get('event_id'):
@@ -410,15 +413,18 @@ class StripeProcessor(PaymentProcessor):
 			"payment_method_types": ['card'],
 			"line_items": items,
 			"mode": mode,
+			"expires_at": int(time.time()) + 30 * 60,
 			"success_url": URL('stripe_checkout_success', vars=params, scheme=True),
 			"cancel_url": back
 		}
+		checkout_params["metadata"] = {key: value for key, value in params.items()}
 
 		if mode == 'payment':
 			checkout_params["payment_intent_data"] = {
-				"setup_future_usage": "off_session"
+				"setup_future_usage": "off_session",
+				"metadata": checkout_params["metadata"]
 			}
-		elif mode == 'subscription' and not session.get('dues'):
+		elif mode == 'subscription' and not decimal.Decimal(session.get('dues') or 0):
 			# Defer the first charge to the end of the first billing cycle by giving the
 			# subscription a full free trial. Stripe then bills on the next renewal date.
 			recurring = price['recurring']
@@ -441,6 +447,7 @@ class StripeProcessor(PaymentProcessor):
 
 		redirect(stripe_session['url'])
 
+
 	# display Stripe Checkout form to enter new card credentials (SCA-compliant)
 	def update_card(self, member):
 		token = str(random.randint(10000, 999999))
@@ -460,6 +467,117 @@ class StripeProcessor(PaymentProcessor):
 
 	def view_card(self):
 		return URL('stripe_view_card')
+
+@action('stripe_webhook', method=['POST'])
+@action.uses(db)
+def stripe_webhook():
+	secret_path = Path(__file__).resolve().parents[2] / '.env.secret'
+	with open(secret_path) as f:
+		endpoint_secret = f.read().strip()
+	if not endpoint_secret:
+		raise HTTP(500, "Stripe webhook secret is not configured")
+
+	payload = request.body.read()
+	signature = request.headers.get('Stripe-Signature')
+	try:
+		event = stripe.Webhook.construct_event(payload, signature, endpoint_secret)
+	except (ValueError, stripe.error.SignatureVerificationError):
+		raise HTTP(400, "Invalid Stripe webhook")
+
+	event_type = event['type']
+	checkout_session = event['data']['object']
+	metadata = getattr(checkout_session, 'metadata', None) or {}
+	if metadata:
+		member_id = getattr(metadata, 'member_id', None)
+		member = db.Members[member_id] if member_id else None
+		event_id = getattr(metadata, 'event_id', None)
+		customer_id = getattr(checkout_session, 'customer', None)
+		dues = decimal.Decimal(getattr(metadata, 'dues', 0))
+		tickets_tbc = decimal.Decimal(getattr(metadata, 'tickets_tbc', 0))
+
+	if event_type == 'checkout.session.expired':
+		reservations = _pending_event_registrations_for_checkout(metadata)
+		for reservation in reservations:
+			reservation.update_record(Pending=False, Provisional=True)
+		if len(reservations) > 0:
+			subject = 'Event Registration Failed'
+			message = f"{msg_header(member, subject)}<b>Please re-register if unconfirmed guests wish to attend this event.</b><br>"
+			if tickets_tbc:
+				message += event_confirm(event_id, member.id, dues)
+			msg_send(member, subject, message)
+		return dict(received=True)
+
+	if event_type != 'checkout.session.completed':
+		return dict(received=True)
+
+	if checkout_session.mode not in ('payment', 'subscription'):
+		return dict(received=True)
+	if checkout_session.payment_status not in ('paid', 'no_payment_required'):
+		return dict(received=True)
+
+	checkout_id = checkout_session['id']
+	payment_intent_id = getattr(checkout_session, 'payment_intent', None)
+	if hasattr(payment_intent_id, 'id'):
+		payment_intent_id = payment_intent_id.id
+	dedup_query = db.Stripe_Checkout_Events.Checkout == checkout_id
+	if db(dedup_query).count():
+		return dict(received=True)
+
+	if not member or customer_id != member.Pay_cust:
+		raise HTTP(400, "Checkout customer does not match member")
+
+	# Make the card selected during Checkout the default for future invoices.
+	payment_method_id = None
+	if payment_intent_id:
+		payment_intent = stripe_client.v1.payment_intents.retrieve(payment_intent_id)
+		payment_method_id = getattr(payment_intent, 'payment_method', None)
+
+	subscription_id = getattr(checkout_session, 'subscription', None) if checkout_session else None
+	if not payment_method_id and subscription_id:
+		subscription = stripe_client.v1.subscriptions.retrieve(subscription_id)
+		payment_method_id = getattr(subscription, 'default_payment_method', None)
+
+	if hasattr(payment_method_id, 'id'):
+		payment_method_id = payment_method_id.id
+	if payment_method_id:
+		stripe_client.v1.customers.update(
+			member.Pay_cust,
+			params={"invoice_settings": {"default_payment_method": payment_method_id}}
+		)
+
+	try:
+		db.Stripe_Checkout_Events.insert(Checkout=checkout_id)
+	except Exception:
+		if db(dedup_query).count():
+			return dict(received=True)
+		raise
+
+	_clear_pending_event_registrations(metadata)
+
+	if dues or checkout_session.mode == 'subscription':
+		member.update_record(Membership=getattr(metadata, 'membership', None), Charged=dues)
+		if checkout_session.mode == 'subscription' and subscription_id:
+			subscription = stripe_client.v1.subscriptions.retrieve(subscription_id)
+			period_end = get_subscription_period_end(subscription)
+			next_date = datetime.datetime.fromtimestamp(period_end).date() if period_end else None
+			member.update_record(Pay_subs=subscription.id, Pay_next=next_date, Pay_modern=True)
+
+	if tickets_tbc:
+		host_reservation = db(
+			(db.Reservations.Event == event_id) &
+			(db.Reservations.Member == member.id) &
+			(db.Reservations.Host == True)
+		).select().first()
+		if not host_reservation:
+			raise HTTP(400, "Checkout reservation was not found")
+		host_reservation.update_record(Charged=(host_reservation.Charged or 0) + tickets_tbc, Checkout=None)
+
+	subject = 'Registration Confirmation' if tickets_tbc else 'Thank you for your membership payment'
+	message = f"{msg_header(member, subject)}<b>Received: {locale.currency(dues + tickets_tbc)}</b><br>"
+	if tickets_tbc:
+		message += event_confirm(event_id, member.id, dues)
+	msg_send(member, subject, message)
+	return dict(received=True)
 
 @action('stripe_view_card', method=['GET', 'POST'])
 @preferred
@@ -606,14 +724,12 @@ we can move your subscription to the new more secure system now.<br>Your price a
 def stripe_checkout_success():
 	member = db.Members[session.member_id]
 	dues = decimal.Decimal(request.query.get('dues', 0))
-	tickets_tbc = decimal.Decimal(request.query.get('tickets_tbc', 0))
 
 	if not request.query.token or request.query.token != session.token:
 		raise Exception(
 			f"Unexpected checkout_success callback received from Stripe, "
 			f"member {member.id}, event {session.get('event_id')}"
 		)
-
 	# Retrieve the checkout session to get the payment_intent
 	checkout_session = stripe_client.v1.checkout.sessions.retrieve(
 		session.get('stripe_session_id'),
@@ -627,76 +743,15 @@ def stripe_checkout_success():
 
 	if pi and getattr(pi, 'status', None) == 'succeeded' and getattr(pi, 'payment_method', '').startswith('pm_') and getattr(pi, 'customer', None) == member.Pay_cust:
 		payment_method_id = pi.payment_method
-
-	checkout_mode = session.get('checkout_mode', 'payment')
-
-	subject = (
-		'Registration Confirmation'
-		if tickets_tbc > 0
-		else 'Thank you for your membership payment'
+	
+	processed = bool(session.get('stripe_session_id') and db(
+		 db.Stripe_Checkout_Events.Checkout == session['stripe_session_id']
+	).count())
+	flash_text = (
+		'Thank you for your payment. Confirmation has been sent by email!'
+		if processed
+		else 'Your payment is being processed. Confirmation will be sent by email.'
 	)
-	message = (
-		f"{msg_header(member, subject)}"
-		f"<b>Received: {locale.currency(dues + tickets_tbc)}</b><br>"
-	)
-
-	if dues > 0:
-		if getattr(checkout_session, "payment_method", None):
-			stripe_client.v1.customers.update(
-				member.Pay_cust,
-				params={
-					"invoice_settings": {
-						"default_payment_method": checkout_session.payment_method
-					}
-				}
-			)
-
-		if checkout_mode == 'subscription':
-
-			subscription = checkout_session.subscription
-			next_date = None
-
-			if subscription:
-				period_end = get_subscription_period_end(subscription)
-				if period_end:
-					next_date = datetime.datetime.fromtimestamp(period_end).date()
-
-				member.update_record(
-					Pay_subs=subscription.id,
-					Pay_next=next_date,
-					Pay_modern=True
-				)
-
-		member.update_record(
-			Membership=request.query.get('membership'),
-			Charged=dues
-		)
-
-		message += 'Thank you, your membership is now current.</b><br>'
-
-	if tickets_tbc > 0:
-		host_reservation = db(
-			(db.Reservations.Event == request.query.get('event_id')) &
-			(db.Reservations.Member == member.id) &
-			(db.Reservations.Host == True)
-		).select().first()
-
-		message += '<br><b>Your registration is now confirmed:</b><br>'
-
-		host_reservation.update_record(
-			Charged=(host_reservation.Charged or 0) + tickets_tbc,
-			Checkout=None
-		)
-
-		message += event_confirm(
-			request.query.get('event_id'),
-			member.id,
-			dues
-		)
-
-	msg_send(member, subject, message)
-
-	flash_text = 'Thank you for your payment. Confirmation has been sent by email!'
 
 	session['membership'] = None
 	session['dues'] = None
@@ -705,14 +760,12 @@ def stripe_checkout_success():
 	session['checkout_mode'] = None
 
 	url = URL('my_account')
-	if dues:
-		flash_text = "confirmation has been sent by email. Please review your mailing list subscriptions."
+	if processed and dues:
+		flash_text = "Confirmation has been sent by email. Please review your mailing list subscriptions."
 		url = URL(f"emails/Y/{member.id}", vars=dict(back=URL('my_account')))
-
-	if payment_method_id and member.Pay_subs and member.Pay_subs != 'Cancelled' and not member.Pay_modern:
+	elif payment_method_id and member.Pay_subs and member.Pay_subs != 'Cancelled' and not member.Pay_modern:
 		redirect(URL('stripe_check_upgrade', vars=dict(payment_method_id=payment_method_id, url=url, flash=flash_text)))
-	if flash_text:
-		flash.set(flash_text)
+	flash.set(flash_text)
 	redirect(url)
 """
 install implementation in base class

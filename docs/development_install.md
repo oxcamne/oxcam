@@ -19,7 +19,11 @@ $ brew install git
 ...
 $ brew install python
 ...
+$ brew install stripe/stripe-cli/stripe
+...
 ```
+
+stripe-cli is needed if you are using Stripe as your payment processor
 
 ### Install Py4web Source Code from Github
 
@@ -68,14 +72,16 @@ You should also use VScode to edit the py4web/.vscode/launch.json. This already 
 ```json
 {   "version": "0.2.0",
     "configurations": [
-        {
+      {
             "name": "Python: py4web",
             "type": "debugpy",
             "request": "launch",
             "program": "py4web.py",
-            "args": ["run", "-L 20", "apps"
-            ],
+            "args": ["run", "-L", "20", "apps"],
+            "preLaunchTask": "Stripe Webhook Forwarding",
+            "postDebugTask": "Stop Stripe Webhook Forwarding",
             "console": "integratedTerminal",
+            "python": ".venv/bin/python",
             "justMyCode": false
         },
         {
@@ -87,6 +93,7 @@ You should also use VScode to edit the py4web/.vscode/launch.json. This already 
                 "call", "apps", "oxcam.daily_maintenance.daily_maintenance"
             ],
             "console": "integratedTerminal",
+            "python": ".venv/bin/python",
             "justMyCode": false
         },
         {
@@ -98,11 +105,78 @@ You should also use VScode to edit the py4web/.vscode/launch.json. This already 
                 "call", "apps", "oxcam.email_daemon.email_daemon"
             ],
             "console": "integratedTerminal",
+            "python": ".venv/bin/python",
             "justMyCode": false
         }
     ]
 }
 ```
+
+This assumes you will use Stripe payment processing. If not, leave out the "preLaunchTask" line from the above.
+
+If you are using Stripe, create the tasks.json file in the py4web root folder:
+
+```json
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Stripe Webhook Forwarding",
+            "type": "shell",
+            "command": "bash -lc 'echo $$ > .stripe-listener.pid; stripe listen --print-secret > .env.secret; exec stripe listen --events checkout.session.completed,checkout.session.expired --forward-to http://127.0.0.1:8000/oxcam/stripe_webhook'",
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "stripe",
+                "severity": "info",
+                "pattern": {
+                    "regexp": "^> Ready!.*$",
+                    "message": 0
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": ".*",
+                    "endsPattern": "^> Ready!.*$"
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            }
+        },
+        {
+            "label": "Stop Stripe Webhook Forwarding",
+            "type": "shell",
+            "command": "bash -lc 'if [ -f .stripe-listener.pid ]; then while IFS= read -r pid; do [ -n \"$pid\" ] && kill \"$pid\" 2>/dev/null || true; done < .stripe-listener.pid; rm -f .stripe-listener.pid; fi; pkill -f \"stripe listen --events checkout.session.completed,checkout.session.expired --forward-to http://127.0.0.1:8000/oxcam/stripe_webhook\" 2>/dev/null || true; pkill -f \"stripe listen --print-secret\" 2>/dev/null || true; rm -f .env.secret || true; exit 0'",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            }
+        }
+    ]
+}
+```
+
+You must also log vscode into the appropriate Stripe (sandbox) account using the vscode terminal:
+
+```bash
+% stripe login
+To authorize, visit https://access.stripe.com/stripecli/oauth2/device
+
+When prompted, enter your verification code:
+
+xxxx-xxxx
+
+Press enter to open the browser (^C to quit)
+```
+
+This login should be persistent, you should not need to repeat it frequently.
+
+Note that starting the Python: py4web process also starts Stripe_Webhook_Forwarding as a background process. The latter saves the STRIPE_WEBHOOK_SECRET (which is changed on each launch) in the file .env.secret and starts a listener for webhook events which it forwards to the local py4web app. This indirection is needed because external sites cannot access the localhost server used for development. This task will have its own terminal in vscode, where you can view the stripe events being forwarded to the Python app.
+
+The Stripe Webhook Forwarding task is stopped automatically by the "Stop Stripe Webhook Forwarding" task triggered after stopping "Python: py4web". If it is still running for any reason, you can terminate it from the terminal panel or by running the task manually.
 
 ### Install the oxcam app
 

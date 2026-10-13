@@ -15,7 +15,7 @@ list, etc.
 
 A group can choose how much of the above to implement and can expand it's use over time.
 
-The project includes an online [User Guide](https://oxcamne.github.io/oxcam) and an online [Support Guide](https://oxcamne.github.io/oxcam/support.html).
+The project includes an online [User Guide](https://oxcamne.github.io/oxcam/docs) and an online [Support Guide](https://oxcamne.github.io/oxcam/docs/support.html).
 
 For questions, bug reports, feature requests etc. use the Issues forum (to post you need to register on github).
 

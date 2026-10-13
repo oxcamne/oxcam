@@ -1382,10 +1382,11 @@ Deleting or moving member on/off waitlist will also affect all guests."))
 			orderby=~db.Reservations.Host|db.Reservations.Created,
 			columns=[db.Reservations.Lastname, db.Reservations.Firstname, db.Reservations.Notes,
 					Column('Selection', lambda row: res_selection(row.id),
-						required_fields=[db.Reservations.Provisional, db.Reservations.Waitlist, db.Reservations.Checked_in]),
+						required_fields=[db.Reservations.Provisional, db.Reservations.Waitlist, db.Reservations.Pending, db.Reservations.Checked_in]),
 					Column('Price', lambda row: res_unitcost(row.id)),
 					Column('Status', lambda r: 'waitlisted' if r.Waitlist else \
-						'unconfirmed' if r.Provisional else "✔" if r.Checked_in else '')],
+						'unconfirmed' if r.Provisional else "✔" if r.Checked_in else 'pending' if r.Pending else ''),
+					],
 			headings=['Last', 'First', 'Notes', 'Selection', 'Price', 'Status'],
 			deletable=write,
 			details=not write, 

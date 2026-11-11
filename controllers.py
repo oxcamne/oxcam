@@ -1595,7 +1595,8 @@ def reservation():
 			if not is_guest_reservation:
 				member_ticket = tickets.find(lambda t: membership and t.Ticket.lower().startswith(membership.lower()))
 				if member_ticket:
-					tickets = member_ticket
+					if not member_ticket[0].Waiting:	#unless, e.g. student discount ticket is sold out, then allow other member tickets
+						tickets = member_ticket
 		else:
 			non_member_ticket = tickets.find(lambda t: t.Ticket.lower().startswith('non-member'))
 			if non_member_ticket:

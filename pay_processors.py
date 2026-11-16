@@ -500,10 +500,9 @@ def stripe_webhook():
 		for reservation in reservations:
 			reservation.update_record(Pending=False, Provisional=True)
 		if len(reservations) > 0:
-			subject = 'Event Registration Failed'
-			message = f"{msg_header(member, subject)}<b>Please re-register if unconfirmed guests wish to attend this event.</b><br>"
-			if tickets_tbc:
-				message += event_confirm(event_id, member.id, dues)
+			subject = 'Event Registration Payment Failed'
+			url = URL('registration', event_id, scheme=True)
+			message = f"{msg_header(member, subject)}<b><a href='{url}'>Please complete checkout with payment</a> to secure your place(s).</b><br>"
 			msg_send(member, subject, message)
 		return dict(received=True)
 
